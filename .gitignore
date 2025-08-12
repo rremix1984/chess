@@ -1,0 +1,70 @@
+# 编译输出
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDE 文件
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+logs/
+gtp_logs/
+debug.log
+
+# 音频/视频文件
+*.mp3
+*.wav
+*.mp4
+*.avi
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.gz
+*.rar
+
+# 临时文件
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Maven/Gradle
+.mvn/
+mvnw
+mvnw.cmd
+
+# 测试输出
+test_output.log
+
+# 模型文件
+*.bin.gz
+*.bin
+
+# 配置文件（包含敏感信息）
+application-local.properties
+
+# 大文件排除
+*.nnue
+*.zip
+external/
+StreetFighterNew/
+
+# 引擎文件
+pikafish_engine/*/
+*.exe
