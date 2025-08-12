@@ -25,11 +25,10 @@
     <module>game-common</module>
     <module>chinese-chess</module>
     <!-- <module>gomoku</module> -->
-    <module>go-game</module>
+    <!-- <module>go-game</module> -->
     <!-- <module>international-chess</module> -->
     <module>flight-chess</module>
     <module>tank-battle-game</module>
-    <module>StreetFighterNew</module>
     <module>game-launcher</module>
   </modules>
 
@@ -113,11 +112,6 @@
       <dependency>
         <groupId>com.example</groupId>
         <artifactId>tank-battle-game</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.example</groupId>
-        <artifactId>street-fighter-new</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>

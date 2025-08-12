@@ -25,10 +25,18 @@
       <groupId>com.example</groupId>
       <artifactId>chinese-chess</artifactId>
     </dependency>
+    <!-- <dependency>
+      <groupId>com.example</groupId>
+      <artifactId>gomoku</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.example</groupId>
       <artifactId>go-game</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.example</groupId>
+      <artifactId>international-chess</artifactId>
+    </dependency> -->
     <dependency>
       <groupId>com.example</groupId>
       <artifactId>flight-chess</artifactId>
@@ -36,10 +44,6 @@
     <dependency>
       <groupId>com.example</groupId>
       <artifactId>tank-battle-game</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.example</groupId>
-      <artifactId>street-fighter-new</artifactId>
     </dependency>
     
     <!-- JavaFX -->
