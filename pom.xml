@@ -25,7 +25,7 @@
     <module>game-common</module>
     <module>chinese-chess</module>
     <!-- <module>gomoku</module> -->
-    <!-- <module>go-game</module> -->
+    <module>go-game</module>
     <!-- <module>international-chess</module> -->
     <module>flight-chess</module>
     <module>tank-battle-game</module>

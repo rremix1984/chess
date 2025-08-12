@@ -77,12 +77,12 @@ public class GameSelectionFrame extends JFrame {
             e -> showComingSoon("五子棋")
         );
         
-        // 围棋选项 - 暂时不可用
+        // 围棋选项
         JPanel goPanel = createGameOptionPanel(
             "⚫⚪ 围棋",
-            "古老的策略棋盘游戏（开发中）",
+            "古老的策略棋盘游戏",
             "/images/go_icon.png",
-            e -> showComingSoon("围棋")
+            e -> startGo()
         );
 
         // 飞行棋选项
