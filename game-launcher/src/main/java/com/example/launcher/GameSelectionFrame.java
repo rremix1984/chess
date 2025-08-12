@@ -77,12 +77,12 @@ public class GameSelectionFrame extends JFrame {
             e -> showComingSoon("五子棋")
         );
         
-        // 围棋选项
+        // 围棋选项 - 暂时不可用
         JPanel goPanel = createGameOptionPanel(
             "⚫⚪ 围棋",
-            "古老的策略棋盘游戏",
+            "古老的策略棋盘游戏（开发中）",
             "/images/go_icon.png",
-            e -> startGo()
+            e -> showComingSoon("围棋")
         );
 
         // 飞行棋选项
@@ -101,12 +101,12 @@ public class GameSelectionFrame extends JFrame {
             e -> startTankBattle()
         );
         
-        // 街头霸王选项
+        // 街头霸王选项 - 暂时不可用
         JPanel streetFighterPanel = createGameOptionPanel(
             "👊 街头霸王",
-            "激烈的格斗游戏，体验经典街机快感",
+            "激烈的格斗游戏（开发中）",
             "/images/street_fighter_icon.png",
-            e -> startStreetFighter()
+            e -> showComingSoon("街头霸王")
         );
         
         panel.add(chineseChessPanel);
