@@ -133,14 +133,19 @@ public class PikafishEngine {
     }
     
     /**
-     * 发送命令到引擎
+     * 发送命令到引擎（增强版本）
      * @param command 要发送的命令
      */
     private void sendCommand(String command) throws IOException {
         if (writer != null) {
             writer.write(command + "\n");
             writer.flush();
-            System.out.println("发送命令: " + command);
+            // 记录所有重要命令以便调试
+            if (command.startsWith("position") || command.startsWith("go") 
+                || command.equals("uci") || command.equals("quit")
+                || command.startsWith("setoption")) {
+                log("📤 发送命令: " + command);
+            }
         }
     }
     
@@ -166,7 +171,10 @@ public class PikafishEngine {
         try {
             String response;
             while ((response = readLine()) != null) {
-                System.out.println("引擎响应: " + response);
+                // 只记录重要的响应信息，减少日志噪声
+                if (response.equals(expectedResponse) || response.startsWith("id name") || response.startsWith("info string")) {
+                    log("引擎响应: " + response);
+                }
                 if (response.equals(expectedResponse)) {
                     return true;
                 }
@@ -216,7 +224,11 @@ public class PikafishEngine {
             long startTime = System.currentTimeMillis();
             String line;
             while ((line = readLine()) != null) {
-                log("引擎响应 (MultiPV): " + line);
+                // 只记录重要信息，减少日志噪声
+                if (line.startsWith("bestmove") || line.startsWith("info string")) {
+                    log("引擎响应 (MultiPV): " + line);
+                }
+                
                 if (line.startsWith("info depth")) {
                     // 提取并格式化分析结果
                     // 示例: info depth 1 seldepth 1 multipv 1 score cp 100 nodes 200 time 10 pv e2e4
@@ -300,8 +312,49 @@ public class PikafishEngine {
             
             StringBuilder analysisInfo = new StringBuilder();
             List<String> moves = new ArrayList<>();
+            int lastDepth = 0;
             while ((response = readLine()) != null) {
-                System.out.println("引擎响应: " + response);
+                // 显示重要的引擎响应，包括深度和分数信息
+                if (response.startsWith("info string") || response.startsWith("bestmove")) {
+                    log("📥 " + response);
+                } else if (response.startsWith("info depth")) {
+                    // 解析和显示搜索进度信息
+                    String[] parts = response.split(" ");
+                    int currentDepth = 0;
+                    String score = "";
+                    String pv = "";
+                    
+                    for (int i = 0; i < parts.length - 1; i++) {
+                        if (parts[i].equals("depth")) {
+                            try {
+                                currentDepth = Integer.parseInt(parts[i + 1]);
+                            } catch (NumberFormatException e) {
+                                // 忽略解析错误
+                            }
+                        } else if (parts[i].equals("cp")) {
+                            try {
+                                int cp = Integer.parseInt(parts[i + 1]);
+                                score = String.format("%.2f", cp / 100.0);
+                            } catch (NumberFormatException e) {
+                                // 忽略解析错误
+                            }
+                        } else if (parts[i].equals("pv") && i + 1 < parts.length) {
+                            pv = parts[i + 1];
+                        }
+                    }
+                    
+                    if (currentDepth > lastDepth) {
+                        lastDepth = currentDepth;
+                        String logMessage = "🔍 深度 " + currentDepth;
+                        if (!score.isEmpty()) {
+                            logMessage += ", 分数: " + score;
+                        }
+                        if (!pv.isEmpty()) {
+                            logMessage += ", 主变: " + pv;
+                        }
+                        log(logMessage);
+                    }
+                }
                 
                 // 保存分析信息
                 if (response.startsWith("info")) {
@@ -326,6 +379,7 @@ public class PikafishEngine {
                            moves.add(parts[1]);
                         }
                         lastAnalysisInfo = analysisInfo.toString();
+                        log("计算完成，最佳走法: " + parts[1]);
                         return moves;
                     }
                     break;
@@ -348,33 +402,37 @@ public class PikafishEngine {
 
     
     /**
-     * 根据思考时间计算搜索深度
+     * 根据思考时间计算搜索深度（增强版本，确保足够深度）
      * @param thinkTime 思考时间（毫秒）
      * @return 搜索深度
      */
     private int calculateSearchDepth(int thinkTime) {
-        // 根据思考时间映射到搜索深度，大幅提高AI智能水平
+        int depth;
+        // 根据思考时间映射到搜索深度，确保最小深度足够高
         if (thinkTime <= 300) {
-            return 12;  // 难度1：深度12
+            depth = 15;  // 提高最小深度到15层
         } else if (thinkTime <= 800) {
-            return 14;  // 难度2：深度14
+            depth = 18;  // 0.8秒：深度18
         } else if (thinkTime <= 1500) {
-            return 16;  // 难度3：深度16
+            depth = 20;  // 1.5秒：深度20
         } else if (thinkTime <= 2500) {
-            return 18;  // 难度4：深度18
+            depth = 22;  // 2.5秒：深度22
         } else if (thinkTime <= 4000) {
-            return 20;  // 难度5：深度20
+            depth = 24;  // 4秒：深度24
         } else if (thinkTime <= 6000) {
-            return 22;  // 难度6：深度22
+            depth = 26;  // 6秒：深度26
         } else if (thinkTime <= 10000) {
-            return 24;  // 难度7：深度24
+            depth = 28;  // 10秒：深度28
         } else if (thinkTime <= 15000) {
-            return 26;  // 难度8：深度26
+            depth = 30;  // 15秒：深度30
         } else if (thinkTime <= 25000) {
-            return 28;  // 难度9：深度28
+            depth = 32;  // 25秒：深度32
         } else {
-            return 30;  // 最高难度：深度30
+            depth = 35;  // 最高深度35层
         }
+        
+        log(String.format("🎯 计算搜索深度: %dms → %d层", thinkTime, depth));
+        return depth;
     }
     
     /**
@@ -402,7 +460,11 @@ public class PikafishEngine {
             long startTime = System.currentTimeMillis();
             
             while ((response = readLine()) != null) {
-                System.out.println("引擎响应: " + response);
+                // 只显示重要信息，减少日志噪声
+                if (response.startsWith("bestmove") || response.startsWith("info string")) {
+                    log("引擎响应: " + response);
+                }
+                
                 if (response.startsWith("info") && response.contains("score cp")) {
                     // 解析评估分数
                     String[] parts = response.split(" ");

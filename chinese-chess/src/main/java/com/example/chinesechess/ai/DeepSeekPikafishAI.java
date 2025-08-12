@@ -569,7 +569,7 @@ public class DeepSeekPikafishAI {
     }
     
     /**
-     * 将UCI格式转换为Move对象
+     * 将UCI格式转换为Move对象（增强版本）
      */
     private Move convertUciToMove(String uci, Board board) {
         if (uci == null) {
@@ -579,21 +579,44 @@ public class DeepSeekPikafishAI {
         
         try {
             System.out.println("🔍 [调试] 开始转换UCI: " + uci);
+            
+            // 验证UCI格式
+            if (uci.length() != 4) {
+                System.out.println("❌ [调试] UCI格式错误，长度不为4: " + uci);
+                return null;
+            }
+            
             Position[] positions = FenConverter.uciToMove(uci);
             System.out.println("🔍 [调试] FenConverter.uciToMove结果: " + (positions != null ? "成功" : "失败"));
             
             if (positions != null && positions.length == 2) {
-                Move move = new Move(positions[0], positions[1]);
-                System.out.println("🔍 [调试] 创建Move对象: " + positions[0] + " -> " + positions[1]);
+                Position from = positions[0];
+                Position to = positions[1];
                 
-                // 验证走法是否合法
-                boolean isValid = isValidMove(move, board);
+                System.out.println("🔍 [调试] 转换后坐标: " + from + " -> " + to);
+                
+                // 检查坐标范围
+                if (!isValidPosition(from) || !isValidPosition(to)) {
+                    System.out.println("❌ [调试] 坐标超出棋盘范围: " + from + " -> " + to);
+                    return null;
+                }
+                
+                Move move = new Move(from, to);
+                
+                // 增强的走法验证
+                boolean isValid = isValidMoveEnhanced(move, board, uci);
                 System.out.println("🔍 [调试] 走法验证结果: " + (isValid ? "合法" : "不合法"));
                 
                 if (isValid) {
                     return move;
                 } else {
-                    System.out.println("❌ [调试] 走法验证失败: " + uci);
+                    // 如果验证失败，尝试使用所有可能走法进行匹配
+                    Move fallbackMove = findMoveByUCI(uci, board);
+                    if (fallbackMove != null) {
+                        System.out.println("✅ [调试] 通过备用方法找到合法走法: " + uci);
+                        return fallbackMove;
+                    }
+                    System.out.println("❌ [调试] 走法验证失败且无备用方案: " + uci);
                 }
             } else {
                 System.out.println("❌ [调试] FenConverter.uciToMove返回无效结果");
@@ -603,6 +626,77 @@ public class DeepSeekPikafishAI {
             e.printStackTrace();
         }
         
+        return null;
+    }
+    
+    /**
+     * 检查位置是否在棋盘范围内
+     */
+    private boolean isValidPosition(Position pos) {
+        return pos != null && pos.getX() >= 0 && pos.getX() <= 9 && pos.getY() >= 0 && pos.getY() <= 8;
+    }
+    
+    /**
+     * 增强的走法验证
+     */
+    private boolean isValidMoveEnhanced(Move move, Board board, String originalUci) {
+        try {
+            Position start = move.getStart();
+            Position end = move.getEnd();
+            
+            // 检查起始位置是否有棋子
+            Piece piece = board.getPiece(start.getX(), start.getY());
+            if (piece == null) {
+                System.out.println("❌ [验证] 起始位置无棋子: " + start + " (UCI: " + originalUci + ")");
+                return false;
+            }
+            
+            // 检查棋子颜色是否正确
+            if (piece.getColor() != aiColor) {
+                System.out.println("❌ [验证] 棋子颜色不匹配: " + piece.getColor() + " vs " + aiColor + " (UCI: " + originalUci + ")");
+                return false;
+            }
+            
+            // 检查目标位置是否可以移动到
+            Piece targetPiece = board.getPiece(end.getX(), end.getY());
+            if (targetPiece != null && targetPiece.getColor() == aiColor) {
+                System.out.println("❌ [验证] 目标位置有同方棋子: " + end + " (UCI: " + originalUci + ")");
+                return false;
+            }
+            
+            // 使用棋子的isValidMove方法验证（但要捕获异常）
+            try {
+                boolean pieceValidation = piece.isValidMove(board, start, end);
+                if (!pieceValidation) {
+                    System.out.println("❌ [验证] 棋子移动规则验证失败: " + piece.getChineseName() + " " + start + "->" + end + " (UCI: " + originalUci + ")");
+                }
+                return pieceValidation;
+            } catch (Exception e) {
+                System.out.println("⚠️ [验证] 棋子验证异常，但允许通过: " + e.getMessage() + " (UCI: " + originalUci + ")");
+                return true; // 如果验证方法本身有问题，允许走法通过
+            }
+        } catch (Exception e) {
+            System.out.println("❌ [验证] 增强验证异常: " + e.getMessage() + " (UCI: " + originalUci + ")");
+            return false;
+        }
+    }
+    
+    /**
+     * 通过UCI在所有可能走法中寻找匹配
+     */
+    private Move findMoveByUCI(String uci, Board board) {
+        try {
+            List<Move> allPossibleMoves = getAllPossibleMoves(board);
+            for (Move move : allPossibleMoves) {
+                String moveUci = FenConverter.moveToUci(move.getStart(), move.getEnd());
+                if (uci.equals(moveUci)) {
+                    System.out.println("✅ [备用] 在可能走法中找到匹配: " + uci);
+                    return move;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("❌ [备用] 备用查找失败: " + e.getMessage());
+        }
         return null;
     }
     
@@ -792,52 +886,92 @@ public class DeepSeekPikafishAI {
     }
     
     /**
-     * 使用Pikafish引擎深度分析局面
+     * 使用Pikafish引擎深度分析局面（增强版本）
      */
     private String analyzePositionWithPikafish(String fen, int timeMs) {
         if (pikafishEngine == null || !pikafishEngine.isAvailable()) {
+            addToAILog("⚠️ Pikafish引擎不可用，无法分析局面");
             return null;
         }
         
         try {
+            addToAILog("开始深度分析局面，时间: " + timeMs + "ms");
+            
             // 设置局面
             pikafishEngine.setPosition(fen);
             
-            // 开始分析
-            String result = pikafishEngine.getBestMove(fen, timeMs);
+            // 开始分析，使用更长的超时时间
+            int extendedTime = Math.max(timeMs, 3000); // 至少 3 秒
+            String result = pikafishEngine.getBestMove(fen, extendedTime);
             
-            // 获取详细分析信息（如果引擎支持）
-            return pikafishEngine.getLastAnalysisInfo();
+            // 获取详细分析信息
+            String analysisInfo = pikafishEngine.getLastAnalysisInfo();
+            
+            if (analysisInfo == null || analysisInfo.trim().isEmpty()) {
+                addToAILog("⚠️ 未获取到分析信息，可能是搜索深度不足");
+                
+                // 尝试使用更长时间重新分析
+                result = pikafishEngine.getBestMove(fen, extendedTime * 2);
+                analysisInfo = pikafishEngine.getLastAnalysisInfo();
+            }
+            
+            if (analysisInfo != null && !analysisInfo.trim().isEmpty()) {
+                addToAILog("✅ 获取到分析信息，长度: " + analysisInfo.length() + " 字符");
+            } else {
+                addToAILog("❌ 仍然未获取到分析信息");
+            }
+            
+            return analysisInfo;
             
         } catch (Exception e) {
-            System.err.println("❌ Pikafish分析失败: " + e.getMessage());
+            addToAILog("❌ Pikafish分析异常: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }
     
     /**
-     * 获取Pikafish引擎的候选走法
+     * 获取Pikafish引擎的候选走法（增强版本）
      */
     private List<String> getCandidateMovesFromPikafish(String fen, int count) {
         if (pikafishEngine == null || !pikafishEngine.isAvailable()) {
+            addToAILog("⚠️ Pikafish引擎不可用，无法获取候选走法");
             return new ArrayList<>();
         }
         
-        addToAILog("--- 获取Pikafish候选走法 ---");
-        // The instruction implies calling a method that returns multiple moves, like getBestMoves.
-        // Assuming PikafishEngine has a method getBestMoves(fen, time, count).
-        List<String> moves = pikafishEngine.getBestMoves(fen, thinkTimes[difficulty - 1], count);
+        addToAILog("——— 获取Pikafish候选走法 ———");
+        
+        // 增强的超时参数，给引擎更多时间
+        int extendedThinkTime = thinkTimes[difficulty - 1] * 2; // 翻倍时间
+        addToAILog("使用增强的思考时间: " + extendedThinkTime + "ms");
+        
+        List<String> moves = pikafishEngine.getBestMoves(fen, extendedThinkTime, count);
         
         if (moves != null && !moves.isEmpty()) {
-            addToAILog("Pikafish返回 " + moves.size() + " 个候选走法");
+            addToAILog("✅ Pikafish返回 " + moves.size() + " 个候选走法");
+            for (int i = 0; i < moves.size(); i++) {
+                addToAILog(String.format("候选走法 %d: %s", i + 1, moves.get(i)));
+            }
             return moves;
         } else {
-            addToAILog("Pikafish未返回候选走法，尝试获取单个最佳走法");
-            // Fallback to single best move if getBestMoves is not supported or fails
-            String bestMove = pikafishEngine.getBestMove(fen, thinkTimes[difficulty - 1]);
-            if (bestMove != null) {
+            addToAILog("⚠️ Pikafish未返回候选走法，尝试单独获取最佳走法");
+            
+            // 备用方案：尝试获取单个最佳走法
+            String bestMove = pikafishEngine.getBestMove(fen, extendedThinkTime);
+            if (bestMove != null && !bestMove.trim().isEmpty()) {
+                addToAILog("✅ 通过备用方法获取走法: " + bestMove);
                 return Arrays.asList(bestMove);
             }
+            
+            // 最后的备用方案：使用最小时间、最小深度尝试
+            addToAILog("⚠️ 尝试使用最小参数重新获取走法");
+            String emergencyMove = pikafishEngine.getBestMove(fen, 500); // 500ms 最小时间
+            if (emergencyMove != null && !emergencyMove.trim().isEmpty()) {
+                addToAILog("✅ 紧急模式获取走法: " + emergencyMove);
+                return Arrays.asList(emergencyMove);
+            }
+            
+            addToAILog("❌ 所有尝试都失败，可能是无法移动的局面或引擎问题");
             return new ArrayList<>();
         }
     }
