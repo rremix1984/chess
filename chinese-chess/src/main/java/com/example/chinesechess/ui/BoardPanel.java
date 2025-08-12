@@ -1,5 +1,8 @@
 package com.example.chinesechess.ui;
 
+import com.example.chinesechess.VictoryAnimation;
+import com.example.chinesechess.ui.ChatPanel;
+import com.example.chinesechess.ui.AILogPanel;
 import com.example.chinesechess.core.*;
 import com.example.chinesechess.ai.ChessAI;
 import com.example.chinesechess.ai.LLMChessAI;
@@ -70,6 +73,12 @@ public class BoardPanel extends JPanel {
     private boolean useDeepSeekPikafish = false;
     private PieceColor humanPlayer = PieceColor.RED; // 默认人类执红棋
     private boolean isAIThinking = false;
+    private volatile boolean isGamePaused = false; // 游戏暂停标志
+
+    public void setGamePaused(boolean isPaused) {
+        this.isGamePaused = isPaused;
+    }
+
     private GameState gameState = GameState.PLAYING;
     
     // 棋盘翻转状态
@@ -116,6 +125,9 @@ public class BoardPanel extends JPanel {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
+                if (isGamePaused) { // 如果游戏暂停，则不处理点击事件
+                    return;
+                }
                 if (SwingUtilities.isRightMouseButton(e) && isSettingUpEndgame) {
                     handleEndgameSetupRightClick(e.getX(), e.getY());
                 } else {
@@ -125,86 +137,55 @@ public class BoardPanel extends JPanel {
         });
     }
 
-    @Override
-    public Dimension getPreferredSize() {
-        // 计算棋盘所需的总尺寸
-        // 棋盘宽度：9列 * 格子大小 + 左右边距
-        int boardWidth = (GameConfig.BOARD_WIDTH - 1) * CELL_SIZE + 2 * MARGIN;
-        // 棋盘高度：10行 * 格子大小 + 上下边距 + 额外空间用于坐标显示
-        int boardHeight = (GameConfig.BOARD_HEIGHT - 1) * CELL_SIZE + 2 * MARGIN + 60; // 额外60像素用于坐标
-        
-        return new Dimension(boardWidth, boardHeight);
-    }
-
-
-
-    private void performMoveAnalysis() {
-        if (useDeepSeekPikafish && deepSeekPikafishAI != null) {
-            moveAnalysisTextArea.setText("Analyzing moves...");
-            CompletableFuture.supplyAsync(() -> deepSeekPikafishAI.getRecommendedMovesWithAnalysis(board, 5)) // 5 moves
-                .thenAccept(analysis -> SwingUtilities.invokeLater(() -> {
-                    moveAnalysisTextArea.setText(String.join("\n", analysis));
-                }));
-        } else {
-            moveAnalysisTextArea.setText("DeepSeek+Pikafish AI is not enabled.");
-        }
-    }
-    
-    public void setStatusUpdateCallback(Consumer<String> callback) {
-        this.statusUpdateCallback = callback;
-        updateStatus(); // 初始化状态显示
-    }
-    
-    /**
-     * 启用AI对弈
-     * @param humanColor 人类玩家颜色
-     * @param difficulty AI难度 (1-4)
-     * @param useLLM 是否使用LLM AI
-     * @param modelName LLM模型名称
-     */
     public void enableAI(PieceColor humanColor, int difficulty, boolean useLLM, String modelName) {
         this.humanPlayer = humanColor;
         this.useLLM = useLLM;
-        
+        this.useEnhanced = false;
+        this.useHybrid = false;
+        this.useDeepSeekPikafish = false;
+
+        PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
+
         if (useLLM) {
-            PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
             this.llmChessAI = new LLMChessAI(aiColor, modelName, difficulty);
+            if (this.aiLogPanel != null) {
+                this.llmChessAI.setAILogPanel(this.aiLogPanel);
+            }
         } else {
-            PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
             this.ai = new ChessAI(aiColor, difficulty);
         }
-        
+
         this.isAIEnabled = true;
-        
+
+        // 添加调试信息
+        String humanColorName = (humanColor == PieceColor.RED) ? "红方" : "黑方";
+        String aiColorName = (aiColor == PieceColor.RED) ? "红方" : "黑方";
+        System.out.println("🎮 AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+        addAILog("system", "AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+
         // 如果当前轮到AI，立即开始AI回合
-        PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
         if (aiColor == currentPlayer) {
             SwingUtilities.invokeLater(this::performAIMove);
         }
-        
+
         updateStatus();
     }
-    
-    /**
-     * 启用增强AI对弈
-     * @param humanColor 人类玩家颜色
-     * @param difficulty AI难度 (1-5)
-     */
+
     public void enableEnhancedAI(PieceColor humanColor, int difficulty) {
         this.humanPlayer = humanColor;
         this.useEnhanced = true;
         this.useLLM = false;
         this.useHybrid = false;
-        
+
         PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
         this.enhancedAI = new EnhancedChessAI(aiColor, difficulty);
         this.isAIEnabled = true;
-        
+
         // 如果当前轮到AI，立即开始AI回合
         if (aiColor == currentPlayer) {
             SwingUtilities.invokeLater(this::performAIMove);
         }
-        
+
         updateStatus();
     }
     
@@ -219,56 +200,53 @@ public class BoardPanel extends JPanel {
         this.useHybrid = true;
         this.useLLM = false;
         this.useEnhanced = false;
-        
+
         PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
         this.hybridAI = new HybridChessAI(aiColor, difficulty, modelName);
         this.isAIEnabled = true;
-        
+
         // 添加调试信息
         String humanColorName = (humanColor == PieceColor.RED) ? "红方" : "黑方";
         String aiColorName = (aiColor == PieceColor.RED) ? "红方" : "黑方";
         System.out.println("🎮 AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
         addAILog("system", "AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
-        
+
         // 如果当前轮到AI，立即开始AI回合
         if (aiColor == currentPlayer) {
             SwingUtilities.invokeLater(this::performAIMove);
         }
-        
+
         updateStatus();
     }
-    
+
     /**
      * 启用DeepSeek+Pikafish AI对弈
      * @param humanColor 人类玩家颜色
      * @param difficulty AI难度 (1-5)
-     * @param modelName LLM模型名称
+     * @param modelName 模型名称 (例如 "deepseek-ai")
      */
     public void enableDeepSeekPikafishAI(PieceColor humanColor, int difficulty, String modelName) {
         this.humanPlayer = humanColor;
-        this.useHybrid = false;
+        this.useDeepSeekPikafish = true;
         this.useLLM = false;
         this.useEnhanced = false;
-        this.useDeepSeekPikafish = true;
-    
+        this.useHybrid = false;
+
         PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
         this.deepSeekPikafishAI = new DeepSeekPikafishAI(aiColor, difficulty, modelName);
-        if (this.aiLogPanel != null) {
-            this.deepSeekPikafishAI.setAILogPanel(this.aiLogPanel);
-        }
         this.isAIEnabled = true;
-    
+
         // 添加调试信息
         String humanColorName = (humanColor == PieceColor.RED) ? "红方" : "黑方";
         String aiColorName = (aiColor == PieceColor.RED) ? "红方" : "黑方";
-        System.out.println("🎮 AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName + " (DeepSeek+Pikafish)");
-        addAILog("system", "AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName + " (DeepSeek+Pikafish)");
-    
+        System.out.println("🎮 DeepSeek+Pikafish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+        addAILog("system", "DeepSeek+Pikafish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+
         // 如果当前轮到AI，立即开始AI回合
         if (aiColor == currentPlayer) {
             SwingUtilities.invokeLater(this::performAIMove);
         }
-    
+
         updateStatus();
     }
     
@@ -1063,6 +1041,12 @@ public class BoardPanel extends JPanel {
      * 执行AI移动
      */
     private void performAIMove() {
+        if (isGamePaused) { // 如果游戏暂停，则不执行AI移动
+            isAIThinking = false;
+            updateStatus();
+            return;
+        }
+
         performAIMoveWithRetry(0);
     }
     
@@ -1858,6 +1842,7 @@ public class BoardPanel extends JPanel {
      * 重新开始游戏
      */
     public void restartGame() {
+        isGamePaused = false; // 重置暂停状态
         board.initializeBoard();
         currentPlayer = PieceColor.RED;
         gameState = GameState.PLAYING;
@@ -2138,6 +2123,12 @@ public class BoardPanel extends JPanel {
      * 执行AI对AI的走棋
      */
     private void performAIvsAIMove() {
+        if (isGamePaused) { // 如果游戏暂停，则不执行AI vs AI移动
+            isAIThinking = false;
+            updateStatus();
+            return;
+        }
+
         if (!isAIvsAIMode || isAIThinking) {
             return;
         }
@@ -2711,6 +2702,10 @@ public class BoardPanel extends JPanel {
     /**
      * 设置聊天面板引用
      */
+    public void setStatusUpdateCallback(Consumer<String> callback) {
+        this.statusUpdateCallback = callback;
+    }
+
     public void setChatPanel(ChatPanel chatPanel) {
         this.chatPanel = chatPanel;
     }
@@ -2861,6 +2856,10 @@ public class BoardPanel extends JPanel {
      * 悔棋功能 - 同时回退红方和黑方各一步
      */
     public void undoLastMove() {
+        if (isGamePaused) { // 如果游戏暂停，不允许悔棋
+            JOptionPane.showMessageDialog(this, "游戏已暂停，无法悔棋！", "悔棋", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
         if (boardHistory.isEmpty()) {
             JOptionPane.showMessageDialog(this, "没有可以撤销的移动！", "悔棋", JOptionPane.INFORMATION_MESSAGE);
             return;
@@ -2989,5 +2988,39 @@ public class BoardPanel extends JPanel {
      */
     public com.example.chinesechess.core.GameState getGameState() {
         return gameState;
+    }
+
+    /**
+     * 暂停游戏
+     */
+    public void pauseGame() {
+        isGamePaused = true;
+        addAILog("system", "游戏已暂停");
+        System.out.println("⏸️ 游戏已暂停");
+        updateStatus();
+    }
+
+    /**
+     * 恢复游戏
+     */
+    public void resumeGame() {
+        isGamePaused = false;
+        addAILog("system", "游戏已恢复");
+        System.out.println("▶️ 游戏已恢复");
+        updateStatus();
+
+        // 如果是AI的回合，恢复后自动执行AI移动
+        if (isAIEnabled && currentPlayer == humanPlayer.getOppositeColor()) {
+            SwingUtilities.invokeLater(this::performAIMove);
+        } else if (isAIvsAIMode) {
+            SwingUtilities.invokeLater(this::performAIvsAIMove);
+        }
+    }
+
+    /**
+     * 检查游戏是否暂停
+     */
+    public boolean isGamePaused() {
+        return isGamePaused;
     }
 }

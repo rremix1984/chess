@@ -42,6 +42,12 @@ public class LLMChessAI {
                 .build();
     }
     
+    private com.example.chinesechess.ui.AILogPanel aiLogPanel;
+
+    public void setAILogPanel(com.example.chinesechess.ui.AILogPanel aiLogPanel) {
+        this.aiLogPanel = aiLogPanel;
+    }
+
     /**
      * 获取AI的颜色
      */

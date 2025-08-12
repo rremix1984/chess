@@ -1,4 +1,4 @@
-package com.example.chinesechess.ui;
+package com.example.chinesechess;
 
 import javax.swing.*;
 import java.awt.*;

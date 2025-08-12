@@ -3,7 +3,11 @@ package com.example.chinesechess.ui;
 import com.example.chinesechess.core.Board;
 import com.example.chinesechess.core.PieceColor;
 import com.example.common.utils.OllamaModelManager;
+import com.example.chinesechess.VictoryAnimation;
 import com.example.chinesechess.ui.AILogPanel;
+import com.example.chinesechess.ui.BoardPanel;
+import com.example.chinesechess.ui.ChatPanel;
+
 
 import javax.swing.*;
 import java.awt.*;
@@ -672,6 +676,9 @@ public class GameFrame extends JFrame {
         // 设置游戏状态
         isGameRunning = true;
         isGamePaused = false;
+        if (boardPanel != null) {
+            boardPanel.setGamePaused(false); // 恢复棋盘
+        }
         
         // 更新按钮状态
         startGameButton.setEnabled(false);
@@ -699,6 +706,7 @@ public class GameFrame extends JFrame {
         
         // 停止AI思考（如果正在进行）
         if (boardPanel != null) {
+            boardPanel.setGamePaused(true); // 暂停棋盘
             // 禁用AI对AI模式
             if (boardPanel.isAIvsAIMode()) {
                 boardPanel.disableAIvsAI();
