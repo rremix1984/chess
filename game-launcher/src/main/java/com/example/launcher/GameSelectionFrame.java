@@ -35,6 +35,48 @@ public class GameSelectionFrame extends JFrame {
         add(bottomPanel, BorderLayout.SOUTH);
     }
     
+    /**
+     * 设置按钮样式
+     */
+    private void styleButton(JButton button) {
+        button.setFocusPainted(false);
+        button.setOpaque(true);
+        
+        // 添加鼠标交互效果
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            Color originalColor = button.getBackground();
+            Color hoverColor = originalColor.brighter();
+            
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+                button.setBackground(hoverColor);
+            }
+            
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                button.setBackground(originalColor);
+            }
+            
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                button.setBackground(originalColor.darker());
+                button.setBorder(BorderFactory.createLoweredBevelBorder());
+            }
+            
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                if (button.contains(evt.getPoint())) {
+                    button.setBackground(hoverColor);
+                } else {
+                    button.setBackground(originalColor);
+                }
+                button.setBorder(BorderFactory.createRaisedBevelBorder());
+            }
+        });
+    }
+    
     private JPanel createTitlePanel() {
         JPanel panel = new JPanel();
         panel.setBackground(new Color(245, 245, 220)); // 与主背景相同
@@ -61,20 +103,20 @@ public class GameSelectionFrame extends JFrame {
             e -> startChineseChess()
         );
         
-        // 国际象棋选项 - 暂时不可用
+        // 国际象棋选项
         JPanel internationalChessPanel = createGameOptionPanel(
             "♟️ 国际象棋", 
-            "经典的国际象棋游戏（开发中）",
+            "经典的国际象棋游戏，支持与AI对弈",
             "/images/international_chess_icon.png",
-            e -> showComingSoon("国际象棋")
+            e -> startInternationalChess()
         );
         
-        // 五子棋选项 - 暂时不可用
+        // 五子棋选项
         JPanel gomokuPanel = createGameOptionPanel(
             "⚫⚪ 五子棋", 
-            "经典的五子棋游戏（开发中）",
+            "经典的五子棋游戏，支持多种对弈模式",
             "/images/gomoku_icon.png",
-            e -> showComingSoon("五子棋")
+            e -> startGomoku()
         );
         
         // 围棋选项
@@ -128,26 +170,13 @@ public class GameSelectionFrame extends JFrame {
         closeButton.setFont(new Font("宋体", Font.BOLD, 16));
         closeButton.setBackground(new Color(220, 20, 60)); // 更深的红色
         closeButton.setForeground(Color.WHITE);
-        closeButton.setFocusPainted(false);
         closeButton.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createRaisedBevelBorder(),
             BorderFactory.createEmptyBorder(8, 16, 8, 16)
         ));
         closeButton.setPreferredSize(new Dimension(120, 40));
         
-        // 添加鼠标悬停效果
-        closeButton.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
-                closeButton.setBackground(new Color(178, 34, 34)); // 悬停时更深
-            }
-            
-            @Override
-            public void mouseExited(java.awt.event.MouseEvent evt) {
-                closeButton.setBackground(new Color(220, 20, 60)); // 恢复原色
-            }
-        });
-        
+        styleButton(closeButton);
         closeButton.addActionListener(e -> System.exit(0));
         panel.add(closeButton);
         return panel;
@@ -204,11 +233,15 @@ public class GameSelectionFrame extends JFrame {
         descLabel.setForeground(new Color(105, 105, 105)); // 灰色文字
         gameButton.add(descLabel);
         
-        // 添加鼠标悬停效果
+        // 添加鼠标交互效果
         gameButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            Color originalColor = new Color(255, 250, 240);
+            Color hoverColor = new Color(240, 248, 255);
+            
             @Override
             public void mouseEntered(java.awt.event.MouseEvent evt) {
-                gameButton.setBackground(new Color(240, 248, 255)); // 悬停时浅蓝色
+                gameButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+                gameButton.setBackground(hoverColor); // 悬停时浅蓝色
                 gameButton.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(new Color(30, 144, 255), 3, true),
                     BorderFactory.createEmptyBorder(14, 14, 14, 14)
@@ -217,11 +250,38 @@ public class GameSelectionFrame extends JFrame {
             
             @Override
             public void mouseExited(java.awt.event.MouseEvent evt) {
-                gameButton.setBackground(new Color(255, 250, 240)); // 恢复原色
+                gameButton.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                gameButton.setBackground(originalColor); // 恢复原色
                 gameButton.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(new Color(139, 69, 19), 2, true),
                     BorderFactory.createEmptyBorder(15, 15, 15, 15)
                 ));
+            }
+            
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                gameButton.setBackground(originalColor.darker());
+                gameButton.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLoweredBevelBorder(),
+                    BorderFactory.createEmptyBorder(15, 15, 15, 15)
+                ));
+            }
+            
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                if (gameButton.contains(evt.getPoint())) {
+                    gameButton.setBackground(hoverColor);
+                    gameButton.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(30, 144, 255), 3, true),
+                        BorderFactory.createEmptyBorder(14, 14, 14, 14)
+                    ));
+                } else {
+                    gameButton.setBackground(originalColor);
+                    gameButton.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(139, 69, 19), 2, true),
+                        BorderFactory.createEmptyBorder(15, 15, 15, 15)
+                    ));
+                }
             }
         });
         
@@ -334,6 +394,50 @@ public class GameSelectionFrame extends JFrame {
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this, "启动坦克大战失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void startInternationalChess() {
+        try {
+            dispose(); // 关闭选择界面
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    // 使用反射来动态加载国际象棋游戏界面
+                    Class<?> gameFrameClass = Class.forName("com.example.internationalchess.InternationalChessFrame");
+                    Object frame = gameFrameClass.getDeclaredConstructor().newInstance();
+                    gameFrameClass.getMethod("setVisible", boolean.class).invoke(frame, true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "启动国际象棋失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+                    // 重新显示选择界面
+                    new GameSelectionFrame().setVisible(true);
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "启动国际象棋失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void startGomoku() {
+        try {
+            dispose(); // 关闭选择界面
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    // 使用反射来动态加载五子棋游戏界面
+                    Class<?> gameFrameClass = Class.forName("com.example.gomoku.GomokuFrame");
+                    Object frame = gameFrameClass.getDeclaredConstructor().newInstance();
+                    gameFrameClass.getMethod("setVisible", boolean.class).invoke(frame, true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "启动五子棋失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+                    // 重新显示选择界面
+                    new GameSelectionFrame().setVisible(true);
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "启动五子棋失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
         }
     }
     

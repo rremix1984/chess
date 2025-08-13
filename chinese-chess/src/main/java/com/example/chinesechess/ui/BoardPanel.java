@@ -2984,6 +2984,14 @@ public class BoardPanel extends JPanel {
     }
     
     /**
+     * 设置当前玩家
+     */
+    public void setCurrentPlayer(PieceColor player) {
+        this.currentPlayer = player;
+        updateStatus();
+    }
+    
+    /**
      * 获取游戏状态
      */
     public com.example.chinesechess.core.GameState getGameState() {
@@ -3022,5 +3030,65 @@ public class BoardPanel extends JPanel {
      */
     public boolean isGamePaused() {
         return isGamePaused;
+    }
+    
+    /**
+     * 开始玩家对玩家残局游戏
+     */
+    public void startPlayerVsPlayerEndgame() {
+        if (!isSettingUpEndgame) {
+            showErrorInfo("请先进入残局设置模式！");
+            return;
+        }
+        
+        // 检查棋盘上是否有棋子
+        boolean hasRedGeneral = false;
+        boolean hasBlackGeneral = false;
+        int totalPieces = 0;
+        
+        for (int row = 0; row < 10; row++) {
+            for (int col = 0; col < 9; col++) {
+                Piece piece = board.getPiece(row, col);
+                if (piece != null) {
+                    totalPieces++;
+                    if (piece instanceof com.example.chinesechess.core.General) {
+                        if (piece.getColor() == PieceColor.RED) {
+                            hasRedGeneral = true;
+                        } else {
+                            hasBlackGeneral = true;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (totalPieces == 0) {
+            showErrorInfo("请先在棋盘上放置一些棋子！");
+            return;
+        }
+        
+        if (!hasRedGeneral || !hasBlackGeneral) {
+            showErrorInfo("棋盘上必须同时有红方和黑方的将/帅！");
+            return;
+        }
+        
+        // 检查棋子数量是否合理
+        String validationResult = validateEndgameBoardSetup();
+        if (validationResult != null) {
+            showErrorInfo(validationResult + "\n\n如需继续，请再次点击'开始残局'按钮。");
+            return;
+        }
+        
+        // 设置玩家对玩家残局模式
+        isSettingUpEndgame = false;
+        isEndgameMode = true;
+        
+        // 禁用AI
+        disableAI();
+        
+        updateStatus();
+        repaint();
+        
+        showErrorInfo("玩家对玩家残局游戏开始！\n红方玩家 vs 黑方玩家");
     }
 }

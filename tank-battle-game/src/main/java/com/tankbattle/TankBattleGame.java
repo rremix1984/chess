@@ -17,6 +17,55 @@ public class TankBattleGame {
         initializeUI();
     }
     
+    /**
+     * 设置按钮样式
+     */
+    private void styleButton(JButton button) {
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createRaisedBevelBorder(),
+            BorderFactory.createEmptyBorder(3, 8, 3, 8)
+        ));
+        button.setBackground(new Color(240, 240, 240));
+        button.setForeground(Color.BLACK);
+        button.setOpaque(true);
+        
+        // 添加鼠标交互效果
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            Color originalColor = new Color(240, 240, 240);
+            Color hoverColor = originalColor.brighter();
+            Color pressedColor = originalColor.darker();
+            
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                button.setBackground(hoverColor);
+                button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLoweredBevelBorder(),
+                    BorderFactory.createEmptyBorder(3, 8, 3, 8)
+                ));
+            }
+            
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                button.setBackground(originalColor);
+                button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createRaisedBevelBorder(),
+                    BorderFactory.createEmptyBorder(3, 8, 3, 8)
+                ));
+            }
+            
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                button.setBackground(pressedColor);
+            }
+            
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent e) {
+                button.setBackground(hoverColor);
+            }
+        });
+    }
+    
     private void initializeUI() {
         mainFrame = new JFrame("坦克大战 - Tank Battle");
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -88,6 +137,7 @@ public class TankBattleGame {
         for (JButton btn : buttons) {
             btn.setFont(new Font("宋体", Font.BOLD, 20));
             btn.setPreferredSize(new Dimension(200, 50));
+            styleButton(btn);
         }
         
         singlePlayerBtn.addActionListener(e -> startSinglePlayerGame());

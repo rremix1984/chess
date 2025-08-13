@@ -85,8 +85,15 @@ public class GomokuBoard {
             return false;
         }
         
+        char currentPiece = isBlackTurn ? BLACK : WHITE;
+        
+        // 黑棋禁手检测（只对黑棋适用）
+        if (isBlackTurn && isForbiddenMove(row, col)) {
+            return false;
+        }
+        
         // 放置棋子
-        board[row][col] = isBlackTurn ? BLACK : WHITE;
+        board[row][col] = currentPiece;
         
         // 记录最后一步棋的位置
         lastMoveRow = row;
@@ -191,6 +198,221 @@ public class GomokuBoard {
         
         // 五子连珠
         return count >= 5;
+    }
+    
+    /**
+     * 检查黑棋是否构成禁手
+     * @param row 落子行
+     * @param col 落子列
+     * @return 是否为禁手
+     */
+    private boolean isForbiddenMove(int row, int col) {
+        // 临时放置黑棋
+        board[row][col] = BLACK;
+        
+        boolean forbidden = false;
+        
+        // 检查是否形成五连，如果形成五连则不是禁手
+        if (checkLine(row, col, 0, 1, BLACK) || // 横向
+            checkLine(row, col, 1, 0, BLACK) || // 纵向
+            checkLine(row, col, 1, 1, BLACK) || // 左上到右下
+            checkLine(row, col, 1, -1, BLACK)) { // 右上到左下
+            // 形成五连，不是禁手
+            board[row][col] = ' '; // 恢复
+            return false;
+        }
+        
+        // 检查长连禁手（六连或以上）
+        if (checkLongConnection(row, col)) {
+            forbidden = true;
+        }
+        
+        // 检查三三禁手
+        if (!forbidden && checkDoubleThree(row, col)) {
+            forbidden = true;
+        }
+        
+        // 检查四四禁手
+        if (!forbidden && checkDoubleFour(row, col)) {
+            forbidden = true;
+        }
+        
+        // 恢复棋盘
+        board[row][col] = ' ';
+        
+        return forbidden;
+    }
+    
+    /**
+     * 检查长连禁手（六连或以上）
+     */
+    private boolean checkLongConnection(int row, int col) {
+        int[][] directions = {{0, 1}, {1, 0}, {1, 1}, {1, -1}};
+        
+        for (int[] dir : directions) {
+            int count = 1;
+            
+            // 向一个方向检查
+            int r = row + dir[0];
+            int c = col + dir[1];
+            while (isValidPosition(r, c) && board[r][c] == BLACK) {
+                count++;
+                r += dir[0];
+                c += dir[1];
+            }
+            
+            // 向相反方向检查
+            r = row - dir[0];
+            c = col - dir[1];
+            while (isValidPosition(r, c) && board[r][c] == BLACK) {
+                count++;
+                r -= dir[0];
+                c -= dir[1];
+            }
+            
+            if (count >= 6) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 检查三三禁手
+     */
+    private boolean checkDoubleThree(int row, int col) {
+        int threeCount = 0;
+        int[][] directions = {{0, 1}, {1, 0}, {1, 1}, {1, -1}};
+        
+        for (int[] dir : directions) {
+            if (isLiveThree(row, col, dir[0], dir[1])) {
+                threeCount++;
+            }
+        }
+        
+        return threeCount >= 2;
+    }
+    
+    /**
+     * 检查四四禁手
+     */
+    private boolean checkDoubleFour(int row, int col) {
+        int fourCount = 0;
+        int[][] directions = {{0, 1}, {1, 0}, {1, 1}, {1, -1}};
+        
+        for (int[] dir : directions) {
+            if (isLiveFour(row, col, dir[0], dir[1]) || isRushFour(row, col, dir[0], dir[1])) {
+                fourCount++;
+            }
+        }
+        
+        return fourCount >= 2;
+    }
+    
+    /**
+     * 检查是否为活三
+     */
+    private boolean isLiveThree(int row, int col, int rowDelta, int colDelta) {
+        int count = 1;
+        int leftEmpty = 0, rightEmpty = 0;
+        
+        // 向一个方向检查
+        int r = row + rowDelta;
+        int c = col + colDelta;
+        while (isValidPosition(r, c) && board[r][c] == BLACK) {
+            count++;
+            r += rowDelta;
+            c += colDelta;
+        }
+        if (isValidPosition(r, c) && board[r][c] == ' ') {
+            rightEmpty = 1;
+        }
+        
+        // 向相反方向检查
+        r = row - rowDelta;
+        c = col - colDelta;
+        while (isValidPosition(r, c) && board[r][c] == BLACK) {
+            count++;
+            r -= rowDelta;
+            c -= colDelta;
+        }
+        if (isValidPosition(r, c) && board[r][c] == ' ') {
+            leftEmpty = 1;
+        }
+        
+        // 活三：连续三个黑子，两端都有空位
+        return count == 3 && leftEmpty == 1 && rightEmpty == 1;
+    }
+    
+    /**
+     * 检查是否为活四
+     */
+    private boolean isLiveFour(int row, int col, int rowDelta, int colDelta) {
+        int count = 1;
+        int leftEmpty = 0, rightEmpty = 0;
+        
+        // 向一个方向检查
+        int r = row + rowDelta;
+        int c = col + colDelta;
+        while (isValidPosition(r, c) && board[r][c] == BLACK) {
+            count++;
+            r += rowDelta;
+            c += colDelta;
+        }
+        if (isValidPosition(r, c) && board[r][c] == ' ') {
+            rightEmpty = 1;
+        }
+        
+        // 向相反方向检查
+        r = row - rowDelta;
+        c = col - colDelta;
+        while (isValidPosition(r, c) && board[r][c] == BLACK) {
+            count++;
+            r -= rowDelta;
+            c -= colDelta;
+        }
+        if (isValidPosition(r, c) && board[r][c] == ' ') {
+            leftEmpty = 1;
+        }
+        
+        // 活四：连续四个黑子，两端都有空位
+        return count == 4 && leftEmpty == 1 && rightEmpty == 1;
+    }
+    
+    /**
+     * 检查是否为冲四
+     */
+    private boolean isRushFour(int row, int col, int rowDelta, int colDelta) {
+        int count = 1;
+        int emptyCount = 0;
+        
+        // 向一个方向检查
+        int r = row + rowDelta;
+        int c = col + colDelta;
+        while (isValidPosition(r, c) && board[r][c] == BLACK) {
+            count++;
+            r += rowDelta;
+            c += colDelta;
+        }
+        if (isValidPosition(r, c) && board[r][c] == ' ') {
+            emptyCount++;
+        }
+        
+        // 向相反方向检查
+        r = row - rowDelta;
+        c = col - colDelta;
+        while (isValidPosition(r, c) && board[r][c] == BLACK) {
+            count++;
+            r -= rowDelta;
+            c -= colDelta;
+        }
+        if (isValidPosition(r, c) && board[r][c] == ' ') {
+            emptyCount++;
+        }
+        
+        // 冲四：连续四个黑子，只有一端有空位
+        return count == 4 && emptyCount == 1;
     }
     
     /**

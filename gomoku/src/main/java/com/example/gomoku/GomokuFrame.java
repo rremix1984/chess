@@ -1,10 +1,10 @@
-package com.example.gomoku.ui;
+package com.example.gomoku;
 
+import com.example.common.config.GameConfig;
 import com.example.common.utils.ExceptionHandler;
-import com.example.launcher.GameSelectionFrame;
-import com.example.common.utils.ResourceManager;
 import com.example.common.utils.OllamaModelManager;
 import com.example.gomoku.core.GameState;
+import com.example.gomoku.ui.*; // 导入所有UI包中的类
 
 import javax.swing.*;
 import java.awt.*;
@@ -20,6 +20,7 @@ public class GomokuFrame extends JFrame {
     private JLabel statusLabel;
     private GomokuBoardPanel boardPanel;
     private ChatPanel chatPanel;
+    private JTextArea aiLogArea;
     private JButton aiToggleButton;
     private JComboBox<String> difficultyComboBox;
     private JComboBox<String> playerColorComboBox;
@@ -27,12 +28,55 @@ public class GomokuFrame extends JFrame {
     private JComboBox<String> modelComboBox;
     
     // 游戏模式相关
-    private JComboBox<String> gameModeComboBox;
-    private JButton startGameButton;
+    private ButtonGroup gameModeGroup;
+    private JRadioButton playerVsAIRadio;
+    private JRadioButton aiVsAIRadio;
+    private JRadioButton playerVsPlayerRadio;
+    private JButton startButton;
+    private JButton pauseButton;
     private String currentGameMode = "玩家对玩家";
     private boolean isAIvsAIMode = false;
-    private GomokuAI blackAI;
-    private GomokuAI whiteAI;
+    private Object blackAI;
+    private Object whiteAI;
+    
+    // 棋局状态统计信息
+    private JLabel gameStatsLabel;
+    private JLabel playerInfoLabel;
+    private JLabel moveCountLabel;
+    private JLabel advantageLabel;
+
+    /**
+     * 统一按钮样式和点击效果
+     */
+    private void styleButton(JButton button) {
+        button.setFocusPainted(false);
+        button.setBorderPainted(true);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+        
+        // 添加鼠标悬停效果
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(button.getBackground().brighter());
+            }
+            
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(UIManager.getColor("Button.background"));
+            }
+            
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                button.setBackground(button.getBackground().darker());
+            }
+            
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                button.setBackground(UIManager.getColor("Button.background"));
+            }
+        });
+    }
 
     public GomokuFrame() {
         setTitle(GameConfig.WINDOW_TITLE);
@@ -61,13 +105,13 @@ public class GomokuFrame extends JFrame {
         // 设置ChatPanel的五子棋棋盘引用
         chatPanel.setGomokuBoard(boardPanel.getBoard());
         
-        // 创建主要内容面板（棋盘+聊天）
+        // 创建主要内容面板（棋盘+右侧面板）
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.add(boardPanel, BorderLayout.CENTER);
         
-        // 将聊天面板放在右侧
-        chatPanel.setPreferredSize(new Dimension(GameConfig.CHAT_PANEL_WIDTH, GameConfig.CHAT_PANEL_HEIGHT));
-        mainPanel.add(chatPanel, BorderLayout.EAST);
+        // 创建右侧面板（AI日志+聊天）
+        JPanel rightPanel = createRightPanel();
+        mainPanel.add(rightPanel, BorderLayout.EAST);
         add(mainPanel, BorderLayout.CENTER);
 
         // 创建控制面板
@@ -94,19 +138,33 @@ public class GomokuFrame extends JFrame {
     private JPanel createControlPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createTitledBorder("🎮 五子棋对弈控制"));
-        panel.setPreferredSize(new Dimension(GameConfig.WINDOW_WIDTH, 80));
+        panel.setPreferredSize(new Dimension(GameConfig.WINDOW_WIDTH, 120)); // 增加高度以容纳更多按钮
 
         // 左侧：基本设置（紧凑布局）
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         
         // 游戏模式选择
         leftPanel.add(new JLabel("模式:"));
-        String[] gameModes = {"玩家对玩家", "玩家对AI", "AI对AI"};
-        gameModeComboBox = new JComboBox<>(gameModes);
-        gameModeComboBox.setPreferredSize(new Dimension(100, 25));
-        gameModeComboBox.setFont(GameConfig.DEFAULT_FONT);
-        gameModeComboBox.addActionListener(e -> updateGameModeSettings());
-        leftPanel.add(gameModeComboBox);
+        gameModeGroup = new ButtonGroup();
+        playerVsPlayerRadio = new JRadioButton("玩家对玩家", true);
+        playerVsAIRadio = new JRadioButton("玩家对AI");
+        aiVsAIRadio = new JRadioButton("AI对AI");
+        
+        playerVsPlayerRadio.setFont(GameConfig.DEFAULT_FONT);
+        playerVsAIRadio.setFont(GameConfig.DEFAULT_FONT);
+        aiVsAIRadio.setFont(GameConfig.DEFAULT_FONT);
+        
+        playerVsPlayerRadio.addActionListener(e -> updateGameModeSettings());
+        playerVsAIRadio.addActionListener(e -> updateGameModeSettings());
+        aiVsAIRadio.addActionListener(e -> updateGameModeSettings());
+        
+        gameModeGroup.add(playerVsPlayerRadio);
+        gameModeGroup.add(playerVsAIRadio);
+        gameModeGroup.add(aiVsAIRadio);
+        
+        leftPanel.add(playerVsPlayerRadio);
+        leftPanel.add(playerVsAIRadio);
+        leftPanel.add(aiVsAIRadio);
         
         // 玩家颜色选择
         leftPanel.add(new JLabel("颜色:"));
@@ -154,38 +212,144 @@ public class GomokuFrame extends JFrame {
         
         panel.add(leftPanel, BorderLayout.CENTER);
 
-        // 右侧：控制按钮
-        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        // 右侧：控制按钮（使用两行布局）
+        JPanel rightPanel = new JPanel(new GridLayout(2, 4, 5, 5));
+        rightPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        
+        // 第一行按钮
+        // 启动游戏按钮
+        startButton = new JButton("启动游戏");
+        startButton.setFont(GameConfig.BUTTON_FONT);
+        startButton.setPreferredSize(new Dimension(80, 30));
+        startButton.addActionListener(e -> startGame());
+        styleButton(startButton);
+        rightPanel.add(startButton);
+        
+        // 暂停游戏按钮
+        pauseButton = new JButton("暂停游戏");
+        pauseButton.setFont(GameConfig.BUTTON_FONT);
+        pauseButton.setPreferredSize(new Dimension(80, 30));
+        pauseButton.addActionListener(e -> pauseGame());
+        pauseButton.setEnabled(false); // 初始状态禁用
+        styleButton(pauseButton);
+        rightPanel.add(pauseButton);
         
         // 启用/禁用AI按钮
         aiToggleButton = new JButton("启用AI");
         aiToggleButton.setFont(GameConfig.BUTTON_FONT);
-        aiToggleButton.setPreferredSize(GameConfig.BUTTON_SIZE);
+        aiToggleButton.setPreferredSize(new Dimension(80, 30));
         aiToggleButton.addActionListener(e -> toggleAI());
+        styleButton(aiToggleButton);
         rightPanel.add(aiToggleButton);
         
         // 悔棋按钮
         JButton undoButton = new JButton("悔棋");
         undoButton.setFont(GameConfig.BUTTON_FONT);
-        undoButton.setPreferredSize(GameConfig.BUTTON_SIZE);
+        undoButton.setPreferredSize(new Dimension(80, 30));
         undoButton.addActionListener(e -> boardPanel.undoLastMove());
+        styleButton(undoButton);
         rightPanel.add(undoButton);
         
+        // 第二行按钮
         // 重新开始按钮
         JButton restartButton = new JButton("重新开始");
         restartButton.setFont(GameConfig.BUTTON_FONT);
-        restartButton.setPreferredSize(GameConfig.BUTTON_SIZE);
+        restartButton.setPreferredSize(new Dimension(80, 30));
         restartButton.addActionListener(e -> restartGame());
+        styleButton(restartButton);
         rightPanel.add(restartButton);
         
-        // 返回按钮
+        // 退出游戏按钮
+        JButton exitButton = new JButton("退出游戏");
+        exitButton.setFont(GameConfig.BUTTON_FONT);
+        exitButton.setPreferredSize(new Dimension(80, 30));
+        exitButton.addActionListener(e -> exitGame());
+        styleButton(exitButton);
+        rightPanel.add(exitButton);
+        
+        // 返回选择按钮
         JButton backButton = new JButton("返回选择");
         backButton.setFont(GameConfig.BUTTON_FONT);
-        backButton.setPreferredSize(GameConfig.BUTTON_SIZE);
+        backButton.setPreferredSize(new Dimension(80, 30));
         backButton.addActionListener(e -> returnToSelection());
+        styleButton(backButton);
         rightPanel.add(backButton);
         
+        // 占位按钮（保持布局对齐）
+        JLabel spacer = new JLabel("");
+        rightPanel.add(spacer);
+        
         panel.add(rightPanel, BorderLayout.EAST);
+        
+        // 添加棋局状态统计面板
+        JPanel gameStatsPanel = createGameStatsPanel();
+        panel.add(gameStatsPanel, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    /**
+     * 创建棋局状态统计面板
+     */
+    private JPanel createGameStatsPanel() {
+        JPanel panel = new JPanel(new GridLayout(2, 2, 10, 5));
+        panel.setBorder(BorderFactory.createTitledBorder("📊 棋局状态统计"));
+        panel.setBackground(Color.LIGHT_GRAY);
+        
+        // 对战双方信息
+        playerInfoLabel = new JLabel("⚫：玩家   ⚪：AI");
+        playerInfoLabel.setFont(GameConfig.DEFAULT_FONT);
+        playerInfoLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        // 手数统计
+        moveCountLabel = new JLabel("手数：0");
+        moveCountLabel.setFont(GameConfig.DEFAULT_FONT);
+        moveCountLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        // 优势分析
+        advantageLabel = new JLabel("优势：均势");
+        advantageLabel.setFont(GameConfig.DEFAULT_FONT);
+        advantageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        // 游戏状态
+        gameStatsLabel = new JLabel("状态：等待开始");
+        gameStatsLabel.setFont(GameConfig.DEFAULT_FONT);
+        gameStatsLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        panel.add(playerInfoLabel);
+        panel.add(moveCountLabel);
+        panel.add(advantageLabel);
+        panel.add(gameStatsLabel);
+        
+        return panel;
+    }
+    
+    /**
+     * 创建右侧面板（AI日志+聊天）
+     */
+    private JPanel createRightPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setPreferredSize(new Dimension(GameConfig.CHAT_PANEL_WIDTH, GameConfig.CHAT_PANEL_HEIGHT));
+        
+        // AI日志面板
+        JPanel aiLogPanel = new JPanel(new BorderLayout());
+        aiLogPanel.setBorder(BorderFactory.createTitledBorder("🤖 AI分析日志"));
+        aiLogPanel.setPreferredSize(new Dimension(GameConfig.CHAT_PANEL_WIDTH, 200));
+        
+        aiLogArea = new JTextArea();
+        aiLogArea.setEditable(false);
+        aiLogArea.setFont(GameConfig.DEFAULT_FONT);
+        aiLogArea.setBackground(GameConfig.CHAT_BACKGROUND_COLOR);
+        aiLogArea.setText("等待AI启用...\n");
+        
+        JScrollPane aiLogScrollPane = new JScrollPane(aiLogArea);
+        aiLogPanel.add(aiLogScrollPane, BorderLayout.CENTER);
+        
+        // 聊天面板
+        chatPanel.setPreferredSize(new Dimension(GameConfig.CHAT_PANEL_WIDTH, 400));
+        
+        panel.add(aiLogPanel, BorderLayout.NORTH);
+        panel.add(chatPanel, BorderLayout.CENTER);
         
         return panel;
     }
@@ -221,7 +385,13 @@ public class GomokuFrame extends JFrame {
      * 更新游戏模式设置
      */
     private void updateGameModeSettings() {
-        currentGameMode = (String) gameModeComboBox.getSelectedItem();
+        if (playerVsPlayerRadio.isSelected()) {
+            currentGameMode = "玩家对玩家";
+        } else if (playerVsAIRadio.isSelected()) {
+            currentGameMode = "玩家对AI";
+        } else if (aiVsAIRadio.isSelected()) {
+            currentGameMode = "AI对AI";
+        }
         
         switch (currentGameMode) {
             case "玩家对玩家":
@@ -267,13 +437,9 @@ public class GomokuFrame extends JFrame {
             String difficulty = (String) difficultyComboBox.getSelectedItem();
             String model = (String) modelComboBox.getSelectedItem();
             
-            if ("大模型AI".equals(aiType)) {
-                blackAI = new GomokuLLMAI(difficulty, model); // 黑方
-                whiteAI = new GomokuLLMAI(difficulty, model); // 白方
-            } else {
-                blackAI = new GomokuAI(difficulty);
-                whiteAI = new GomokuAI(difficulty);
-            }
+            // 统一使用GomokuAdvancedAI
+            blackAI = new GomokuAdvancedAI(difficulty);
+            whiteAI = new GomokuAdvancedAI(difficulty);
             
             // 如果当前是黑方回合且是AI对AI模式，立即开始AI思考
             if (boardPanel.getBoard().isBlackTurn()) {
@@ -295,9 +461,13 @@ public class GomokuFrame extends JFrame {
         
         SwingUtilities.invokeLater(() -> {
             try {
-                GomokuAI currentAI = boardPanel.getBoard().isBlackTurn() ? blackAI : whiteAI;
+                Object currentAI = boardPanel.getBoard().isBlackTurn() ? blackAI : whiteAI;
                 if (currentAI != null) {
-                    int[] move = currentAI.getNextMove(boardPanel.getBoard());
+                    int[] move = null;
+                    if (currentAI instanceof GomokuAdvancedAI) {
+                        move = ((GomokuAdvancedAI) currentAI).getNextMove(boardPanel.getBoard());
+                    }
+                    
                     if (move != null && move.length == 2) {
                         // 直接在棋盘上落子
                         if (boardPanel.getBoard().placePiece(move[0], move[1])) {
@@ -423,17 +593,25 @@ public class GomokuFrame extends JFrame {
      */
     private void returnToSelection() {
         try {
-            handleWindowClosing(); // 确保资源正确释放
-            SwingUtilities.invokeLater(() -> {
-                try {
-                    GameSelectionFrame frame = new GameSelectionFrame();
-                    frame.setVisible(true);
-                } catch (Exception e) {
-                    ExceptionHandler.handleException(e, "打开游戏选择界面", true);
-                }
-            });
+            // 停止AI对AI模式
+            if (isAIvsAIMode) {
+                boardPanel.setAIEnabled(false);
+                isAIvsAIMode = false;
+            }
+            
+            // 清理资源
+            if (chatPanel != null) {
+                chatPanel.setEnabled(false);
+            }
+            
+            // 关闭当前窗口
+            dispose();
+            
+            // TODO: 添加返回游戏选择界面的逻辑
+            System.out.println("返回游戏选择界面");
+            
         } catch (Exception e) {
-            ExceptionHandler.handleException(e, "返回游戏选择", true);
+            ExceptionHandler.handleException(e, "返回游戏选择界面", false);
         }
     }
     
@@ -458,7 +636,6 @@ public class GomokuFrame extends JFrame {
             // 如果这是最后一个窗口，退出应用程序
             if (Window.getWindows().length <= 1) {
                 ExceptionHandler.logInfo("应用程序即将退出，正在清理资源...", "五子棋界面");
-                ResourceManager.getInstance().shutdown();
                 System.exit(0);
             }
         } catch (Exception e) {
@@ -494,6 +671,56 @@ public class GomokuFrame extends JFrame {
     public void autoEnableAI() {
         if (aiToggleButton.getText().equals("启用AI")) {
             toggleAI();
+        }
+    }
+    
+    /**
+     * 启动游戏
+     */
+    private void startGame() {
+        if (boardPanel != null) {
+            boardPanel.resetGame();
+            updateStatus("⚫ 当前玩家: 黑方");
+            startButton.setEnabled(false);
+            pauseButton.setEnabled(true);
+            
+            // 如果是AI对AI模式，开始AI对弈
+            if (aiVsAIRadio.isSelected()) {
+                initializeAIvsAI();
+            }
+            
+            ExceptionHandler.logInfo("游戏已启动", "五子棋界面");
+        }
+    }
+
+    /**
+     * 暂停游戏
+     */
+    private void pauseGame() {
+        if (boardPanel != null) {
+            // 暂停AI对AI模式
+            isAIvsAIMode = false;
+            startButton.setEnabled(true);
+            pauseButton.setEnabled(false);
+            updateStatus("游戏已暂停");
+            ExceptionHandler.logInfo("游戏已暂停", "五子棋界面");
+        }
+    }
+
+    /**
+     * 退出游戏
+     */
+    private void exitGame() {
+        int option = JOptionPane.showConfirmDialog(
+            this,
+            "确定要退出游戏吗？",
+            "退出确认",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE
+        );
+        
+        if (option == JOptionPane.YES_OPTION) {
+            handleWindowClosing();
         }
     }
     

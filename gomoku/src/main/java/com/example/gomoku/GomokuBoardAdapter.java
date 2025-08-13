@@ -1,4 +1,4 @@
-package com.example.gomoku.ui;
+package com.example.gomoku;
 
 import com.example.gomoku.core.*;
 
@@ -6,7 +6,7 @@ import com.example.gomoku.core.*;
  * 五子棋棋盘适配器
  * 将GomokuBoard适配为Board接口，使ChatPanel能够处理五子棋棋盘
  */
-public class GomokuBoardAdapter extends Board {
+public class GomokuBoardAdapter implements Board {
     
     private com.example.gomoku.core.GomokuBoard gomokuBoard;
     
@@ -15,51 +15,45 @@ public class GomokuBoardAdapter extends Board {
     }
     
     @Override
-    public Piece getPiece(int row, int col) {
-        // 将五子棋的棋子转换为象棋的Piece对象
-        char piece = gomokuBoard.getPiece(row, col);
+    public Piece getPieceAt(Position position) {
+        char piece = gomokuBoard.getPiece(position.getX(), position.getY());
         if (piece == com.example.gomoku.core.GomokuBoard.BLACK) {
-            // 创建一个虚拟的黑色棋子
-            return new VirtualPiece(PieceColor.BLACK, "黑");
+            return new Piece(PieceColor.BLACK, position);
         } else if (piece == com.example.gomoku.core.GomokuBoard.WHITE) {
-            // 创建一个虚拟的白色棋子
-            return new VirtualPiece(PieceColor.RED, "白"); // 使用RED代表白子
+            return new Piece(PieceColor.WHITE, position);
         }
-        return null; // 空位置
+        return null;
     }
     
     @Override
-    public void setPiece(int row, int col, Piece piece) {
-        // 五子棋不支持直接设置棋子，这个方法留空
+    public boolean isEmpty(Position position) {
+        char piece = gomokuBoard.getPiece(position.getX(), position.getY());
+        return piece == ' ';
     }
     
     @Override
-    public void movePiece(Position start, Position end) {
-        // 五子棋不支持移动棋子，这个方法留空
+    public boolean placePiece(Position position, Piece piece) {
+        // 五子棋通过placePiece方法放置棋子
+        return gomokuBoard.placePiece(position.getX(), position.getY());
     }
     
     @Override
-    public void initializeBoard() {
-        // 五子棋的初始化由GomokuBoard自己处理
+    public void removePiece(Position position) {
+        // 五子棋支持移除棋子（用于悔棋）
+        gomokuBoard.removePiece(position.getX(), position.getY());
     }
     
     @Override
-    public void printBoard() {
-        // 打印五子棋棋盘状态
-        System.out.println("五子棋棋盘状态:");
-        for (int i = 0; i < com.example.gomoku.core.GomokuBoard.BOARD_SIZE; i++) {
-            for (int j = 0; j < com.example.gomoku.core.GomokuBoard.BOARD_SIZE; j++) {
-                char piece = gomokuBoard.getPiece(i, j);
-                if (piece == com.example.gomoku.core.GomokuBoard.BLACK) {
-                    System.out.print("⚫ ");
-                } else if (piece == com.example.gomoku.core.GomokuBoard.WHITE) {
-                    System.out.print("⚪ ");
-                } else {
-                    System.out.print("+ ");
-                }
-            }
-            System.out.println();
-        }
+    public int getSize() {
+        return com.example.gomoku.core.GomokuBoard.BOARD_SIZE;
+    }
+    
+    @Override
+    public boolean isValidPosition(Position position) {
+        int x = position.getX();
+        int y = position.getY();
+        return x >= 0 && x < com.example.gomoku.core.GomokuBoard.BOARD_SIZE && 
+               y >= 0 && y < com.example.gomoku.core.GomokuBoard.BOARD_SIZE;
     }
     
     /**
@@ -67,33 +61,5 @@ public class GomokuBoardAdapter extends Board {
      */
     public com.example.gomoku.core.GomokuBoard getGomokuBoard() {
         return gomokuBoard;
-    }
-    
-    /**
-     * 虚拟棋子类，用于适配五子棋棋子到象棋Piece接口
-     */
-    private static class VirtualPiece extends Piece {
-        private String name;
-        
-        public VirtualPiece(PieceColor color, String name) {
-            super(color);
-            this.name = name;
-        }
-        
-        @Override
-        public String getChineseName() {
-            return name;
-        }
-        
-        @Override
-        public boolean isValidMove(Board board, Position start, Position end) {
-            // 五子棋棋子不能移动
-            return false;
-        }
-
-        @Override
-        public Piece clone() {
-            return new VirtualPiece(this.color, this.name);
-        }
     }
 }

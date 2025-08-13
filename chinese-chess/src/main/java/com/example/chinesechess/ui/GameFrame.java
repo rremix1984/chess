@@ -53,6 +53,8 @@ public class GameFrame extends JFrame {
     // 残局功能相关组件
     private JButton endgameButton;
     private JComboBox<String> endgameAIColorComboBox;
+    private JComboBox<String> endgameFirstMoveComboBox; // 谁先手选择
+    private JComboBox<String> endgamePlayerModeComboBox; // 玩家模式选择
     private JButton startEndgameButton;
     private JButton aiVsAiEndgameButton;
     private boolean isInEndgameSetup = false;
@@ -113,6 +115,67 @@ public class GameFrame extends JFrame {
         
         // 默认启用大模型AI
         initializeDefaultAI();
+    }
+    
+    /**
+     * 设置按钮样式
+     */
+    private void styleButton(JButton button) {
+        button.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createRaisedBevelBorder(),
+            BorderFactory.createEmptyBorder(3, 8, 3, 8)
+        ));
+        button.setBackground(new Color(240, 240, 240));
+        button.setForeground(Color.BLACK);
+        button.setOpaque(true);
+        
+        // 添加鼠标交互效果
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            Color originalColor = new Color(240, 240, 240);
+            
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(originalColor.brighter());
+                button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            }
+            
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(originalColor);
+                button.setCursor(Cursor.getDefaultCursor());
+                // 恢复正常边框
+                button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createRaisedBevelBorder(),
+                    BorderFactory.createEmptyBorder(3, 8, 3, 8)
+                ));
+            }
+            
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                // 按下时的效果：更暗的颜色和凹陷边框
+                button.setBackground(originalColor.darker());
+                button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLoweredBevelBorder(),
+                    BorderFactory.createEmptyBorder(3, 8, 3, 8)
+                ));
+            }
+            
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                // 释放时恢复悬停效果
+                if (button.contains(evt.getPoint())) {
+                    button.setBackground(originalColor.brighter());
+                } else {
+                    button.setBackground(originalColor);
+                }
+                button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createRaisedBevelBorder(),
+                    BorderFactory.createEmptyBorder(3, 8, 3, 8)
+                ));
+            }
+        });
     }
 
     private JPanel createControlPanel() {
@@ -198,6 +261,7 @@ public class GameFrame extends JFrame {
         startGameButton.setPreferredSize(new Dimension(80, 30));
         startGameButton.setToolTipText("启动选定模式的游戏");
         startGameButton.addActionListener(e -> startGame());
+        styleButton(startGameButton);
         gameControlPanel.add(startGameButton);
         
         // 暂停游戏按钮
@@ -206,6 +270,7 @@ public class GameFrame extends JFrame {
         pauseGameButton.setToolTipText("暂停当前游戏并保存棋局");
         pauseGameButton.setEnabled(false);
         pauseGameButton.addActionListener(e -> pauseGame());
+        styleButton(pauseGameButton);
         gameControlPanel.add(pauseGameButton);
         
         rightPanel.add(gameControlPanel);
@@ -214,6 +279,7 @@ public class GameFrame extends JFrame {
         JButton undoButton = new JButton("悔棋");
         undoButton.setPreferredSize(new Dimension(60, 30));
         undoButton.addActionListener(e -> boardPanel.undoLastMove());
+        styleButton(undoButton);
         rightPanel.add(undoButton);
         
         // 棋盘翻转按钮
@@ -221,12 +287,14 @@ public class GameFrame extends JFrame {
         flipButton.setPreferredSize(new Dimension(60, 30));
         flipButton.setToolTipText("翻转棋盘视角");
         flipButton.addActionListener(e -> boardPanel.flipBoard());
+        styleButton(flipButton);
         rightPanel.add(flipButton);
 
         // 新游戏按钮
         JButton newGameButton = new JButton("新游戏");
         newGameButton.setPreferredSize(new Dimension(80, 30));
         newGameButton.addActionListener(e -> startNewGame());
+        styleButton(newGameButton);
         rightPanel.add(newGameButton);
         
         // 残局按钮
@@ -234,7 +302,21 @@ public class GameFrame extends JFrame {
         endgameButton.setPreferredSize(new Dimension(60, 30));
         endgameButton.setToolTipText("进入残局设置模式");
         endgameButton.addActionListener(e -> toggleEndgameSetup());
+        styleButton(endgameButton);
         rightPanel.add(endgameButton);
+        
+        // 残局先手选择（初始隐藏）
+        endgameFirstMoveComboBox = new JComboBox<>(new String[]{"红方先手", "黑方先手"});
+        endgameFirstMoveComboBox.setPreferredSize(new Dimension(80, 30));
+        endgameFirstMoveComboBox.setVisible(false);
+        rightPanel.add(endgameFirstMoveComboBox);
+        
+        // 残局玩家模式选择（初始隐藏）
+        endgamePlayerModeComboBox = new JComboBox<>(new String[]{"玩家对AI", "AI对AI", "玩家对玩家"});
+        endgamePlayerModeComboBox.setPreferredSize(new Dimension(100, 30));
+        endgamePlayerModeComboBox.setVisible(false);
+        endgamePlayerModeComboBox.addActionListener(e -> updateEndgameAIOptions());
+        rightPanel.add(endgamePlayerModeComboBox);
         
         // 残局AI颜色选择（初始隐藏）
         endgameAIColorComboBox = new JComboBox<>(new String[]{"AI执红", "AI执黑"});
@@ -248,6 +330,7 @@ public class GameFrame extends JFrame {
         startEndgameButton.setToolTipText("开始残局游戏");
         startEndgameButton.setVisible(false);
         startEndgameButton.addActionListener(e -> startEndgameGame());
+        styleButton(startEndgameButton);
         rightPanel.add(startEndgameButton);
         
         // AI对AI残局按钮（初始隐藏）
@@ -256,6 +339,7 @@ public class GameFrame extends JFrame {
         aiVsAiEndgameButton.setToolTipText("开始AI对AI残局游戏");
         aiVsAiEndgameButton.setVisible(false);
         aiVsAiEndgameButton.addActionListener(e -> startAIvsAIEndgameGame());
+        styleButton(aiVsAiEndgameButton);
         rightPanel.add(aiVsAiEndgameButton);
         
         // 返回主菜单按钮
@@ -263,6 +347,7 @@ public class GameFrame extends JFrame {
         returnButton.setToolTipText("返回主菜单");
         returnButton.setPreferredSize(new Dimension(40, 30));
         returnButton.addActionListener(e -> returnToSelection());
+        styleButton(returnButton);
         rightPanel.add(returnButton);
         
         panel.add(rightPanel, BorderLayout.EAST);
@@ -283,6 +368,19 @@ public class GameFrame extends JFrame {
         } else {
             modelComboBox.setBackground(Color.LIGHT_GRAY);
         }
+    }
+    
+    /**
+     * 更新残局AI选项的可见性
+     */
+    private void updateEndgameAIOptions() {
+        String selectedMode = (String) endgamePlayerModeComboBox.getSelectedItem();
+        boolean showAIOptions = "玩家对AI".equals(selectedMode);
+        endgameAIColorComboBox.setVisible(showAIOptions);
+        
+        // 刷新界面
+        revalidate();
+        repaint();
     }
 
 
@@ -448,9 +546,11 @@ public class GameFrame extends JFrame {
             // 更新UI
             endgameButton.setText("退出残局");
             endgameButton.setToolTipText("退出残局设置模式");
-            endgameAIColorComboBox.setVisible(true);
+            endgameFirstMoveComboBox.setVisible(true);
+            endgamePlayerModeComboBox.setVisible(true);
+            updateEndgameAIOptions(); // 根据选择的模式显示AI选项
             startEndgameButton.setVisible(true);
-            aiVsAiEndgameButton.setVisible(true);
+            aiVsAiEndgameButton.setVisible(false); // 隐藏旧的AI对AI按钮，使用新的模式选择
             
             // 禁用其他按钮
             playerColorComboBox.setEnabled(false);
@@ -468,6 +568,8 @@ public class GameFrame extends JFrame {
             // 更新UI
             endgameButton.setText("残局");
             endgameButton.setToolTipText("进入残局设置模式");
+            endgameFirstMoveComboBox.setVisible(false);
+            endgamePlayerModeComboBox.setVisible(false);
             endgameAIColorComboBox.setVisible(false);
             startEndgameButton.setVisible(false);
             aiVsAiEndgameButton.setVisible(false);
@@ -494,35 +596,78 @@ public class GameFrame extends JFrame {
             return;
         }
         
-        // 获取AI颜色选择
-        String aiColorSelection = (String) endgameAIColorComboBox.getSelectedItem();
-        PieceColor aiColor = aiColorSelection.equals("AI执红") ? PieceColor.RED : PieceColor.BLACK;
+        // 获取先手选择
+        String firstMoveSelection = (String) endgameFirstMoveComboBox.getSelectedItem();
+        PieceColor firstMoveColor = firstMoveSelection.equals("红方先手") ? PieceColor.RED : PieceColor.BLACK;
+        
+        // 获取玩家模式选择
+        String playerModeSelection = (String) endgamePlayerModeComboBox.getSelectedItem();
         
         // 获取当前AI设置
         int aiTypeIndex = aiTypeComboBox.getSelectedIndex();
         int difficulty = difficultyComboBox.getSelectedIndex() + 1;
         String modelName = (String) modelComboBox.getSelectedItem();
         
+        // 根据选择的模式启动不同的残局游戏
+        switch (playerModeSelection) {
+            case "玩家对AI":
+                startPlayerVsAIEndgame(firstMoveColor, aiTypeIndex, difficulty, modelName);
+                break;
+            case "AI对AI":
+                startAIVsAIEndgame(firstMoveColor, aiTypeIndex, difficulty, modelName);
+                break;
+            case "玩家对玩家":
+                startPlayerVsPlayerEndgame(firstMoveColor);
+                break;
+        }
+        
+        // 退出残局设置模式
+        isInEndgameSetup = false;
+        
+        // 更新UI
+        endgameButton.setText("残局");
+        endgameButton.setToolTipText("进入残局设置模式");
+        endgameFirstMoveComboBox.setVisible(false);
+        endgamePlayerModeComboBox.setVisible(false);
+        endgameAIColorComboBox.setVisible(false);
+        startEndgameButton.setVisible(false);
+        aiVsAiEndgameButton.setVisible(false);
+        
+        // 刷新界面
+        revalidate();
+        repaint();
+    }
+    
+    /**
+     * 开始玩家对AI残局游戏
+     */
+    private void startPlayerVsAIEndgame(PieceColor firstMoveColor, int aiTypeIndex, int difficulty, String modelName) {
+        // 获取AI颜色选择
+        String aiColorSelection = (String) endgameAIColorComboBox.getSelectedItem();
+        PieceColor aiColor = aiColorSelection.equals("AI执红") ? PieceColor.RED : PieceColor.BLACK;
+        
+        // 设置先手
+        boardPanel.setCurrentPlayer(firstMoveColor);
+        
         // 启动残局游戏
         boardPanel.startEndgameGame(aiColor);
         
         // 根据AI类型启用相应的AI
-        PieceColor humanColor = (aiColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
         switch (aiTypeIndex) {
             case 0: // 传统AI
-                boardPanel.enableAI(humanColor, difficulty, false, null);
+                boardPanel.enableAI(aiColor, difficulty, false, null);
                 break;
             case 1: // 增强AI
-                boardPanel.enableEnhancedAI(humanColor, difficulty);
+                boardPanel.enableEnhancedAI(aiColor, difficulty);
                 break;
             case 2: // 大模型AI
-                boardPanel.enableAI(humanColor, difficulty, true, modelName);
+                boardPanel.enableAI(aiColor, difficulty, true, modelName);
                 break;
             case 3: // 混合AI
-                boardPanel.enableHybridAI(humanColor, difficulty, modelName);
+                boardPanel.enableHybridAI(aiColor, difficulty, modelName);
                 break;
             case 4: // DeepSeek+Pikafish
-                boardPanel.enableDeepSeekPikafishAI(humanColor, difficulty, modelName);
+                boardPanel.enableDeepSeekPikafishAI(aiColor, difficulty, modelName);
                 break;
         }
         
@@ -537,34 +682,79 @@ public class GameFrame extends JFrame {
             aiLogPanel.setEnabled(true);
         }
         
-        // 退出残局设置模式
-        isInEndgameSetup = false;
-        
-        // 更新UI
-        endgameButton.setText("残局");
-        endgameButton.setToolTipText("进入残局设置模式");
-        endgameAIColorComboBox.setVisible(false);
-        startEndgameButton.setVisible(false);
-        aiVsAiEndgameButton.setVisible(false);
-        
-        // 禁用AI相关控件（因为已经启用了AI）
+        // 禁用AI相关控件
         playerColorComboBox.setEnabled(false);
         difficultyComboBox.setEnabled(false);
         aiTypeComboBox.setEnabled(false);
         modelComboBox.setEnabled(false);
         
         String aiColorName = (aiColor == PieceColor.RED) ? "红方" : "黑方";
-        String humanColorName = (humanColor == PieceColor.RED) ? "红方" : "黑方";
-        updateStatus("🎯 残局游戏开始 - AI执" + aiColorName + "，玩家执" + humanColorName);
+        String humanColorName = (aiColor == PieceColor.RED) ? "黑方" : "红方";
+        String firstMoveName = (firstMoveColor == PieceColor.RED) ? "红方" : "黑方";
+        updateStatus("🎯 残局游戏开始 - AI执" + aiColorName + "，玩家执" + humanColorName + "，" + firstMoveName + "先手");
         
-        // 刷新界面
-        revalidate();
-        repaint();
-        
-        System.out.println("🎯 残局游戏开始:");
+        System.out.println("🎯 玩家对AI残局游戏开始:");
         System.out.println("   - AI颜色: " + aiColorName);
         System.out.println("   - 玩家颜色: " + humanColorName);
+        System.out.println("   - 先手: " + firstMoveName);
         System.out.println("   - AI类型: " + aiTypeComboBox.getSelectedItem());
+    }
+    
+    /**
+     * 开始AI对AI残局游戏
+     */
+    private void startAIVsAIEndgame(PieceColor firstMoveColor, int aiTypeIndex, int difficulty, String modelName) {
+        // 设置先手
+        boardPanel.setCurrentPlayer(firstMoveColor);
+        
+        // 启动AI对AI残局游戏
+        boardPanel.startAIvsAIEndgameGame();
+        
+        // 设置游戏模式为AI对AI
+        currentGameMode = GameMode.AI_VS_AI;
+        
+        // 禁用AI相关控件
+        playerColorComboBox.setEnabled(false);
+        difficultyComboBox.setEnabled(false);
+        aiTypeComboBox.setEnabled(false);
+        modelComboBox.setEnabled(false);
+        
+        String firstMoveName = (firstMoveColor == PieceColor.RED) ? "红方" : "黑方";
+        updateStatus("🤖 AI对AI残局游戏开始 - " + firstMoveName + "先手");
+        
+        System.out.println("🤖 AI对AI残局游戏开始:");
+        System.out.println("   - 红方: AI");
+        System.out.println("   - 黑方: AI");
+        System.out.println("   - 先手: " + firstMoveName);
+        System.out.println("   - AI类型: DeepSeek+Pikafish");
+    }
+    
+    /**
+     * 开始玩家对玩家残局游戏
+     */
+    private void startPlayerVsPlayerEndgame(PieceColor firstMoveColor) {
+        // 设置先手
+        boardPanel.setCurrentPlayer(firstMoveColor);
+        
+        // 启动玩家对玩家残局游戏
+        boardPanel.startPlayerVsPlayerEndgame();
+        
+        // 设置游戏模式为玩家对玩家
+        currentGameMode = GameMode.PLAYER_VS_PLAYER;
+        
+        // 禁用AI相关控件
+        playerColorComboBox.setEnabled(false);
+        difficultyComboBox.setEnabled(false);
+        aiTypeComboBox.setEnabled(false);
+        modelComboBox.setEnabled(false);
+        
+        String firstMoveName = (firstMoveColor == PieceColor.RED) ? "红方" : "黑方";
+        updateStatus("👥 玩家对玩家残局游戏开始 - " + firstMoveName + "先手");
+        
+        System.out.println("👥 玩家对玩家残局游戏开始:");
+        System.out.println("   - 红方: 玩家");
+        System.out.println("   - 黑方: 玩家");
+        System.out.println("   - 先手: " + firstMoveName);
     }
     
     /**
