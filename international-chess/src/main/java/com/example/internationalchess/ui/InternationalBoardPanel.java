@@ -80,7 +80,8 @@ public class InternationalBoardPanel extends JPanel {
     }
     
     private void drawPieces(Graphics2D g2d) {
-        g2d.setFont(new Font("Arial Unicode MS", Font.BOLD, 36));
+        g2d.setFont(new Font("Arial Unicode MS", Font.BOLD, 40));
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FontMetrics fm = g2d.getFontMetrics();
         
         for (int row = 0; row < BOARD_SIZE; row++) {
@@ -89,26 +90,91 @@ public class InternationalBoardPanel extends JPanel {
                 if (piece != null && !piece.trim().isEmpty()) {
                     String symbol = getPieceSymbol(piece);
                     if (!symbol.isEmpty()) {
-                        int x = col * CELL_SIZE + (CELL_SIZE - fm.stringWidth(symbol)) / 2;
-                        int y = row * CELL_SIZE + (CELL_SIZE + fm.getAscent()) / 2;
+                        int centerX = col * CELL_SIZE + CELL_SIZE / 2;
+                        int centerY = row * CELL_SIZE + CELL_SIZE / 2;
                         
-                        // 设置棋子颜色
-                        if (piece.charAt(0) == 'W') {
-                            g2d.setColor(Color.WHITE);
-                            // 绘制黑色边框
-                            g2d.drawString(symbol, x-1, y-1);
-                            g2d.drawString(symbol, x-1, y+1);
-                            g2d.drawString(symbol, x+1, y-1);
-                            g2d.drawString(symbol, x+1, y+1);
-                            g2d.setColor(Color.BLACK);
-                        } else {
-                            g2d.setColor(Color.BLACK);
-                        }
-                        g2d.drawString(symbol, x, y);
+                        // 绘制3D立体棋子
+                        draw3DPiece(g2d, symbol, centerX, centerY, piece.charAt(0) == 'W', fm);
                     }
                 }
             }
         }
+    }
+    
+    /**
+     * 绘制3D立体效果的棋子
+     */
+    private void draw3DPiece(Graphics2D g2d, String symbol, int centerX, int centerY, boolean isWhite, FontMetrics fm) {
+        int symbolWidth = fm.stringWidth(symbol);
+        int symbolHeight = fm.getHeight();
+        int x = centerX - symbolWidth / 2;
+        int y = centerY + fm.getAscent() / 2;
+        
+        // 阴影偏移量
+        int shadowOffset = 3;
+        
+        // 绘制阴影（右下角）
+        g2d.setColor(new Color(0, 0, 0, 60)); // 半透明黑色阴影
+        g2d.drawString(symbol, x + shadowOffset, y + shadowOffset);
+        
+        if (isWhite) {
+            // 白棋：绘制立体效果
+            // 1. 绘制深色轮廓（左上角高光的反面）
+            g2d.setColor(new Color(120, 120, 120));
+            g2d.drawString(symbol, x + 1, y + 1);
+            
+            // 2. 绘制主体（白色）
+            g2d.setColor(new Color(250, 250, 250));
+            g2d.drawString(symbol, x, y);
+            
+            // 3. 绘制高光（左上角）
+            g2d.setColor(Color.WHITE);
+            g2d.drawString(symbol, x - 1, y - 1);
+            
+            // 4. 绘制最终轮廓
+            g2d.setColor(new Color(80, 80, 80));
+            g2d.setStroke(new BasicStroke(0.5f));
+            // 使用细线描边增强立体感
+            drawOutlineText(g2d, symbol, x, y, fm);
+        } else {
+            // 黑棋：绘制立体效果
+            // 1. 绘制深色基底
+            g2d.setColor(new Color(40, 40, 40));
+            g2d.drawString(symbol, x + 1, y + 1);
+            
+            // 2. 绘制主体（黑色）
+            g2d.setColor(new Color(50, 50, 50));
+            g2d.drawString(symbol, x, y);
+            
+            // 3. 绘制高光（左上角）
+            g2d.setColor(new Color(120, 120, 120));
+            g2d.drawString(symbol, x - 1, y - 1);
+            
+            // 4. 绘制最终轮廓
+            g2d.setColor(Color.BLACK);
+            drawOutlineText(g2d, symbol, x, y, fm);
+        }
+    }
+    
+    /**
+     * 绘制文字轮廓
+     */
+    private void drawOutlineText(Graphics2D g2d, String text, int x, int y, FontMetrics fm) {
+        // 绘制细致的轮廓线以增强立体效果
+        Color originalColor = g2d.getColor();
+        Stroke originalStroke = g2d.getStroke();
+        
+        g2d.setStroke(new BasicStroke(1.0f));
+        
+        // 8个方向的轮廓
+        int[] dx = {-1, -1, -1, 0, 0, 1, 1, 1};
+        int[] dy = {-1, 0, 1, -1, 1, -1, 0, 1};
+        
+        for (int i = 0; i < dx.length; i++) {
+            g2d.drawString(text, x + dx[i], y + dy[i]);
+        }
+        
+        g2d.setStroke(originalStroke);
     }
     
     private void drawSelection(Graphics2D g2d) {
@@ -136,6 +202,12 @@ public class InternationalBoardPanel extends JPanel {
     }
     
     private void handleMouseClick(int x, int y) {
+        // 如果游戏暂停，禁用所有操作
+        if (isPaused) {
+            updateStatus("⏸️ 游戏已暂停，请先继续游戏");
+            return;
+        }
+        
         // 如果AI启用且当前不是人类玩家回合，忽略点击
         if (aiEnabled && !isHumanTurn()) {
             updateStatus("等待AI走棋...");
@@ -211,11 +283,15 @@ public class InternationalBoardPanel extends JPanel {
     private StockfishAIAdapter whiteStockfishAI;
     private StockfishAIAdapter blackStockfishAI;
     
+    // 暂停状态管理
+    private boolean isPaused = false;
+    private SwingWorker<int[], Void> currentAIWorker = null;
+    
     /**
      * 让AI走棋
      */
     private void makeAIMove() {
-        if (!aiEnabled || board.getGameState() != GameState.PLAYING) {
+        if (!aiEnabled || board.getGameState() != GameState.PLAYING || isPaused) {
             return;
         }
         
@@ -234,7 +310,7 @@ public class InternationalBoardPanel extends JPanel {
         updateStatus("🤖 AI正在思考...");
         
         // 在新线程中计算AI移动，避免阻塞UI
-        new SwingWorker<int[], Void>() {
+        currentAIWorker = new SwingWorker<int[], Void>() {
             @Override
             protected int[] doInBackground() throws Exception {
                 try {
@@ -282,7 +358,7 @@ public class InternationalBoardPanel extends JPanel {
      * AI vs AI 移动
      */
     private void makeAIvsAIMove() {
-        if (!isAIvsAIMode || board.getGameState() != GameState.PLAYING) {
+        if (!isAIvsAIMode || board.getGameState() != GameState.PLAYING || isPaused) {
             return;
         }
         
@@ -290,7 +366,7 @@ public class InternationalBoardPanel extends JPanel {
         String currentPlayer = isWhiteTurn ? "白方AI" : "黑方AI";
         updateStatus("🤖🆚🤖 " + currentPlayer + "正在思考...");
         
-        new SwingWorker<int[], Void>() {
+        currentAIWorker = new SwingWorker<int[], Void>() {
             @Override
             protected int[] doInBackground() throws Exception {
                 try {
@@ -380,6 +456,9 @@ public class InternationalBoardPanel extends JPanel {
             String moveDescription = generateMoveDescription(piece, fromRow, fromCol, toRow, toCol, isCapture, targetPiece);
             updateStatus("✅ " + moveDescription);
             
+            // 在Stockfish日志面板中显示AI建议
+            logDetailedAIRecommendation(moveDescription, piece, fromRow, fromCol, toRow, toCol, isCapture, targetPiece);
+            
             if (stockfishLogPanel != null) {
                 stockfishLogPanel.addGameEvent("移动执行: " + moveDescription);
             }
@@ -399,6 +478,133 @@ public class InternationalBoardPanel extends JPanel {
     }
     
     /**
+     * 记录详细的AI建议到日志面板
+     */
+    private void logDetailedAIRecommendation(String moveDescription, String piece, int fromRow, int fromCol, int toRow, int toCol, boolean isCapture, String targetPiece) {
+        if (stockfishLogPanel == null) return;
+        
+        // 添加分隔线
+        stockfishLogPanel.addAIDecision("═══════════════════════════════════════");
+        stockfishLogPanel.addAIDecision("🤖 AI移动建议详情");
+        stockfishLogPanel.addAIDecision("═══════════════════════════════════════");
+        
+        // 棋子信息
+        String pieceNameCh = getPieceNameChinese(piece.charAt(1));
+        String colorName = piece.charAt(0) == 'W' ? "白方" : "黑方";
+        stockfishLogPanel.addAIDecision("♟️ 棋子: " + colorName + pieceNameCh);
+        
+        // 坐标信息
+        char fromFile = (char) ('a' + fromCol);
+        int fromRank = 8 - fromRow;
+        char toFile = (char) ('a' + toCol);
+        int toRank = 8 - toRow;
+        stockfishLogPanel.addAIDecision("📍 起始位置: " + fromFile + fromRank);
+        stockfishLogPanel.addAIDecision("🎯 目标位置: " + toFile + toRank);
+        
+        // 移动描述
+        stockfishLogPanel.addAIDecision("📋 移动: " + moveDescription.replace("🤖 ", ""));
+        
+        // 战术分析
+        if (isCapture) {
+            String capturedPiece = getPieceNameChinese(targetPiece.charAt(1));
+            int captureValue = getPieceValue(targetPiece.charAt(1));
+            stockfishLogPanel.addAIDecision("⚔️ 战术分析: 吃掉对方" + capturedPiece + " (价值: " + captureValue + "分)");
+        } else {
+            stockfishLogPanel.addAIDecision("📊 战术分析: 位置移动");
+        }
+        
+        // 位置价值分析
+        StringBuilder positionAnalysis = new StringBuilder();
+        if ((toRow == 3 || toRow == 4) && (toCol == 3 || toCol == 4)) {
+            positionAnalysis.append("控制中心; ");
+        }
+        
+        if (piece.charAt(1) != 'P' && fromRow >= 6) {
+            positionAnalysis.append("开发后排棋子; ");
+        }
+        
+        // 检查是否威胁对方棋子
+        if (isThreateningMove(toRow, toCol, piece.charAt(0))) {
+            positionAnalysis.append("威胁对方棋子; ");
+        }
+        
+        // 检查是否改善棋子安全性
+        if (isSaferPosition(fromRow, fromCol, toRow, toCol, piece.charAt(0))) {
+            positionAnalysis.append("提升棋子安全; ");
+        }
+        
+        String positionValue = positionAnalysis.length() > 0 ? positionAnalysis.toString() : "常规移动";
+        stockfishLogPanel.addAIDecision("🎯 战略价值: " + positionValue);
+        
+        // 总体评估
+        String evaluation = evaluateMove(isCapture, targetPiece, toRow, toCol, piece);
+        stockfishLogPanel.addAIDecision("💡 综合评估: " + evaluation);
+        
+        stockfishLogPanel.addAIDecision("═══════════════════════════════════════");
+    }
+    
+    /**
+     * 检查移动是否威胁对方棋子
+     */
+    private boolean isThreateningMove(int toRow, int toCol, char pieceColor) {
+        // 简化版本：检查周围是否有对方棋子
+        for (int dr = -1; dr <= 1; dr++) {
+            for (int dc = -1; dc <= 1; dc++) {
+                if (dr == 0 && dc == 0) continue;
+                int checkRow = toRow + dr;
+                int checkCol = toCol + dc;
+                if (checkRow >= 0 && checkRow < 8 && checkCol >= 0 && checkCol < 8) {
+                    String neighborPiece = board.getPiece(checkRow, checkCol);
+                    if (neighborPiece != null && neighborPiece.charAt(0) != pieceColor) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * 检查新位置是否更安全
+     */
+    private boolean isSaferPosition(int fromRow, int fromCol, int toRow, int toCol, char pieceColor) {
+        // 简化版本：移动到边缘通常更安全（对于某些棋子）
+        boolean wasOnEdge = (fromRow == 0 || fromRow == 7 || fromCol == 0 || fromCol == 7);
+        boolean isOnEdge = (toRow == 0 || toRow == 7 || toCol == 0 || toCol == 7);
+        
+        // 如果从中央移动到边缘，通常是为了安全
+        return !wasOnEdge && isOnEdge;
+    }
+    
+    /**
+     * 评估移动质量
+     */
+    private String evaluateMove(boolean isCapture, String targetPiece, int toRow, int toCol, String piece) {
+        if (isCapture) {
+            int captureValue = getPieceValue(targetPiece.charAt(1));
+            if (captureValue >= 5) {
+                return "优秀 - 吃掉高价值棋子";
+            } else if (captureValue >= 3) {
+                return "良好 - 吃掉中等价值棋子";
+            } else {
+                return "一般 - 吃掉低价值棋子";
+            }
+        }
+        
+        // 检查是否控制中心
+        if ((toRow == 3 || toRow == 4) && (toCol == 3 || toCol == 4)) {
+            return "良好 - 控制棋盘中心";
+        }
+        
+        // 检查是否发展棋子
+        if (piece.charAt(1) != 'P' && toRow < 6) {
+            return "良好 - 积极发展棋子";
+        }
+        
+        return "标准 - 稳妥的位置调整";
+    }
+    
+    /**
      * 生成移动描述
      */
     private String generateMoveDescription(String piece, int fromRow, int fromCol, int toRow, int toCol, boolean isCapture, String targetPiece) {
@@ -410,14 +616,18 @@ public class InternationalBoardPanel extends JPanel {
         char toFile = (char) ('a' + toCol);
         int toRank = 8 - toRow;
         
-        String moveStr = "" + fromFile + fromRank + "→" + toFile + toRank;
+        // 生成具体的移动描述
+        StringBuilder description = new StringBuilder();
+        description.append("🤖 ").append(colorName).append(pieceNameCh);
+        description.append(" 从 ").append(fromFile).append(fromRank);
+        description.append(" 移动到 ").append(toFile).append(toRank);
         
         if (isCapture) {
             String capturedPiece = getPieceNameChinese(targetPiece.charAt(1));
-            return String.format("🤖 %s%s %s 吃掉%s", colorName, pieceNameCh, moveStr, capturedPiece);
-        } else {
-            return String.format("🤖 %s%s %s", colorName, pieceNameCh, moveStr);
+            description.append(" (吃掉").append(capturedPiece).append(")");
         }
+        
+        return description.toString();
     }
     
     /**
@@ -564,18 +774,14 @@ public class InternationalBoardPanel extends JPanel {
     // 设置人类玩家颜色
     public void setHumanPlayer(char color) {
         this.humanPlayer = color;
-        if (aiEnabled) {
-            initializeAI(); // 重新初始化AI
-        }
+        // 注意: 不在这里重新初始化AI，由外部调用者控制
     }
     
     // 设置AI类型
     public void setAIType(String aiType, int difficulty, String modelName) {
         this.aiType = aiType;
         this.difficulty = difficulty;
-        if (aiEnabled) {
-            initializeAI(); // 重新初始化AI
-        }
+        // 注意: 不在这里重新初始化AI，由外部调用者控制
         updateStatus("AI类型设置为: " + aiType + ", 难度: " + difficulty);
     }
     
@@ -787,5 +993,70 @@ public class InternationalBoardPanel extends JPanel {
      */
     public GameState getGameState() {
         return board.getGameState();
+    }
+    
+    /**
+     * 暂停游戏
+     */
+    public void pauseGame() {
+        isPaused = true;
+        
+        // 取消当前AI计算任务
+        if (currentAIWorker != null && !currentAIWorker.isDone()) {
+            currentAIWorker.cancel(true);
+            currentAIWorker = null;
+        }
+        
+        // 清除选择状态
+        selectedRow = -1;
+        selectedCol = -1;
+        repaint();
+        
+        updateStatus("⏸️ 游戏已暂停");
+        
+        if (stockfishLogPanel != null) {
+            stockfishLogPanel.addGameEvent("游戏暂停");
+        }
+    }
+    
+    /**
+     * 恢复游戏
+     */
+    public void resumeGame() {
+        isPaused = false;
+        
+        if (isAIvsAIMode) {
+            updateStatus("🔄 AI对战恢夏...");
+            // 延迟500毫秒后恢夏AI vs AI
+            Timer resumeTimer = new Timer(500, e -> {
+                if (!isPaused && isAIvsAIMode && board.getGameState() == GameState.PLAYING) {
+                    makeAIvsAIMove();
+                }
+            });
+            resumeTimer.setRepeats(false);
+            resumeTimer.start();
+        } else if (aiEnabled && !isHumanTurn() && board.getGameState() == GameState.PLAYING) {
+            updateStatus("🔄 游戏恢夏 - AI继续思考...");
+            // 延迟300毫秒后让AI走棋
+            SwingUtilities.invokeLater(() -> {
+                if (!isPaused) {
+                    makeAIMove();
+                }
+            });
+        } else {
+            String currentPlayer = board.isWhiteTurn() ? "白方" : "黑方";
+            updateStatus("▶️ 游戏恢夏 - 当前回合: " + currentPlayer);
+        }
+        
+        if (stockfishLogPanel != null) {
+            stockfishLogPanel.addGameEvent("游戏恢夏");
+        }
+    }
+    
+    /**
+     * 检查游戏是否处于暂停状态
+     */
+    public boolean isPaused() {
+        return isPaused;
     }
 }

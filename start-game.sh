@@ -31,6 +31,15 @@ fi
 
 echo "编译完成，启动游戏选择界面..."
 
+# 设置KataGo
+./setup-katago.sh
+
+# 设置Pikafish
+./setup-pikafish.sh
+
+# 设置Stockfish
+./setup-stockfish.sh
+
 # 启动游戏启动器（使用打包后的JAR文件）
 java -cp game-launcher/target/game-launcher-1.0-SNAPSHOT.jar com.example.launcher.GameLauncher
 

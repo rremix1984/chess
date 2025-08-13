@@ -646,17 +646,16 @@ public class GoFrame extends JFrame {
         
         switch (aiType) {
             case "KataGo AI":
-                if (katagoAI != null) {
-                    System.out.println("✅ 使用KataGo AI引擎");
-                    // 创建专用的KataGo AI实例
-                    KataGoAI playerKataGoAI = new KataGoAI(difficulty);
-                    playerKataGoAI.initializeEngine();
-                    boardPanel.setKataGoAI(playerKataGoAI);
+                // 检查KataGo是否真正可用（不仅要存在，还要初始化成功）
+                if (katagoAI != null && katagoAI.isEngineReady()) {
+                    System.out.println("✅ 使用已初始化的KataGo AI引擎");
+                    // 使用已经初始化的KataGo AI实例
+                    boardPanel.setKataGoAI(katagoAI);
                     // 使用KataGo AI作为主要AI
                     boardPanel.setAIEnabled(true, aiPlayer, difficulty, true); // 最后一个参数表示Use KataGo
                     return; // 提前返回，不执行下面的setAIEnabled
                 } else {
-                    System.out.println("⚠️ KataGo不可用，回退到传统AI");
+                    System.out.println("⚠️ KataGo不可用，回退到传统AI（KataGo对象: " + (katagoAI != null ? "存在但未就绪" : "不存在") + ")");
                     GoAI fallbackAI = new GoAI(aiPlayer, difficulty);
                     boardPanel.setGoAI(fallbackAI);
                 }

@@ -303,6 +303,158 @@ public class InternationalChessFrame extends JFrame {
         return panel;
     }
     
+    /**
+     * 创建控制面板（不自动调用updateGameModeSettings）
+     * 用于重新创建界面时避免重置游戏模式
+     */
+    private JPanel createControlPanelWithoutInit() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("♟️ 国际象棋对弈控制"));
+        panel.setPreferredSize(new Dimension(1000, 80));
+
+        // 左侧：基本设置（紧凑布局）
+        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        
+        // 游戏模式选择
+        leftPanel.add(new JLabel("模式:"));
+        gameModeGroup = new ButtonGroup();
+        playerVsPlayerRadio = new JRadioButton("玩家对玩家", false);
+        playerVsAIRadio = new JRadioButton("玩家对AI", true);
+        aiVsAIRadio = new JRadioButton("AI对AI", false);
+        
+        playerVsPlayerRadio.setFont(new Font("宋体", Font.PLAIN, 12));
+        playerVsAIRadio.setFont(new Font("宋体", Font.PLAIN, 12));
+        aiVsAIRadio.setFont(new Font("宋体", Font.PLAIN, 12));
+        
+        playerVsPlayerRadio.addActionListener(e -> updateGameModeSettings());
+        playerVsAIRadio.addActionListener(e -> updateGameModeSettings());
+        aiVsAIRadio.addActionListener(e -> updateGameModeSettings());
+        
+        gameModeGroup.add(playerVsPlayerRadio);
+        gameModeGroup.add(playerVsAIRadio);
+        gameModeGroup.add(aiVsAIRadio);
+        
+        leftPanel.add(playerVsPlayerRadio);
+        leftPanel.add(playerVsAIRadio);
+        leftPanel.add(aiVsAIRadio);
+        
+        // 玩家颜色选择
+        leftPanel.add(new JLabel("颜色:"));
+        playerColorComboBox = new JComboBox<>(new String[]{"白方", "黑方"});
+        playerColorComboBox.setPreferredSize(new Dimension(60, 25));
+        playerColorComboBox.setFont(new Font("宋体", Font.PLAIN, 12));
+        playerColorComboBox.addActionListener(e -> updatePlayerColor());
+        leftPanel.add(playerColorComboBox);
+
+        // AI类型选择
+        leftPanel.add(new JLabel("AI:"));
+        aiTypeComboBox = new JComboBox<>(new String[]{"Stockfish", "传统AI", "增强AI", "大模型AI", "混合AI"});
+        aiTypeComboBox.setSelectedIndex(0); // 默认选择Stockfish
+        aiTypeComboBox.setPreferredSize(new Dimension(80, 25));
+        aiTypeComboBox.setFont(new Font("宋体", Font.PLAIN, 12));
+        aiTypeComboBox.addActionListener(e -> updateModelComboBox());
+        leftPanel.add(aiTypeComboBox);
+
+        // AI难度选择
+        leftPanel.add(new JLabel("难度:"));
+        difficultyComboBox = new JComboBox<>(new String[]{"简单", "普通", "困难", "专家", "大师", "特级", "超级", "顶级", "传奇", "神级"});
+        difficultyComboBox.setSelectedIndex(2); // 默认困难难度
+        difficultyComboBox.setPreferredSize(new Dimension(60, 25));
+        difficultyComboBox.setFont(new Font("宋体", Font.PLAIN, 12));
+        leftPanel.add(difficultyComboBox);
+        
+        // 模型选择
+        leftPanel.add(new JLabel("模型:"));
+        // 动态获取ollama模型列表
+        try {
+            List<String> availableModels = OllamaModelManager.getAvailableModels();
+            modelComboBox = new JComboBox<>(availableModels.toArray(new String[0]));
+            if (!availableModels.isEmpty()) {
+                modelComboBox.setSelectedIndex(0); // 默认选择第一个模型
+            }
+        } catch (Exception e) {
+            modelComboBox = new JComboBox<>(new String[]{"deepseek-r1:7b"});
+            modelComboBox.setSelectedIndex(0);
+        }
+        modelComboBox.setPreferredSize(new Dimension(150, 25));
+        modelComboBox.setFont(new Font("宋体", Font.PLAIN, 12));
+        leftPanel.add(modelComboBox);
+        
+        panel.add(leftPanel, BorderLayout.CENTER);
+
+        // 右侧：控制按钮
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        
+        // 启动游戏按钮
+        startButton = new JButton("启动游戏");
+        startButton.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        startButton.setPreferredSize(new Dimension(80, 30));
+        startButton.addActionListener(e -> startGame());
+        styleButton(startButton);
+        rightPanel.add(startButton);
+        
+        // 暂停游戏按钮
+        pauseButton = new JButton("暂停游戏");
+        pauseButton.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        pauseButton.setPreferredSize(new Dimension(80, 30));
+        pauseButton.addActionListener(e -> pauseGame());
+        pauseButton.setEnabled(false); // 初始状态禁用
+        styleButton(pauseButton);
+        rightPanel.add(pauseButton);
+        
+        // 启用/禁用AI按钮
+        aiToggleButton = new JButton("启用AI对弈");
+        aiToggleButton.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        aiToggleButton.setPreferredSize(new Dimension(80, 30)); // 增加宽度以适应较长的文本
+        aiToggleButton.addActionListener(e -> toggleAI());
+        styleButton(aiToggleButton);
+        rightPanel.add(aiToggleButton);
+        
+        // 悔棋按钮
+        JButton undoButton = new JButton("悔棋");
+        undoButton.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        undoButton.setPreferredSize(new Dimension(60, 30));
+        undoButton.addActionListener(e -> {
+            if (boardPanel.canUndo()) {
+                boardPanel.undoMove();
+            } else {
+                JOptionPane.showMessageDialog(this, "无法悔棋！", "提示", JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
+        styleButton(undoButton);
+        rightPanel.add(undoButton);
+
+        // 重新开始按钮
+        JButton restartButton = new JButton("重新开始");
+        restartButton.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        restartButton.setPreferredSize(new Dimension(80, 30));
+        restartButton.addActionListener(e -> startNewGame());
+        styleButton(restartButton);
+        rightPanel.add(restartButton);
+        
+        // 退出游戏按钮
+        quitButton = new JButton("退出游戏");
+        quitButton.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        quitButton.setPreferredSize(new Dimension(80, 30));
+        quitButton.addActionListener(e -> quitGame());
+        styleButton(quitButton);
+        rightPanel.add(quitButton);
+        
+        // 返回选择按钮
+        JButton backButton = new JButton("返回选择");
+        backButton.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        backButton.setPreferredSize(new Dimension(80, 30));
+        backButton.addActionListener(e -> returnToSelection());
+        styleButton(backButton);
+        rightPanel.add(backButton);
+        
+        panel.add(rightPanel, BorderLayout.EAST);
+        
+        // 注意：不调用 updateGameModeSettings() 来避免重置游戏模式
+
+        return panel;
+    }
+    
     private void updateModelComboBox() {
         int aiTypeIndex = aiTypeComboBox.getSelectedIndex();
         // Stockfish=0, 传统AI=1, 增强AI=2, 大模型AI=3, 混合AI=4
@@ -370,6 +522,30 @@ public class InternationalChessFrame extends JFrame {
     }
 
     private void startNewGame() {
+        // 保存当前AI状态和游戏模式
+        boolean wasAIEnabled = (boardPanel != null && aiToggleButton.getText().equals("禁用AI对弈"));
+        String currentAIType = null;
+        int currentDifficulty = difficultyComboBox.getSelectedIndex() + 1;
+        String currentModelName = (String) modelComboBox.getSelectedItem();
+        char currentHumanColor = 'W';
+        
+        // 保存当前游戏模式状态
+        String savedGameMode = currentGameMode;
+        boolean savedAIvsAIMode = isAIvsAIMode;
+        boolean savedPlayerVsPlayerSelected = playerVsPlayerRadio.isSelected();
+        boolean savedPlayerVsAISelected = playerVsAIRadio.isSelected();
+        boolean savedAIvsAISelected = aiVsAIRadio.isSelected();
+        
+        System.out.println("💾 保存游戏模式: " + savedGameMode + ", isAIvsAI: " + savedAIvsAIMode);
+        
+        if (boardPanel != null && wasAIEnabled) {
+            // 保存当前设置
+            String colorStr = (String) playerColorComboBox.getSelectedItem();
+            currentHumanColor = colorStr.equals("白方") ? 'W' : 'B';
+            String[] aiTypes = {"Stockfish", "传统AI", "增强AI", "大模型AI", "混合AI"};
+            currentAIType = aiTypes[aiTypeComboBox.getSelectedIndex()];
+        }
+        
         // 移除旧的棋盘面板
         getContentPane().removeAll();
         
@@ -387,36 +563,94 @@ public class InternationalChessFrame extends JFrame {
         // 重新构建界面布局
         recreateLayout();
         
+        // 恢复保存的游戏模式状态
+        SwingUtilities.invokeLater(() -> {
+            System.out.println("🔄 恢复游戏模式状态: " + savedGameMode);
+            
+            // 恢复单选按钮状态
+            playerVsPlayerRadio.setSelected(savedPlayerVsPlayerSelected);
+            playerVsAIRadio.setSelected(savedPlayerVsAISelected);
+            aiVsAIRadio.setSelected(savedAIvsAISelected);
+            
+            // 恢复模式变量
+            currentGameMode = savedGameMode;
+            isAIvsAIMode = savedAIvsAIMode;
+            
+            // 显式调用游戏模式设置更新（传递真实状态）
+            updateGameModeSettingsWithState(savedGameMode, savedAIvsAIMode);
+            
+            System.out.println("✅ 游戏模式已恢复: " + currentGameMode + ", isAIvsAI: " + isAIvsAIMode);
+        });
+        
         // 设置回调
         boardPanel.setStatusUpdateCallback(this::updateStatus);
         
         // 根据当前游戏模式恢复设置
-        if (!isAIvsAIMode) {
-            // 非AI vs AI模式，重置AI按钮状态
-            aiToggleButton.setText("启用AI对弈");
-            playerColorComboBox.setEnabled(true);
-            difficultyComboBox.setEnabled(true);
-            aiTypeComboBox.setEnabled(true);
-            updateModelComboBox(); // 恢复模型选择状态
-            
-            // 确保AI被禁用（非AI vs AI模式）
-            boardPanel.setAIEnabled(false);
+        if (!savedAIvsAIMode) {
+            if (wasAIEnabled && currentAIType != null) {
+                // 创建final变量供lambda使用
+                final String finalAIType = currentAIType;
+                final char finalHumanColor = currentHumanColor;
+                final String finalModelName = currentModelName;
+                final int finalDifficulty = currentDifficulty;
+                
+                // 恢复AI状态
+                SwingUtilities.invokeLater(() -> {
+                    // 先设置所有参数，然后再启用AI，避免多次初始化
+                    boardPanel.setHumanPlayer(finalHumanColor);
+                    boardPanel.setAIType(finalAIType, finalDifficulty, finalModelName);
+                    
+                    // 最后启用AI，这样只会初始化一次
+                    boardPanel.setAIEnabled(true);
+                    
+                    // 恢复UI状态
+                    aiToggleButton.setText("禁用AI对弈");
+                    playerColorComboBox.setEnabled(false);
+                    difficultyComboBox.setEnabled(false);
+                    aiTypeComboBox.setEnabled(false);
+                    modelComboBox.setEnabled(false);
+                    
+                    // 启用聊天面板（如果需要）
+                    int aiTypeIndex = aiTypeComboBox.getSelectedIndex();
+                    boolean enableChat = (aiTypeIndex == 3) || (aiTypeIndex == 4);
+                    if (enableChat) {
+                        chatPanel.setEnabled(true);
+                        chatPanel.setModelName(finalModelName);
+                    }
+                    
+                    updateStatus("游戏重新开始 - AI已恢复 (" + finalAIType + ")");
+                });
+            } else {
+                // 非AI vs AI模式，重置AI按钮状态
+                SwingUtilities.invokeLater(() -> {
+                    aiToggleButton.setText("启用AI对弈");
+                    playerColorComboBox.setEnabled(true);
+                    difficultyComboBox.setEnabled(true);
+                    aiTypeComboBox.setEnabled(true);
+                    updateModelComboBox(); // 恢复模型选择状态
+                    
+                    // 确保AI被禁用（非AI vs AI模式）
+                    boardPanel.setAIEnabled(false);
+                    updateStatus("游戏重新开始 - 当前玩家: 白方");
+                });
+            }
+        } else {
+            SwingUtilities.invokeLater(() -> {
+                updateStatus("游戏重新开始 - 当前玩家: 白方");
+            });
         }
-        // AI vs AI模式的设置将在initializeAIvsAI()中处理，不在这里重置
         
         // 刷新界面
         revalidate();
         repaint();
-        
-        updateStatus("当前玩家: 白方");
     }
     
     /**
      * 重新创建界面布局
      */
     private void recreateLayout() {
-        // 创建控制面板
-        JPanel controlPanel = createControlPanel();
+        // 创建控制面板（但不自动初始化游戏模式）
+        JPanel controlPanel = createControlPanelWithoutInit();
         add(controlPanel, BorderLayout.NORTH);
         
         // 创建主面板
@@ -465,23 +699,20 @@ public class InternationalChessFrame extends JFrame {
             aiTypeComboBox.setEnabled(false);
             modelComboBox.setEnabled(false);
 
-            // 启用聊天面板
-            chatPanel.setEnabled(true);
-            String modelName = (String) modelComboBox.getSelectedItem();
-            chatPanel.setModelName(modelName);
-
-            // 实际启用AI并设置人类玩家颜色
-            boardPanel.setAIEnabled(true);
             // 默认人类玩家为白方，AI为黑方
             char humanColor = 'W'; // 白方
-            boardPanel.setHumanPlayer(humanColor);
-
-            // 设置AI类型为大模型AI
-            aiTypeComboBox.setSelectedIndex(2); // "大模型AI"
+            
+            // 设置AI类型为Stockfish
+            aiTypeComboBox.setSelectedIndex(0); // "Stockfish"
             int difficulty = difficultyComboBox.getSelectedIndex() + 1; // 难度级别
-            boardPanel.setAIType("大模型AI", difficulty, modelName);
+            String modelName = (String) modelComboBox.getSelectedItem();
+            
+            // 先设置所有参数，然后再初始化AI（只调用一次）
+            boardPanel.setHumanPlayer(humanColor);
+            boardPanel.setAIType("Stockfish", difficulty, modelName);
+            boardPanel.setAIEnabled(true);
 
-            updateStatus("AI对弈已启用 - 大模型AI");
+            updateStatus("AI对弈已启用 - Stockfish");
         });
     }
 
@@ -491,45 +722,85 @@ public class InternationalChessFrame extends JFrame {
     private JPanel createBoardWithCoordinates() {
         JPanel panel = new JPanel(new BorderLayout());
         
-        // 创建顶部列标签 (a-h)
+        // 获取棋盘的实际尺寸
+        int boardSize = 8 * 70; // CELL_SIZE = 70
+        
+        // 创建顶部列标签 (a-h) - 确保宽度与棋盘一致
         JPanel topLabels = new JPanel(new GridLayout(1, 8));
-        topLabels.setPreferredSize(new Dimension(560, 20));
+        topLabels.setPreferredSize(new Dimension(boardSize, 25));
+        topLabels.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
         for (char c = 'a'; c <= 'h'; c++) {
             JLabel label = new JLabel(String.valueOf(c), JLabel.CENTER);
-            label.setFont(new Font("宋体", Font.BOLD, 14));
+            label.setFont(new Font("Arial", Font.BOLD, 16));
+            label.setForeground(new Color(101, 67, 33));
             topLabels.add(label);
         }
         
-        // 创建底部列标签 (a-h)
+        // 创建底部列标签 (a-h) - 确保宽度与棋盘一致
         JPanel bottomLabels = new JPanel(new GridLayout(1, 8));
-        bottomLabels.setPreferredSize(new Dimension(560, 20));
+        bottomLabels.setPreferredSize(new Dimension(boardSize, 25));
+        bottomLabels.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
         for (char c = 'a'; c <= 'h'; c++) {
             JLabel label = new JLabel(String.valueOf(c), JLabel.CENTER);
-            label.setFont(new Font("宋体", Font.BOLD, 14));
+            label.setFont(new Font("Arial", Font.BOLD, 16));
+            label.setForeground(new Color(101, 67, 33));
             bottomLabels.add(label);
         }
         
-        // 创建左侧行标签 (8-1)
+        // 创建左侧行标签 (8-1) - 确保高度与棋盘一致
         JPanel leftLabels = new JPanel(new GridLayout(8, 1));
-        leftLabels.setPreferredSize(new Dimension(20, 560));
+        leftLabels.setPreferredSize(new Dimension(25, boardSize));
+        leftLabels.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
         for (int i = 8; i >= 1; i--) {
             JLabel label = new JLabel(String.valueOf(i), JLabel.CENTER);
-            label.setFont(new Font("宋体", Font.BOLD, 14));
+            label.setFont(new Font("Arial", Font.BOLD, 16));
+            label.setForeground(new Color(101, 67, 33));
             leftLabels.add(label);
         }
         
-        // 创建右侧行标签 (8-1)
+        // 创建右侧行标签 (8-1) - 确保高度与棋盘一致
         JPanel rightLabels = new JPanel(new GridLayout(8, 1));
-        rightLabels.setPreferredSize(new Dimension(20, 560));
+        rightLabels.setPreferredSize(new Dimension(25, boardSize));
+        rightLabels.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
         for (int i = 8; i >= 1; i--) {
             JLabel label = new JLabel(String.valueOf(i), JLabel.CENTER);
-            label.setFont(new Font("宋体", Font.BOLD, 14));
+            label.setFont(new Font("Arial", Font.BOLD, 16));
+            label.setForeground(new Color(101, 67, 33));
             rightLabels.add(label);
         }
         
+        // 创建角落占位符
+        JPanel topLeftCorner = new JPanel();
+        topLeftCorner.setPreferredSize(new Dimension(25, 25));
+        topLeftCorner.setBackground(Color.WHITE);
+        
+        JPanel topRightCorner = new JPanel();
+        topRightCorner.setPreferredSize(new Dimension(25, 25));
+        topRightCorner.setBackground(Color.WHITE);
+        
+        JPanel bottomLeftCorner = new JPanel();
+        bottomLeftCorner.setPreferredSize(new Dimension(25, 25));
+        bottomLeftCorner.setBackground(Color.WHITE);
+        
+        JPanel bottomRightCorner = new JPanel();
+        bottomRightCorner.setPreferredSize(new Dimension(25, 25));
+        bottomRightCorner.setBackground(Color.WHITE);
+        
+        // 创建顶部面板 (包含角落和列标签)
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(topLeftCorner, BorderLayout.WEST);
+        topPanel.add(topLabels, BorderLayout.CENTER);
+        topPanel.add(topRightCorner, BorderLayout.EAST);
+        
+        // 创建底部面板 (包含角落和列标签)
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(bottomLeftCorner, BorderLayout.WEST);
+        bottomPanel.add(bottomLabels, BorderLayout.CENTER);
+        bottomPanel.add(bottomRightCorner, BorderLayout.EAST);
+        
         // 组合棋盘和坐标
-        panel.add(topLabels, BorderLayout.NORTH);
-        panel.add(bottomLabels, BorderLayout.SOUTH);
+        panel.add(topPanel, BorderLayout.NORTH);
+        panel.add(bottomPanel, BorderLayout.SOUTH);
         panel.add(leftLabels, BorderLayout.WEST);
         panel.add(rightLabels, BorderLayout.EAST);
         panel.add(boardPanel, BorderLayout.CENTER);
@@ -574,16 +845,23 @@ public class InternationalChessFrame extends JFrame {
     private void updateGameModeSettings() {
         if (playerVsPlayerRadio.isSelected()) {
             currentGameMode = "玩家对玩家";
+            isAIvsAIMode = false;
         } else if (playerVsAIRadio.isSelected()) {
             currentGameMode = "玩家对AI";
+            isAIvsAIMode = false;
         } else if (aiVsAIRadio.isSelected()) {
             currentGameMode = "AI对AI";
+            isAIvsAIMode = true;
         }
+        
+        System.out.println("🗺️ 游戏模式切换: " + currentGameMode + ", isAIvsAIMode: " + isAIvsAIMode);
         
         switch (currentGameMode) {
             case "玩家对玩家":
-                isAIvsAIMode = false;
-                boardPanel.setAIEnabled(false);
+                if (boardPanel != null) {
+                    boardPanel.setAIEnabled(false);
+                    boardPanel.setAIvsAIMode(false);
+                }
                 aiToggleButton.setEnabled(false);
                 playerColorComboBox.setEnabled(true);
                 difficultyComboBox.setEnabled(false);
@@ -592,7 +870,9 @@ public class InternationalChessFrame extends JFrame {
                 break;
                 
             case "玩家对AI":
-                isAIvsAIMode = false;
+                if (boardPanel != null) {
+                    boardPanel.setAIvsAIMode(false);
+                }
                 aiToggleButton.setEnabled(true);
                 playerColorComboBox.setEnabled(true);
                 difficultyComboBox.setEnabled(true);
@@ -601,7 +881,60 @@ public class InternationalChessFrame extends JFrame {
                 break;
                 
             case "AI对AI":
-                isAIvsAIMode = true;
+                if (boardPanel != null) {
+                    boardPanel.setAIvsAIMode(true);
+                }
+                aiToggleButton.setEnabled(false);
+                playerColorComboBox.setEnabled(false);
+                difficultyComboBox.setEnabled(true);
+                aiTypeComboBox.setEnabled(true);
+                updateModelComboBox();
+                // 不立即初始化，等待用户点击“启动游戏”
+                updateStatus("请点击“启动游戏”开始AI对AI模式");
+                break;
+        }
+        
+        updateStatusDisplay();
+    }
+    
+    /**
+     * 根据指定状态更新游戏模式设置（用于恢复状态）
+     */
+    private void updateGameModeSettingsWithState(String gameMode, boolean aiVsAIMode) {
+        // 直接设置状态变量
+        currentGameMode = gameMode;
+        isAIvsAIMode = aiVsAIMode;
+        
+        System.out.println("🔧 恢复游戏模式设置: " + currentGameMode + ", isAIvsAIMode: " + isAIvsAIMode);
+        
+        switch (currentGameMode) {
+            case "玩家对玩家":
+                if (boardPanel != null) {
+                    boardPanel.setAIEnabled(false);
+                    boardPanel.setAIvsAIMode(false);
+                }
+                aiToggleButton.setEnabled(false);
+                playerColorComboBox.setEnabled(true);
+                difficultyComboBox.setEnabled(false);
+                aiTypeComboBox.setEnabled(false);
+                modelComboBox.setEnabled(false);
+                break;
+                
+            case "玩家对AI":
+                if (boardPanel != null) {
+                    boardPanel.setAIvsAIMode(false);
+                }
+                aiToggleButton.setEnabled(true);
+                playerColorComboBox.setEnabled(true);
+                difficultyComboBox.setEnabled(true);
+                aiTypeComboBox.setEnabled(true);
+                modelComboBox.setEnabled(true);
+                break;
+                
+            case "AI对AI":
+                if (boardPanel != null) {
+                    boardPanel.setAIvsAIMode(true);
+                }
                 aiToggleButton.setEnabled(false);
                 playerColorComboBox.setEnabled(false);
                 difficultyComboBox.setEnabled(true);
@@ -666,21 +999,28 @@ public class InternationalChessFrame extends JFrame {
      */
     private void startGame() {
         if (boardPanel != null) {
+            System.out.println("🎮 启动游戏: " + currentGameMode + ", isAIvsAIMode: " + isAIvsAIMode);
+            System.out.println("🎮 aiVsAIRadio.isSelected(): " + aiVsAIRadio.isSelected());
+            
             // 重置游戏状态
             startNewGame();
             startButton.setEnabled(false);
             pauseButton.setEnabled(true);
             isPaused = false;
             
-            // 如果是AI对AI模式，初始化AI对AI
-            if (aiVsAIRadio.isSelected()) {
-                initializeAIvsAI();
-            } else if (playerVsAIRadio.isSelected()) {
-                // 自动启用AI对弈
-                if (aiToggleButton.getText().equals("启用AI对弈")) {
-                    toggleAI();
+            // 延迟执行以确保棋盘已重新创建
+            SwingUtilities.invokeLater(() -> {
+                // 如果是AI对AI模式，初始化AI对AI
+                if (isAIvsAIMode || aiVsAIRadio.isSelected()) {
+                    System.out.println("🤖 初始化AI对AI模式...");
+                    initializeAIvsAI();
+                } else if (playerVsAIRadio.isSelected()) {
+                    // 自动启用AI对弈
+                    if (aiToggleButton.getText().equals("启用AI对弈")) {
+                        toggleAI();
+                    }
                 }
-            }
+            });
             
             updateStatus("游戏已启动 - 当前模式: " + currentGameMode);
         }
@@ -695,21 +1035,24 @@ public class InternationalChessFrame extends JFrame {
             if (isPaused) {
                 pauseButton.setText("继续游戏");
                 startButton.setEnabled(false);
-                updateStatus("游戏已暂停");
+                
+                // 调用棋盘面板的暂停功能
+                boardPanel.pauseGame();
                 
                 // 停止AI对AI定时器
                 if (aiVsAiTimer != null) {
                     aiVsAiTimer.stop();
                 }
+                
+                System.out.println("⏸️ 游戏已暂停");
             } else {
                 pauseButton.setText("暂停游戏");
                 startButton.setEnabled(false);
-                updateStatus("游戏继续 - 当前模式: " + currentGameMode);
                 
-                // 重启AI对AI模式
-                if (isAIvsAIMode && boardPanel != null) {
-                    boardPanel.resumeAIvsAI();
-                }
+                // 调用棋盘面板的恢复功能
+                boardPanel.resumeGame();
+                
+                System.out.println("▶️ 游戏已恢复");
             }
         }
     }

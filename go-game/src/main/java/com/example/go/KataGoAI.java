@@ -64,14 +64,15 @@ public class KataGoAI {
         if (engineInitialized) {
             return true;
         }
-        
+
         try {
             ExceptionHandler.logInfo(LOG_TAG, "🚀 正在启动KataGo引擎...");
             
             // 首先检查KataGo是否已安装
+            ExceptionHandler.logInfo(LOG_TAG, "1. 检查KataGo安装状态...");
             KataGoInstaller installer = KataGoInstaller.getInstance();
             if (!installer.isKataGoInstalled()) {
-                ExceptionHandler.logInfo(LOG_TAG, "⚠️ 检测到KataGo未安装，开始自动安装...");
+                ExceptionHandler.logInfo(LOG_TAG, "⚠️ KataGo不可用，开始自动安装/配置...");
                 
                 // 在GUI线程中显示安装进度
                 final boolean[] installResult = {false};
@@ -79,30 +80,39 @@ public class KataGoAI {
                 
                 SwingUtilities.invokeLater(() -> {
                     try {
+                        String executablePath = installer.getKataGoExecutablePath();
+                        String message;
+                        if (executablePath != null) {
+                            message = "围棋AI需要KataGo引擎支持。\n检测到KataGo可执行文件但缺少模型或配置文件。\n是否自动下载所需文件？";
+                        } else {
+                            message = "围棋AI需要KataGo引擎支持。\n检测到KataGo未安装，是否立即下载安装？\n\n" +
+                                "安装将下载约100MB的文件，请确保网络连接正常。";
+                        }
+                        
                         int choice = JOptionPane.showConfirmDialog(
                             null,
-                            "围棋AI需要KataGo引擎支持。\n检测到KataGo未安装，是否立即下载安装？\n\n" +
-                            "安装将下载约100MB的文件，请确保网络连接正常。",
-                            "安装KataGo引擎",
+                            message,
+                            "配置KataGo引擎",
                             JOptionPane.YES_NO_OPTION,
                             JOptionPane.QUESTION_MESSAGE
                         );
                         
                         if (choice == JOptionPane.YES_OPTION) {
                             // 显示安装进度对话框
+                            String progressTitle = executablePath != null ? "正在配置KataGo引擎..." : "正在安装KataGo引擎...";
                             javax.swing.ProgressMonitor progressMonitor = new javax.swing.ProgressMonitor(
                                 null,
-                                "正在安装KataGo引擎...",
+                                progressTitle,
                                 "初始化...",
                                 0, 100
                             );
                             progressMonitor.setMillisToDecideToPopup(0);
                             progressMonitor.setMillisToPopup(0);
                             
-                            // 在后台线程中执行安装
+                            // 在后台线程中执行安装/配置
                             new Thread(() -> {
                                 try {
-                                    boolean success = installer.installKataGo(new KataGoInstaller.ProgressCallback() {
+                                    boolean success = installer.ensureKataGoInstalled(new KataGoInstaller.ProgressCallback() {
                                         @Override
                                         public void onProgress(int percentage, String message) {
                                             SwingUtilities.invokeLater(() -> {
@@ -165,18 +175,21 @@ public class KataGoAI {
                     return false;
                 }
             }
+            ExceptionHandler.logInfo(LOG_TAG, "1. 检查完成.");
             
             // 更新配置以使用已安装的KataGo
+            ExceptionHandler.logInfo(LOG_TAG, "2. 获取KataGo路径...");
             String installedKataGoPath = installer.getKataGoExecutablePath();
             String installedModelPath = installer.getModelPath();
             String installedConfigPath = installer.getConfigPath();
+            ExceptionHandler.logInfo(LOG_TAG, "2. 路径获取完成.");
             
             ConfigurationManager.KataGoConfig actualConfig;
             if (installedKataGoPath != null) {
                 actualConfig = new ConfigurationManager.KataGoConfig(
                     installedKataGoPath,
-                    installedModelPath != null ? installedModelPath : katagoConfig.modelPath,
-                    installedConfigPath != null ? installedConfigPath : katagoConfig.configPath,
+                    installedModelPath,
+                    installedConfigPath,
                     katagoConfig.threads,
                     katagoConfig.timePerMove,
                     katagoConfig.resignThreshold
@@ -186,6 +199,7 @@ public class KataGoAI {
             }
             
             // 检查引擎文件是否存在
+            ExceptionHandler.logInfo(LOG_TAG, "3. 检查文件是否存在...");
             File engineFile = new File(actualConfig.enginePath);
             if (!engineFile.exists() || !engineFile.canExecute()) {
                 ExceptionHandler.logError(LOG_TAG, "❌ KataGo引擎文件不存在或无法执行: " + actualConfig.enginePath);
@@ -198,8 +212,10 @@ public class KataGoAI {
                 ExceptionHandler.logError(LOG_TAG, "❌ 神经网络模型文件不存在: " + actualConfig.modelPath);
                 return false;
             }
+            ExceptionHandler.logInfo(LOG_TAG, "3. 文件检查完成.");
             
             // 构建启动命令
+            ExceptionHandler.logInfo(LOG_TAG, "4. 构建启动命令...");
             List<String> command = new ArrayList<>();
             command.add(actualConfig.enginePath);
             command.add("gtp");
@@ -209,30 +225,48 @@ public class KataGoAI {
                 command.add("-config");
                 command.add(actualConfig.configPath);
             }
+            ExceptionHandler.logInfo(LOG_TAG, "4. 命令构建完成: " + String.join(" ", command));
             
             // 启动进程
+            ExceptionHandler.logInfo(LOG_TAG, "5. 启动KataGo进程...");
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(true);
-            katagoProcess = pb.start();
+            try {
+                katagoProcess = pb.start();
+            } catch (IOException e) {
+                ExceptionHandler.handleException(e, "KataGo引擎进程启动失败", false);
+                engineInitialized = false;
+                return false;
+            }
+            ExceptionHandler.logInfo(LOG_TAG, "5. 进程启动成功.");
             
             // 设置输入输出流
+            ExceptionHandler.logInfo(LOG_TAG, "6. 设置输入输出流...");
             katagoReader = new BufferedReader(new InputStreamReader(katagoProcess.getInputStream()));
             katagoWriter = new BufferedWriter(new OutputStreamWriter(katagoProcess.getOutputStream()));
+            ExceptionHandler.logInfo(LOG_TAG, "6. 流设置完成.");
             
             // 设置初始化标志，便于配置命令可以发送
             engineInitialized = true;
             
             // 初始化引擎配置
+            ExceptionHandler.logInfo(LOG_TAG, "7. 配置KataGo引擎...");
             if (!configureEngine()) {
+                ExceptionHandler.logError(LOG_TAG, "❌ configureEngine失败.");
                 engineInitialized = false;
                 shutdownEngine();
                 return false;
             }
+            ExceptionHandler.logInfo(LOG_TAG, "7. 引擎配置成功.");
+            
             ExceptionHandler.logInfo(LOG_TAG, "✅ KataGo引擎初始化成功");
             return true;
             
         } catch (Exception e) {
-            ExceptionHandler.logError(LOG_TAG, "❌ KataGo引擎初始化失败: " + e.getMessage());
+            StringWriter sw = new StringWriter();
+            e.printStackTrace(new PrintWriter(sw));
+            String stackTrace = sw.toString();
+            ExceptionHandler.logError(LOG_TAG, "❌ KataGo引擎初始化失败: " + e.getMessage() + "\n" + stackTrace);
             shutdownEngine();
             return false;
         }
@@ -364,11 +398,18 @@ public class KataGoAI {
     }
     
     /**
+     * 检查引擎是否已完全初始化并可用
+     */
+    public boolean isEngineReady() {
+        return engineInitialized && !isShutdown && katagoProcess != null && katagoProcess.isAlive();
+    }
+    
+    /**
      * 计算最佳移动
      */
     public GoPosition calculateBestMove(int[][] board, int currentPlayer) {
-        if (!engineInitialized) {
-            ExceptionHandler.logError(LOG_TAG, "❌ KataGo引擎未初始化");
+        if (!isEngineReady()) {
+            ExceptionHandler.logError(LOG_TAG, "❌ KataGo引擎未初始化或不可用");
             return null;
         }
         

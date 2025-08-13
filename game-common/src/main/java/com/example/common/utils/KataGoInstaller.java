@@ -55,24 +55,42 @@ public class KataGoInstaller {
         // Private constructor
     }
     
+    public static void forceCleanInstall() {
+        try {
+            Path dir = Paths.get(KATAGO_DIR);
+            if (Files.exists(dir)) {
+                Files.walk(dir)
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .forEach(File::delete);
+            }
+        } catch (IOException e) {
+            ExceptionHandler.logError("无法清理KataGo目录: " + e.getMessage(), "KataGoInstaller");
+        }
+    }
+
     /**
      * 检查KataGo是否已安装且可用
      * 
-     * @return 如果KataGo可用返回true，否则返回false
+     * @return 如果KataGo可用返回true，否则返囎false
      */
     public boolean isKataGoInstalled() {
         try {
             String executablePath = getKataGoExecutablePath();
             if (executablePath == null) {
+                ExceptionHandler.logInfo("未找到KataGo可执行文件", "KataGoInstaller");
                 return false;
             }
             
             File executable = new File(executablePath);
             if (!executable.exists() || !executable.canExecute()) {
+                ExceptionHandler.logInfo("KataGo可执行文件不存在或无法执行: " + executablePath, "KataGoInstaller");
                 return false;
             }
             
-            // 尝试运行KataGo验证
+            ExceptionHandler.logInfo("找到KataGo可执行文件: " + executablePath, "KataGoInstaller");
+            
+            // 尝试运行KataGo验证可执行文件
             ProcessBuilder pb = new ProcessBuilder(executablePath, "version");
             pb.redirectErrorStream(true);
             Process process = pb.start();
@@ -81,10 +99,66 @@ public class KataGoInstaller {
             String line = reader.readLine();
             int exitCode = process.waitFor();
             
-            return exitCode == 0 && line != null && line.toLowerCase().contains("katago");
+            if (exitCode != 0 || line == null || !line.toLowerCase().contains("katago")) {
+                ExceptionHandler.logError("KataGo可执行文件验证失败", "KataGoInstaller");
+                return false;
+            }
+            
+            ExceptionHandler.logInfo("KataGo可执行文件验证成功: " + line.trim(), "KataGoInstaller");
+            
+            // 检查模型文件是否存在
+            String modelPath = getModelPath();
+            if (modelPath == null) {
+                ExceptionHandler.logInfo("模型路径为空", "KataGoInstaller");
+                return false;
+            }
+            
+            Path modelPathObj = Paths.get(modelPath);
+            
+            // 使用Files.exists()检查文件是否存在（包括符号链接）
+            if (!Files.exists(modelPathObj)) {
+                ExceptionHandler.logInfo("模型文件不存在: " + modelPath, "KataGoInstaller");
+                return false;
+            }
+            
+            // 检查是否是符号链接，如果是，打印链接信息
+            if (Files.isSymbolicLink(modelPathObj)) {
+                try {
+                    Path realPath = Files.readSymbolicLink(modelPathObj);
+                    ExceptionHandler.logInfo("找到符号链接模型文件: " + modelPath + " -> " + realPath, "KataGoInstaller");
+                    
+                    // 如果是相对路径，需要解析为绝对路径
+                    if (!realPath.isAbsolute()) {
+                        Path parentDir = modelPathObj.getParent();
+                        realPath = parentDir.resolve(realPath);
+                    }
+                    
+                    // 检查实际目标文件是否存在
+                    if (!Files.exists(realPath)) {
+                        ExceptionHandler.logInfo("符号链接目标不存在: " + realPath, "KataGoInstaller");
+                        return false;
+                    }
+                } catch (Exception e) {
+                    ExceptionHandler.logInfo("无法读取符号链接: " + modelPath + ", 错误: " + e.getMessage(), "KataGoInstaller");
+                    return false;
+                }
+            } else {
+                ExceptionHandler.logInfo("找到模型文件: " + modelPath, "KataGoInstaller");
+            }
+            
+            // 检查配置文件是否存在
+            String configPath = getConfigPath();
+            if (configPath == null || !new File(configPath).exists()) {
+                ExceptionHandler.logInfo("配置文件不存在: " + configPath, "KataGoInstaller");
+                return false;
+            }
+            ExceptionHandler.logInfo("找到配置文件: " + configPath, "KataGoInstaller");
+            
+            ExceptionHandler.logInfo("KataGo安装检查完成 - 所有文件都可用", "KataGoInstaller");
+            return true;
             
         } catch (Exception e) {
-            System.err.println("检查KataGo安装状态时出错: " + e.getMessage());
+            ExceptionHandler.logError("检查KataGo安装状态时出错: " + e.getMessage(), "KataGoInstaller");
             return false;
         }
     }
@@ -143,67 +217,88 @@ public class KataGoInstaller {
     public boolean installKataGo(ProgressCallback progressCallback) {
         try {
             progressCallback.onProgress(0, "开始安装KataGo...");
-            
+            ExceptionHandler.logInfo("开始安装KataGo...", "KataGoInstaller");
+    
             // 创建安装目录
             createDirectories();
             progressCallback.onProgress(10, "创建安装目录...");
-            
+            ExceptionHandler.logInfo("创建安装目录...", "KataGoInstaller");
+    
             // 检测操作系统并选择合适的下载URL
             String downloadUrl = getDownloadUrl();
             if (downloadUrl == null) {
                 progressCallback.onProgress(100, "不支持的操作系统");
+                ExceptionHandler.logError("不支持的操作系统", "KataGoInstaller");
                 return false;
             }
-            
+            ExceptionHandler.logInfo("下载链接: " + downloadUrl, "KataGoInstaller");
+    
             progressCallback.onProgress(20, "正在下载KataGo...");
-            
+            ExceptionHandler.logInfo("正在下载KataGo...", "KataGoInstaller");
+    
             // 下载KataGo
             String tempFile = downloadFile(downloadUrl, "katago.zip");
             if (tempFile == null) {
                 progressCallback.onProgress(100, "下载KataGo失败");
+                ExceptionHandler.logError("下载KataGo失败", "KataGoInstaller");
                 return false;
             }
-            
+            ExceptionHandler.logInfo("KataGo 已下载到: " + tempFile, "KataGoInstaller");
+    
             progressCallback.onProgress(60, "正在解压KataGo...");
-            
+            ExceptionHandler.logInfo("正在解压KataGo...", "KataGoInstaller");
+    
             // 解压文件
             if (!extractKataGo(tempFile)) {
                 progressCallback.onProgress(100, "解压KataGo失败");
+                ExceptionHandler.logError("解压KataGo失败", "KataGoInstaller");
                 return false;
             }
-            
+            ExceptionHandler.logInfo("KataGo 解压成功", "KataGoInstaller");
+    
             progressCallback.onProgress(70, "正在下载模型文件...");
-            
+            ExceptionHandler.logInfo("正在下载模型文件...", "KataGoInstaller");
+    
             // 下载模型文件
             String modelFile = downloadFile(KATAGO_MODEL_URL, "model.bin.gz");
             if (modelFile != null) {
                 Files.move(Paths.get(modelFile), Paths.get(KATAGO_MODELS_DIR, "model.bin.gz"), StandardCopyOption.REPLACE_EXISTING);
+                ExceptionHandler.logInfo("模型文件已移动到: " + KATAGO_MODELS_DIR, "KataGoInstaller");
+            } else {
+                ExceptionHandler.logError("下载模型文件失败", "KataGoInstaller");
             }
-            
+    
             progressCallback.onProgress(85, "正在下载配置文件...");
-            
+            ExceptionHandler.logInfo("正在下载配置文件...", "KataGoInstaller");
+    
             // 下载配置文件
             String configFile = downloadFile(KATAGO_CONFIG_URL, "gtp_example.cfg");
             if (configFile != null) {
                 Files.move(Paths.get(configFile), Paths.get(KATAGO_CONFIGS_DIR, "gtp_example.cfg"), StandardCopyOption.REPLACE_EXISTING);
+                ExceptionHandler.logInfo("配置文件已移动到: " + KATAGO_CONFIGS_DIR, "KataGoInstaller");
+            } else {
+                ExceptionHandler.logError("下载配置文件失败", "KataGoInstaller");
             }
-            
+    
             progressCallback.onProgress(95, "设置文件权限...");
-            
+            ExceptionHandler.logInfo("设置文件权限...", "KataGoInstaller");
+    
             // 设置可执行权限（Unix系统）
             setExecutablePermissions();
-            
+            ExceptionHandler.logInfo("文件权限设置成功", "KataGoInstaller");
+    
             // 清理临时文件
             new File(tempFile).delete();
-            
+            ExceptionHandler.logInfo("临时文件已删除", "KataGoInstaller");
+    
             progressCallback.onProgress(100, "KataGo安装完成");
-            
+            ExceptionHandler.logInfo("KataGo安装完成", "KataGoInstaller");
+    
             return isKataGoInstalled();
-            
+    
         } catch (Exception e) {
             progressCallback.onProgress(100, "安装失败: " + e.getMessage());
-            System.err.println("安装KataGo时出错: " + e.getMessage());
-            e.printStackTrace();
+            ExceptionHandler.handleException(e, "KataGoInstaller", false);
             return false;
         }
     }
@@ -311,7 +406,26 @@ public class KataGoInstaller {
      */
     public String getModelPath() {
         String modelPath = KATAGO_MODELS_DIR + File.separator + "model.bin.gz";
-        return Files.exists(Paths.get(modelPath)) ? modelPath : null;
+        // 如果标准模型文件存在
+        if (Files.exists(Paths.get(modelPath))) {
+            return modelPath;
+        }
+        
+        // 检查模型目录中是否有其他.bin.gz文件
+        try {
+            File modelsDir = new File(KATAGO_MODELS_DIR);
+            if (modelsDir.exists() && modelsDir.isDirectory()) {
+                File[] modelFiles = modelsDir.listFiles((dir, name) -> name.endsWith(".bin.gz"));
+                if (modelFiles != null && modelFiles.length > 0) {
+                    return modelFiles[0].getAbsolutePath();
+                }
+            }
+        } catch (Exception e) {
+            // 忽略异常，返回默认路径
+        }
+        
+        // 返回默认路径，即使文件不存在（安装过程中会创建）
+        return modelPath;
     }
     
     /**
@@ -330,6 +444,116 @@ public class KataGoInstaller {
     }
     
     /**
+     * 仅下载模型和配置文件（当KataGo可执行文件已存在时）
+     */
+    public boolean downloadModelsAndConfigs(ProgressCallback progressCallback) {
+        try {
+            progressCallback.onProgress(0, "开始下载模型和配置文件...");
+            
+            // 创建必要的目录
+            createDirectories();
+            progressCallback.onProgress(20, "创建目录完成");
+            
+            // 下载模型文件
+            progressCallback.onProgress(30, "正在下载模型文件...");
+            String modelUrl = "https://katagotraining.org/networks/kata1-b18c384nbt-s6582191616-d3422816034.bin.gz";
+            String modelFile = downloadFileFromKataGoTraining(modelUrl, "model.bin.gz");
+            if (modelFile != null) {
+                Files.move(Paths.get(modelFile), Paths.get(KATAGO_MODELS_DIR, "model.bin.gz"), StandardCopyOption.REPLACE_EXISTING);
+                progressCallback.onProgress(70, "模型文件下载完成");
+            } else {
+                // 尝试备用模型
+                progressCallback.onProgress(40, "尝试备用模型源...");
+                modelFile = downloadFile(KATAGO_MODEL_URL, "model.bin.gz");
+                if (modelFile != null) {
+                    Files.move(Paths.get(modelFile), Paths.get(KATAGO_MODELS_DIR, "model.bin.gz"), StandardCopyOption.REPLACE_EXISTING);
+                    progressCallback.onProgress(70, "备用模型文件下载完成");
+                } else {
+                    progressCallback.onProgress(70, "模型文件下载失败，将创建默认配置");
+                }
+            }
+            
+            // 下载配置文件
+            progressCallback.onProgress(80, "正在下载配置文件...");
+            String configFile = downloadFile(KATAGO_CONFIG_URL, "gtp_example.cfg");
+            if (configFile != null) {
+                Files.move(Paths.get(configFile), Paths.get(KATAGO_CONFIGS_DIR, "gtp_example.cfg"), StandardCopyOption.REPLACE_EXISTING);
+                progressCallback.onProgress(90, "配置文件下载完成");
+            } else {
+                // 创建默认配置文件
+                createDefaultConfig();
+                progressCallback.onProgress(90, "创建默认配置文件");
+            }
+            
+            progressCallback.onProgress(100, "模型和配置文件准备完成");
+            return true;
+            
+        } catch (Exception e) {
+            progressCallback.onProgress(100, "下载失败: " + e.getMessage());
+            ExceptionHandler.handleException(e, "KataGoInstaller", false);
+            return false;
+        }
+    }
+    
+    /**
+     * 从KataGo训练网站下载文件
+     */
+    private String downloadFileFromKataGoTraining(String urlString, String fileName) {
+        try {
+            URL url = new URL(urlString);
+            String tempDir = System.getProperty("java.io.tmpdir");
+            String tempFile = tempDir + File.separator + fileName;
+            
+            try (ReadableByteChannel rbc = Channels.newChannel(url.openStream());
+                 FileOutputStream fos = new FileOutputStream(tempFile)) {
+                fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+            }
+            
+            return tempFile;
+        } catch (Exception e) {
+            ExceptionHandler.logError("下载文件失败: " + urlString + ", 错误: " + e.getMessage(), "KataGoInstaller");
+            return null;
+        }
+    }
+    
+    /**
+     * 创建默认配置文件
+     */
+    private void createDefaultConfig() {
+        try {
+            String configPath = KATAGO_CONFIGS_DIR + File.separator + "gtp_example.cfg";
+            String defaultConfig = "# KataGo GTP配置文件\n" +
+                "# 基本设置\n" +
+                "logSearchInfo = false\n" +
+                "logMoves = false\n" +
+                "logGamesRequested = false\n" +
+                "logAllGTPCommunication = false\n" +
+                "\n" +
+                "# 搜索设置\n" +
+                "maxVisits = 800\n" +
+                "maxPlayouts = 800\n" +
+                "maxTime = 10\n" +
+                "\n" +
+                "# 神经网络设置\n" +
+                "nnMaxBatchSize = 16\n" +
+                "nnCacheSizePowerOfTwo = 20\n" +
+                "nnMutexPoolSizePowerOfTwo = 16\n" +
+                "\n" +
+                "# 搜索参数\n" +
+                "numSearchThreads = 1\n" +
+                "\n" +
+                "# 规则设置\n" +
+                "rules = chinese\n" +
+                "komi = 7.5\n";
+            
+            Files.write(Paths.get(configPath), defaultConfig.getBytes());
+            ExceptionHandler.logInfo("创建默认配置文件: " + configPath, "KataGoInstaller");
+        } catch (Exception e) {
+            ExceptionHandler.logError("创建默认配置文件失败: " + e.getMessage(), "KataGoInstaller");
+        }
+    }
+    
+    /**
      * 检查并安装KataGo（如果需要）
      * 
      * @param progressCallback 进度回调
@@ -343,6 +567,22 @@ public class KataGoInstaller {
             return true;
         }
         
+        // 检查是否有可执行文件但缺少模型/配置
+        String executablePath = getKataGoExecutablePath();
+        if (executablePath != null) {
+            // 可执行文件存在，只需要下载模型和配置
+            if (progressCallback != null) {
+                progressCallback.onProgress(0, "检测到KataGo可执行文件，正在下载模型和配置...");
+            }
+            return downloadModelsAndConfigs(progressCallback != null ? progressCallback : new ProgressCallback() {
+                @Override
+                public void onProgress(int percentage, String message) {
+                    System.out.println(String.format("[%d%%] %s", percentage, message));
+                }
+            });
+        }
+        
+        // 完全安装
         if (progressCallback != null) {
             progressCallback.onProgress(0, "检测到KataGo未安装，开始自动安装...");
         }

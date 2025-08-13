@@ -175,12 +175,6 @@ public class StockfishAI {
         }
     }
     
-    /**
-     * 析构函数 - 确保引擎正确关闭
-     */
-    @Override
-    protected void finalize() throws Throwable {
-        shutdown();
-        super.finalize();
-    }
+    // 注意: finalize() 方法已被移除，因为它可能导致引擎过早关闭
+    // 如果需要清理资源，请显式调用 shutdown() 方法
 }

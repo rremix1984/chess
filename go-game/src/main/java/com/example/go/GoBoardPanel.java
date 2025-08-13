@@ -245,7 +245,7 @@ public class GoBoardPanel extends JPanel {
                 String analysisInfo = "";
                 
                 // 优先使用KataGo AI（如果可用且没有传统AI）
-                if (kataGoAI != null && ai == null) {
+                if (kataGoAI != null && ai == null && kataGoAI.isEngineReady()) {
                     System.out.println("✅ 使用KataGo AI计算移动");
                     
                     // 获取棋局分析
@@ -275,7 +275,11 @@ public class GoBoardPanel extends JPanel {
                     move = ai.calculateMove(game);
                     analysisInfo = "传统AI决策";
                 } else {
-                    System.out.println("❌ 没有AI引擎可用");
+                    if (kataGoAI != null && ai == null && !kataGoAI.isEngineReady()) {
+                        System.out.println("❌ KataGo引擎未就绪，无法使用");
+                    } else {
+                        System.out.println("❌ 没有AI引擎可用");
+                    }
                     return null;
                 }
                 
@@ -686,13 +690,22 @@ public class GoBoardPanel extends JPanel {
         if ("KataGo AI".equals(aiType)) {
             useKataGo = true;
             System.out.println("⚙️ 尝试使用KataGo AI - kataGoAI存在: " + (kataGoAI != null));
-            // 如果有KataGo引擎，创建两个实例
-            if (kataGoAI != null) {
+            // 检查KataGo是否真正可用（不仅要存在，还要初始化成功）
+            if (kataGoAI != null && kataGoAI.isEngineReady()) {
+                System.out.println("✅ 使用已初始化的KataGo实例创建两个AI");
                 blackKataGoAI = new KataGoAI(difficulty);
                 whiteKataGoAI = new KataGoAI(difficulty);
-                blackKataGoAI.initializeEngine();
-                whiteKataGoAI.initializeEngine();
-                System.out.println("✅ 创建了两个KataGo AI实例");
+                // 同步初始化引擎
+                if (blackKataGoAI.initializeEngine() && whiteKataGoAI.initializeEngine()) {
+                    System.out.println("✅ 创建了两个KataGo AI实例并成功初始化");
+                } else {
+                    System.out.println("❌ KataGo AI实例初始化失败，回退到传统AI");
+                    blackKataGoAI = null;
+                    whiteKataGoAI = null;
+                    blackAI = new GoAI(GoGame.BLACK, difficulty);
+                    whiteAI = new GoAI(GoGame.WHITE, difficulty);
+                    useKataGo = false;
+                }
             } else {
                 // 回退到传统AI
                 System.out.println("⚠️ KataGo不可用，回退到传统AI");
@@ -792,8 +805,10 @@ public class GoBoardPanel extends JPanel {
                 if (useKataGo) {
                     // 使用KataGo
                     KataGoAI currentKataGoAI = isBlackTurn ? blackKataGoAI : whiteKataGoAI;
-                    if (currentKataGoAI != null) {
+                    if (currentKataGoAI != null && currentKataGoAI.isEngineReady()) {
                         move = currentKataGoAI.calculateBestMove(game.getBoard(), currentPlayer);
+                    } else {
+                        System.out.println("❌ KataGo引擎未就绪，无法计算AI对AI移动");
                     }
                 } else {
                     // 使用传统AI

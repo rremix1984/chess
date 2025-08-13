@@ -85,8 +85,8 @@ public class GameConfig {
     }
     
     public String findNnueFile() {
-        // 首先检查您提供的具体路径
-        String specificPath = "/Users/wangxiaozhe/workspace/chinese-chess-game/international-chess/nn-1c0000000000.nnue";
+        // 首先检查用户当前的具体路径
+        String specificPath = "/Users/rremixwang/workspace/chinese/international-chess/nn-1c0000000000.nnue";
         if (Files.exists(Paths.get(specificPath))) {
             return specificPath;
         }

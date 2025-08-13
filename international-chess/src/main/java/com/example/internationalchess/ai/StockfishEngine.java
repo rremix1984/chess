@@ -61,14 +61,37 @@ public class StockfishEngine {
             sendCommand("setoption name Skill Level value " + skillLevel);
             sendCommand("setoption name Threads value 1");
             
-            // 加载NNUE文件
-            String nnueFile = config.findNnueFile();
-            if (nnueFile != null) {
-                sendCommand("setoption name EvalFile value " + nnueFile);
-                log("NNUE已加载: " + new File(nnueFile).getName());
-                System.out.println("🧠 已加载神经网络文件: " + nnueFile);
-            } else {
-                System.out.println("⚠️  未找到NNUE文件，使用传统评估");
+            // 加载NNUE文件（带错误处理）
+            try {
+                String nnueFile = config.findNnueFile();
+                if (nnueFile != null) {
+                    File file = new File(nnueFile);
+                    if (file.exists() && file.canRead()) {
+                        System.out.println("🔍 尝试加载NNUE文件: " + nnueFile + " (" + (file.length() / 1024 / 1024) + "MB)");
+                        
+                        // 尝试设置NNUE文件
+                        sendCommand("setoption name EvalFile value " + nnueFile);
+                        
+                        // 等待一秒钟确保设置生效
+                        Thread.sleep(1000);
+                        
+                        // 检查引擎是否仍然正常
+                        if (stockfishProcess.isAlive()) {
+                            log("NNUE已加载: " + file.getName());
+                            System.out.println("🧠 成功加载神经网络文件: " + file.getName());
+                        } else {
+                            System.err.println("❌ NNUE文件加载后引擎崩溃，跳过NNUE设置");
+                            throw new RuntimeException("Engine crashed after NNUE loading");
+                        }
+                    } else {
+                        System.out.println("⚠️  NNUE文件不存在或不可读: " + nnueFile);
+                    }
+                } else {
+                    System.out.println("⚠️  未找到NNUE文件，使用Stockfish默认评估");
+                }
+            } catch (Exception e) {
+                System.err.println("❌ NNUE文件加载失败: " + e.getMessage());
+                System.out.println("⚠️  回退到Stockfish默认评估，不使用NNUE");
             }
             
             // 准备引擎
