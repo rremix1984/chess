@@ -351,7 +351,8 @@ public class InternationalBoardPanel extends JPanel {
                     e.printStackTrace();
                 }
             }
-        }.execute();
+        };
+        currentAIWorker.execute();
     }
     
     /**
@@ -405,7 +406,7 @@ public class InternationalBoardPanel extends JPanel {
                     if (move != null && move.length == 4) {
                         executeAIMove(move);
                         
-                        // 继续AI vs AI游戏循环
+                        // 继续 AI vs AI游戏循环
                         if (isAIvsAIMode && board.getGameState() == GameState.PLAYING) {
                             // 延迟1.5秒后进行下一步
                             Timer nextMoveTimer = new Timer(1500, e -> makeAIvsAIMove());
@@ -422,7 +423,8 @@ public class InternationalBoardPanel extends JPanel {
                     pauseAIvsAI();
                 }
             }
-        }.execute();
+        };
+        currentAIWorker.execute();
     }
     
     /**
@@ -1026,8 +1028,8 @@ public class InternationalBoardPanel extends JPanel {
         isPaused = false;
         
         if (isAIvsAIMode) {
-            updateStatus("🔄 AI对战恢夏...");
-            // 延迟500毫秒后恢夏AI vs AI
+            updateStatus("🔄 AI对战恢复...");
+            // 延迟500毫秒后恢复AI vs AI
             Timer resumeTimer = new Timer(500, e -> {
                 if (!isPaused && isAIvsAIMode && board.getGameState() == GameState.PLAYING) {
                     makeAIvsAIMove();
@@ -1035,21 +1037,33 @@ public class InternationalBoardPanel extends JPanel {
             });
             resumeTimer.setRepeats(false);
             resumeTimer.start();
-        } else if (aiEnabled && !isHumanTurn() && board.getGameState() == GameState.PLAYING) {
-            updateStatus("🔄 游戏恢夏 - AI继续思考...");
-            // 延迟300毫秒后让AI走棋
-            SwingUtilities.invokeLater(() -> {
-                if (!isPaused) {
-                    makeAIMove();
-                }
-            });
+        } else if (aiEnabled && board.getGameState() == GameState.PLAYING) {
+            // 检查当前是否轮到AI下棋
+            boolean isWhiteTurn = board.isWhiteTurn();
+            boolean isAITurn = (humanPlayer == 'W' && !isWhiteTurn) || (humanPlayer == 'B' && isWhiteTurn);
+            
+            if (isAITurn) {
+                updateStatus("🔄 游戏恢复 - AI继续思考...");
+                // 延迟300毫秒后让AI走棋
+                Timer aiResumeTimer = new Timer(300, e -> {
+                    if (!isPaused && aiEnabled) {
+                        makeAIMove();
+                    }
+                });
+                aiResumeTimer.setRepeats(false);
+                aiResumeTimer.start();
+            } else {
+                String currentPlayer = isWhiteTurn ? "白方" : "黑方";
+                updateStatus("▶️ 游戏恢复 - 当前回合: " + currentPlayer + "（请您下棋）");
+            }
         } else {
             String currentPlayer = board.isWhiteTurn() ? "白方" : "黑方";
-            updateStatus("▶️ 游戏恢夏 - 当前回合: " + currentPlayer);
+            updateStatus("▶️ 游戏恢复 - 当前回合: " + currentPlayer);
+            System.out.println("ℹ️ 恢复游戏但不符合AI条件: aiEnabled=" + aiEnabled + ", gameState=" + board.getGameState());
         }
         
         if (stockfishLogPanel != null) {
-            stockfishLogPanel.addGameEvent("游戏恢夏");
+            stockfishLogPanel.addGameEvent("游戏恢复");
         }
     }
     
