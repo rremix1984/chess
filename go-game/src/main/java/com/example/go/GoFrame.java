@@ -21,6 +21,12 @@ public class GoFrame extends JFrame {
     private JLabel statusLabel;
     private JLabel captureLabel;
     
+    // 棋局状态统计信息
+    private JLabel gameStatsLabel;
+    private JLabel playerInfoLabel;
+    private JLabel moveCountLabel;
+    private JLabel advantageLabel;
+    
     // 游戏模式单选按钮
     private JRadioButton playerVsAIRadio;
     private JRadioButton aiVsAIRadio;
@@ -101,10 +107,18 @@ public class GoFrame extends JFrame {
             public void onTitleUpdateNeeded() {
                 updateWindowTitle();
             }
+            
+            @Override
+            public void onGameStatsUpdate() {
+                updateGameStats();
+            }
         });
         
         // 创建AI日志面板
         aiLogPanel = new GoAILogPanel();
+        
+        // 设置AI日志面板到棋盘面板
+        boardPanel.setAILogPanel(aiLogPanel);
         
         // 创建聊天面板
         chatPanel = new GoChatPanel();
@@ -116,6 +130,19 @@ public class GoFrame extends JFrame {
         // 被吃棋子标签
         captureLabel = new JLabel("被吃棋子 - 黑: 0, 白: 0");
         captureLabel.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        
+        // 棋局状态统计标签
+        gameStatsLabel = new JLabel("棋局状态统计");
+        gameStatsLabel.setFont(new Font("微软雅黑", Font.BOLD, 12));
+        
+        playerInfoLabel = new JLabel("●：玩家   ○：AI");
+        playerInfoLabel.setFont(new Font("微软雅黑", Font.PLAIN, 11));
+        
+        moveCountLabel = new JLabel("手数: 0");
+        moveCountLabel.setFont(new Font("微软雅黑", Font.PLAIN, 11));
+        
+        advantageLabel = new JLabel("当前: 黑棋回合");
+        advantageLabel.setFont(new Font("微软雅黑", Font.PLAIN, 11));
         
         // 游戏模式单选按钮
         gameModeGroup = new ButtonGroup();
@@ -183,18 +210,49 @@ public class GoFrame extends JFrame {
         button.setPreferredSize(new Dimension(90, 35));
         button.setOpaque(true);
         
-        // 添加鼠标悬停效果
+        // 添加鼠标交互效果
         button.addMouseListener(new java.awt.event.MouseAdapter() {
             Color originalColor = color;
             
             @Override
             public void mouseEntered(java.awt.event.MouseEvent evt) {
                 button.setBackground(originalColor.brighter());
+                button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             }
             
             @Override
             public void mouseExited(java.awt.event.MouseEvent evt) {
                 button.setBackground(originalColor);
+                button.setCursor(Cursor.getDefaultCursor());
+                // 恢复正常边框
+                button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createRaisedBevelBorder(),
+                    BorderFactory.createEmptyBorder(5, 10, 5, 10)
+                ));
+            }
+            
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                // 按下时的效果：更暗的颜色和凹陷边框
+                button.setBackground(originalColor.darker());
+                button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLoweredBevelBorder(),
+                    BorderFactory.createEmptyBorder(5, 10, 5, 10)
+                ));
+            }
+            
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                // 释放时恢复悬停效果
+                if (button.contains(evt.getPoint())) {
+                    button.setBackground(originalColor.brighter());
+                } else {
+                    button.setBackground(originalColor);
+                }
+                button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createRaisedBevelBorder(),
+                    BorderFactory.createEmptyBorder(5, 10, 5, 10)
+                ));
             }
         });
     }
@@ -237,7 +295,7 @@ public class GoFrame extends JFrame {
     private JPanel createTopControlPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createTitledBorder("🎮 围棋对弈控制"));
-        panel.setPreferredSize(new Dimension(1400, 120));
+        panel.setPreferredSize(new Dimension(1400, 160)); // 增加高度以容纳状态统计
         
         // 左侧：基本设置
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
@@ -315,9 +373,40 @@ public class GoFrame extends JFrame {
         returnButton.setToolTipText("返回主菜单");
         returnButton.setPreferredSize(new Dimension(40, 30));
         returnButton.addActionListener(e -> returnToSelection());
+        styleButton(returnButton, new Color(158, 158, 158));
         rightPanel.add(returnButton);
         
         panel.add(rightPanel, BorderLayout.EAST);
+        
+        // 底部：棋局状态统计信息栏
+        JPanel statsPanel = createGameStatsPanel();
+        panel.add(statsPanel, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    /**
+     * 创建棋局状态统计面板
+     */
+    private JPanel createGameStatsPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("📊 棋局状态统计"));
+        panel.setPreferredSize(new Dimension(1400, 40));
+        
+        // 左侧：对战双方信息
+        JPanel leftStatsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        leftStatsPanel.add(playerInfoLabel);
+        panel.add(leftStatsPanel, BorderLayout.WEST);
+        
+        // 中间：手数统计
+        JPanel centerStatsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+        centerStatsPanel.add(moveCountLabel);
+        panel.add(centerStatsPanel, BorderLayout.CENTER);
+        
+        // 右侧：优势分析
+        JPanel rightStatsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        rightStatsPanel.add(advantageLabel);
+        panel.add(rightStatsPanel, BorderLayout.EAST);
         
         return panel;
     }
@@ -637,6 +726,52 @@ public class GoFrame extends JFrame {
             }
         } else {
             setTitle("🏆 围棋对弈 - 专业版");
+        }
+    }
+    
+    /**
+     * 更新棋局状态统计
+     */
+    private void updateGameStats() {
+        if (boardPanel == null || boardPanel.getGame() == null) {
+            return;
+        }
+        
+        GoGame game = boardPanel.getGame();
+        
+        // 更新手数统计
+        int totalMoves = game.getMoveHistory().size();
+        moveCountLabel.setText("手数: " + totalMoves);
+        
+        // 更新当前回合
+        if (game.isGameEnded()) {
+            GoGame.GoGameResult result = game.calculateGameResult();
+            if (result != null) {
+                advantageLabel.setText("结果: " + result.getResultDescription());
+            } else {
+                advantageLabel.setText("游戏结束");
+            }
+        } else {
+            String currentPlayer = (game.getCurrentPlayer() == GoGame.BLACK) ? "黑棋" : "白棋";
+            advantageLabel.setText("当前: " + currentPlayer + "回合");
+        }
+        
+        // 更新玩家信息（根据游戏模式）
+        switch (currentGameMode) {
+            case PLAYER_VS_AI:
+                int aiPlayer = aiPlayerCombo.getSelectedIndex() == 0 ? GoGame.WHITE : GoGame.BLACK;
+                if (aiPlayer == GoGame.BLACK) {
+                    playerInfoLabel.setText("●：AI   ○：玩家");
+                } else {
+                    playerInfoLabel.setText("●：玩家   ○：AI");
+                }
+                break;
+            case AI_VS_AI:
+                playerInfoLabel.setText("●：AI   ○：AI");
+                break;
+            case PLAYER_VS_PLAYER:
+                playerInfoLabel.setText("●：玩家   ○：玩家");
+                break;
         }
     }
     

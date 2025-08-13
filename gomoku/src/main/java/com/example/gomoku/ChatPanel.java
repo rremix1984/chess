@@ -1,11 +1,9 @@
-package com.example.gomoku.ui;
+package com.example.gomoku;
 
 import com.example.gomoku.core.Board;
-// 移除了ChineseChessBoard的import
+// 移除了ChineseChessBoard的importimport com.example.gomoku.core.Board;
 import com.example.gomoku.core.GameState;
 import com.example.gomoku.core.GomokuBoard;
-import com.example.gomoku.core.Piece;
-import com.example.gomoku.core.PieceColor;
 import com.example.gomoku.core.Position;
 // 移除了Gson和OkHttp相关的import
 
@@ -107,7 +105,7 @@ public class ChatPanel extends JPanel {
         ));
         evaluateButton.setFocusPainted(false);
         evaluateButton.setToolTipText("让Pikafish引擎评估当前棋局并给出建议");
-        evaluateButton.addActionListener(e -> requestPikafishEvaluation());
+        evaluateButton.addActionListener(e -> requestGomokuAIAnalysis());
         
         // Pikafish难度选择
         JLabel difficultyLabel = new JLabel("难度:");
@@ -335,18 +333,8 @@ public class ChatPanel extends JPanel {
         }
         
         try {
-            // 创建DeepSeekPikafishAI实例进行深度分析
-            com.example.ai.DeepSeekPikafishAI analyzer = new com.example.ai.DeepSeekPikafishAI(
-                com.example.gomoku.core.PieceColor.RED, // 默认颜色
-                8, // 高难度分析
-                "deepseek-r1:7b" // 使用DeepSeek模型
-            );
-            
-            // 获取Pikafish引擎分析
-            String pikafishAnalysis = analyzer.evaluateGameAndGiveAdvice(
-                (com.example.gomoku.core.Board) board, 
-                com.example.gomoku.core.PieceColor.RED
-            );
+            // 五子棋暂不支持深度分析
+            String pikafishAnalysis = "五子棋暂不支持Pikafish引擎分析";
             
             // 获取当前棋盘状态
             String boardState = getBoardStateDescription();
@@ -371,15 +359,12 @@ public class ChatPanel extends JPanel {
             // 调用DeepSeek模型
             String deepAnalysis = callDeepSeekForAnalysis(prompt);
             
-            // 清理资源
-            analyzer.shutdown();
-            
-            return "🤖 **AI象棋大师深度分析**\n\n" + deepAnalysis + 
-                   "\n\n💡 **提示**：以上分析结合了Pikafish引擎的精确计算和AI的战略思维，为您提供最专业的走法建议。";
+            return "🤖 **五子棋分析**\n\n" + deepAnalysis + 
+                   "\n\n💡 **提示**：五子棋暂不支持深度引擎分析。";
             
         } catch (Exception e) {
             System.err.println("深度走法分析失败: " + e.getMessage());
-            return "抱歉，深度分析功能暂时不可用。请使用下方的'🐟 Pikafish评估'按钮获取专业的引擎分析。";
+            return "抱歉，五子棋深度分析功能暂时不可用。";
         }
     }
     
@@ -426,18 +411,8 @@ public class ChatPanel extends JPanel {
      */
     private String callDeepSeekForAnalysis(String prompt) {
         try {
-            // 创建临时的DeepSeekPikafishAI实例来调用DeepSeek模型
-            com.example.ai.DeepSeekPikafishAI tempAI = new com.example.ai.DeepSeekPikafishAI(
-                com.example.gomoku.core.PieceColor.RED,
-                5, // 中等难度即可
-                "deepseek-r1:7b"
-            );
-            
-            // 使用AI的内部方法调用DeepSeek（需要添加公共方法）
-            String response = tempAI.callDeepSeekAPI(prompt);
-            
-            // 清理资源
-            tempAI.shutdown();
+            // 五子棋暂不支持DeepSeek分析
+            String response = "五子棋暂不支持DeepSeek AI分析功能";
             
             if (response != null && !response.trim().isEmpty()) {
                 return response;
@@ -552,22 +527,8 @@ public class ChatPanel extends JPanel {
             sb.append(String.format("%2d ", row + 1));
             for (int col = 0; col < 9; col++) {
                 try {
-                    if (board instanceof com.example.gomoku.core.Board) {
-                        Piece piece = ((com.example.gomoku.core.Board) board).getPiece(row, col);
-                        if (piece == null) {
-                            sb.append("口 ");
-                        } else {
-                            String name = piece.getChineseName();
-                            if (piece.getColor() == PieceColor.RED) {
-                                sb.append("红").append(name);
-                            } else {
-                                sb.append("黑").append(name);
-                            }
-                            sb.append(" ");
-                        }
-                    } else {
-                        sb.append("口 ");
-                    }
+                    // 五子棋不使用复杂的棋子系统，直接显示空位
+                    sb.append("口 ");
                 } catch (Exception e) {
                     sb.append("? ");
                 }
@@ -855,17 +816,11 @@ public class ChatPanel extends JPanel {
     }
     
     /**
-     * 请求Pikafish引擎评估当前棋局
+     * 请求五子棋AI分析当前棋局
      */
-    private void requestPikafishEvaluation() {
-        if (!isEnabled || board == null) {
-            appendErrorMessage("🐟 Pikafish评估：请先启用AI对弈功能并开始游戏。");
-            return;
-        }
-        
-        // 检查是否为五子棋模式
-        if (gomokuBoard != null) {
-            appendErrorMessage("🐟 Pikafish评估：Pikafish引擎仅支持中国象棋，不支持五子棋。");
+    private void requestGomokuAIAnalysis() {
+        if (!isEnabled || gomokuBoard == null) {
+            appendErrorMessage("🤖 五子棋AI分析：请先启用AI对弈功能并开始游戏。");
             return;
         }
         
@@ -873,60 +828,40 @@ public class ChatPanel extends JPanel {
         int selectedDifficulty = pikafishDifficultyComboBox.getSelectedIndex() + 1; // 1-10级难度
         String difficultyName = (String) pikafishDifficultyComboBox.getSelectedItem();
         
-        System.out.println("用户请求Pikafish评估，难度: " + difficultyName);
+        System.out.println("用户请求五子棋AI分析，难度: " + difficultyName);
         
         // 显示评估开始消息
-        appendUserMessage("👤 你：请Pikafish引擎评估当前棋局（难度: " + difficultyName + "）");
+        appendUserMessage("👤 你：请五子棋AI分析当前棋局（难度: " + difficultyName + "）");
         
         // 禁用输入，显示分析状态
         setInputEnabled(false);
-        appendThinkingMessage("🐟 Pikafish引擎：正在进行" + difficultyName + "深度分析棋局...");
+        appendThinkingMessage("🤖 五子棋AI：正在进行" + difficultyName + "深度分析棋局...");
         
-        // 在后台线程中处理Pikafish评估
+        // 在后台线程中处理五子棋AI分析
         new Thread(() -> {
             try {
-                // 实际调用DeepSeekPikafishAI进行分析
-                if (board instanceof com.example.gomoku.core.Board) {
-                    // 创建DeepSeekPikafishAI实例，使用用户选择的难度
-                    com.example.ai.DeepSeekPikafishAI analyzer = new com.example.ai.DeepSeekPikafishAI(
-                        com.example.gomoku.core.PieceColor.RED, // 默认颜色
-                        selectedDifficulty, // 用户选择的难度
-                        "deepseek-r1:7b" // 默认模型
-                    );
+                // 使用五子棋专用AI进行分析
+                com.example.gomoku.ui.GomokuAdvancedAI analyzer = new com.example.gomoku.ui.GomokuAdvancedAI(difficultyName);
+                
+                // 获取当前局面分析
+                String analysis = analyzeGomokuPosition(analyzer, gomokuBoard);
+                
+                SwingUtilities.invokeLater(() -> {
+                    removeThinkingMessage();
+                    if (analysis != null && !analysis.trim().isEmpty()) {
+                        appendAIMessage("🤖 五子棋AI分析：\n\n" + analysis + "\n\n💡 提示：以上分析由专业的五子棋AI提供，包含局面评估和最佳走法推荐。");
+                        System.out.println("五子棋AI分析完成");
+                    } else {
+                        appendErrorMessage("🤖 五子棋AI：抱歉，无法获取有效的分析结果。");
+                    }
                     
-                    // 获取当前玩家颜色，如果无法确定则使用红方
-                    com.example.gomoku.core.PieceColor currentPlayer = com.example.gomoku.core.PieceColor.RED;
-                    // 注意：Board类没有getCurrentPlayer方法，这里使用默认的红方颜色
-                    
-                    String evaluation = analyzer.evaluateGameAndGiveAdvice((com.example.gomoku.core.Board) board, currentPlayer);
-                    
-                    SwingUtilities.invokeLater(() -> {
-                        removeThinkingMessage();
-                        if (evaluation != null && !evaluation.trim().isEmpty()) {
-                            appendAIMessage("🐟 Pikafish引擎分析：\n\n" + evaluation + "\n\n💡 提示：以上分析由专业的Pikafish引擎提供，包含精确的局面评估和最佳走法推荐。");
-                            System.out.println("Pikafish评估完成");
-                        } else {
-                            appendErrorMessage("🐟 Pikafish引擎：抱歉，无法获取有效的评估结果。请确保引擎正常运行。");
-                        }
-                        
-                        setInputEnabled(true);
-                        inputField.requestFocus();
-                    });
-                    
-                    // 清理资源
-                    analyzer.shutdown();
-                } else {
-                    SwingUtilities.invokeLater(() -> {
-                        removeThinkingMessage();
-                        appendErrorMessage("🐟 Pikafish引擎：当前棋盘类型不支持Pikafish分析。");
-                        setInputEnabled(true);
-                        inputField.requestFocus();
-                    });
-                }
+                    setInputEnabled(true);
+                    inputField.requestFocus();
+                });
             } catch (Exception e) {
                 SwingUtilities.invokeLater(() -> {
                     removeThinkingMessage();
-                    handlePikafishEvaluationError(e);
+                    handleGomokuAIAnalysisError(e);
                     setInputEnabled(true);
                     inputField.requestFocus();
                 });
@@ -935,19 +870,62 @@ public class ChatPanel extends JPanel {
     }
     
     /**
-     * 处理Pikafish评估错误
+     * 分析五子棋当前局面
      */
-    private void handlePikafishEvaluationError(Throwable throwable) {
-        String errorMessage = "🐟 Pikafish引擎：抱歉，评估过程中出现问题。";
+    private String analyzeGomokuPosition(com.example.gomoku.ui.GomokuAdvancedAI analyzer, com.example.gomoku.core.GomokuBoard board) {
+        StringBuilder analysis = new StringBuilder();
+        
+        try {
+            // 获取当前局面信息
+            boolean isBlackTurn = board.isBlackTurn();
+            String currentPlayer = isBlackTurn ? "黑棋" : "白棋";
+            
+            analysis.append("📊 当前局面分析：\n");
+            analysis.append("当前轮次：").append(currentPlayer).append("\n\n");
+            
+            // 获取AI推荐的最佳走法
+            int[] bestMove = analyzer.getNextMove(board);
+            if (bestMove != null && bestMove.length == 2) {
+                char col = (char)('A' + bestMove[1]);
+                int row = bestMove[0] + 1;
+                analysis.append("🎯 推荐走法：").append(col).append(row).append("\n");
+                analysis.append("📝 走法说明：这是当前局面下的最佳选择\n\n");
+            }
+            
+            // 获取AI的思考过程
+            String thinking = analyzer.getThinking();
+            if (thinking != null && !thinking.trim().isEmpty()) {
+                analysis.append("🧠 AI思考过程：\n").append(thinking).append("\n\n");
+            }
+            
+            // 添加一般性建议
+            analysis.append("💡 战术建议：\n");
+            analysis.append("• 优先考虑形成连子威胁\n");
+            analysis.append("• 注意防守对手的连子\n");
+            analysis.append("• 控制棋盘中心区域\n");
+            analysis.append("• 寻找双重威胁的机会\n");
+            
+        } catch (Exception e) {
+            analysis.append("分析过程中出现错误：").append(e.getMessage());
+        }
+        
+        return analysis.toString();
+    }
+    
+    /**
+     * 处理五子棋AI分析错误
+     */
+    private void handleGomokuAIAnalysisError(Throwable throwable) {
+        String errorMessage = "🤖 五子棋AI：抱歉，分析过程中出现问题。";
         
         if (throwable instanceof InterruptedException) {
-            errorMessage += "评估被中断，请稍后重试。";
+            errorMessage += "分析被中断，请稍后重试。";
         } else {
-            errorMessage += "请检查引擎状态。";
+            errorMessage += "请检查AI状态。";
         }
         
         appendErrorMessage(errorMessage);
-        System.err.println("Pikafish评估错误: " + throwable.getMessage());
+        System.err.println("五子棋AI分析错误: " + throwable.getMessage());
     }
     
     /**
@@ -986,13 +964,12 @@ public class ChatPanel extends JPanel {
              this.gomokuBoard = gomokuBoard;
          }
          
-         public Piece getPiece(int row, int col) {
-             // 五子棋棋盘不使用Piece对象，返回null
-             return null;
+         public char getPiece(int row, int col) {
+             return gomokuBoard.getPiece(row, col);
          }
          
-         public void setPiece(int row, int col, Piece piece) {
-             // 五子棋棋盘不使用Piece对象，空实现
+         public void setPiece(int row, int col, char piece) {
+             gomokuBoard.setPiece(row, col, piece);
          }
          
          public boolean isValidMove(Position from, Position to) {

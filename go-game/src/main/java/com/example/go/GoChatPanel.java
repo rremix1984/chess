@@ -80,8 +80,12 @@ public class GoChatPanel extends JPanel {
             }
         });
         
-        // 按钮面板
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        // KataGo分析按钮面板 - 放在输入框上方
+        JPanel analysisPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
+        analysisPanel.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
+        
+        // 发送按钮面板 - 放在输入框右侧
+        JPanel sendButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
         
         // KataGo分析按钮 - 更加醒目的设计
         suggestButton = new JButton("🔥 KataGo分析");
@@ -141,12 +145,22 @@ public class GoChatPanel extends JPanel {
         sendButton.setPreferredSize(new Dimension(60, 30));
         sendButton.addActionListener(e -> sendMessage());
         
-        buttonPanel.add(suggestButton);
-        buttonPanel.add(sendButton);
+        // 将按钮添加到对应的面板
+        analysisPanel.add(suggestButton);
+        sendButtonPanel.add(sendButton);
         
-        inputPanel.add(inputField, BorderLayout.CENTER);
-        inputPanel.add(buttonPanel, BorderLayout.EAST);
-        add(inputPanel, BorderLayout.SOUTH);
+        // 创建底部面板，包含分析按钮和输入区域
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(analysisPanel, BorderLayout.NORTH);
+        
+        // 输入行面板
+        JPanel inputRowPanel = new JPanel(new BorderLayout());
+        inputRowPanel.add(inputField, BorderLayout.CENTER);
+        inputRowPanel.add(sendButtonPanel, BorderLayout.EAST);
+        inputRowPanel.setBorder(BorderFactory.createEmptyBorder(3, 5, 3, 5));
+        
+        bottomPanel.add(inputRowPanel, BorderLayout.SOUTH);
+        add(bottomPanel, BorderLayout.SOUTH);
         
         // 状态提示
         JLabel statusLabel = new JLabel("请先启用AI对弈功能", JLabel.CENTER);

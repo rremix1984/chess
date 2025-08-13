@@ -37,15 +37,18 @@ public class GoBoardPanel extends JPanel {
     private GoPosition lastMove;
     private boolean showCoordinates = true;
     private boolean thinking = false;
+    private GoPosition suggestedMove; // 推荐落子位置
     
     // 回调接口
     public interface GameStateCallback {
         void onGameStateChanged(String status);
         void onMoveCount(int blackCaptured, int whiteCaptured);
         void onTitleUpdateNeeded();
+        void onGameStatsUpdate();
     }
     
     private GameStateCallback callback;
+    private GoAILogPanel aiLogPanel; // AI日志面板
     
     public GoBoardPanel() {
         this.game = new GoGame();
@@ -71,6 +74,13 @@ public class GoBoardPanel extends JPanel {
      */
     public void setGameStateCallback(GameStateCallback callback) {
         this.callback = callback;
+    }
+    
+    /**
+     * 设置AI日志面板
+     */
+    public void setAILogPanel(GoAILogPanel aiLogPanel) {
+        this.aiLogPanel = aiLogPanel;
     }
     
     /**
@@ -123,6 +133,7 @@ public class GoBoardPanel extends JPanel {
     public void restartGame() {
         game.restart();
         lastMove = null;
+        suggestedMove = null; // 清除推荐位置
         thinking = false;
         
         // 如果AI是黑棋，让AI先走
@@ -211,23 +222,77 @@ public class GoBoardPanel extends JPanel {
         thinking = true;
         updateGameState();
         
+        // 添加AI思考日志
+        if (aiLogPanel != null) {
+            String playerColor = (game.getCurrentPlayer() == GoGame.BLACK) ? "黑棋" : "白棋";
+            aiLogPanel.logAIThinking(playerColor + "开始分析当前局面...");
+        }
+        
         // 在后台线程中计算AI移动
         SwingWorker<GoPosition, Void> worker = new SwingWorker<GoPosition, Void>() {
             @Override
             protected GoPosition doInBackground() throws Exception {
+                long startTime = System.currentTimeMillis();
+                
+                // 添加分析日志
+                if (aiLogPanel != null) {
+                    aiLogPanel.logAIThinking("正在计算最佳走法...");
+                }
+                
                 Thread.sleep(500); // 模拟思考时间
+                
+                GoPosition move = null;
+                String analysisInfo = "";
                 
                 // 优先使用KataGo AI（如果可用且没有传统AI）
                 if (kataGoAI != null && ai == null) {
                     System.out.println("✅ 使用KataGo AI计算移动");
-                    return kataGoAI.calculateBestMove(game.getBoard(), game.getCurrentPlayer());
+                    
+                    // 获取棋局分析
+                    KataGoAI.GoAnalysis analysis = kataGoAI.analyzePosition(game.getBoard(), game.getCurrentPlayer());
+                    if (analysis != null && aiLogPanel != null) {
+                        String playerColor = (game.getCurrentPlayer() == GoGame.BLACK) ? "黑棋" : "白棋";
+                        aiLogPanel.logAIThinking(String.format("当前%s胜率: %.1f%%", playerColor, analysis.winRate * 100));
+                        
+                        if (!analysis.principalVariation.isEmpty()) {
+                            String pv = String.join(" ", analysis.principalVariation.subList(0, Math.min(3, analysis.principalVariation.size())));
+                            aiLogPanel.logAIThinking("推荐变化: " + pv);
+                        }
+                    }
+                    
+                    move = kataGoAI.calculateBestMove(game.getBoard(), game.getCurrentPlayer());
+                    
+                    // 获取移动后的分析信息
+                    if (analysis != null) {
+                        analysisInfo = String.format("胜率: %.1f%%, 访问数: %d", analysis.winRate * 100, analysis.visits);
+                    }
+                    
                 } else if (ai != null) {
                     System.out.println("⚙️ 使用传统AI计算移动");
-                    return ai.calculateMove(game);
+                    if (aiLogPanel != null) {
+                        aiLogPanel.logAIThinking("使用传统AI引擎分析...");
+                    }
+                    move = ai.calculateMove(game);
+                    analysisInfo = "传统AI决策";
                 } else {
                     System.out.println("❌ 没有AI引擎可用");
                     return null;
                 }
+                
+                // 计算思考时间
+                long thinkTime = System.currentTimeMillis() - startTime;
+                
+                // 记录决策信息
+                if (move != null && aiLogPanel != null) {
+                    int displayRow = GoGame.BOARD_SIZE - move.row;
+                    int displayCol = move.col + 1;
+                    String moveStr = "(" + displayRow + "," + displayCol + ")";
+                    aiLogPanel.logAIDecision(moveStr, thinkTime, analysisInfo);
+                } else if (aiLogPanel != null) {
+                    aiLogPanel.logAIDecision("弃权", thinkTime, "无合适落子点");
+                }
+                
+                return move;
             }
             
             @Override
@@ -304,7 +369,29 @@ public class GoBoardPanel extends JPanel {
         if (callback != null) {
             String status;
             if (game.isGameEnded()) {
-                status = "游戏结束";
+                // 游戏结束，计算并显示结果
+                GoGame.GoGameResult result = game.calculateGameResult();
+                if (result != null) {
+                    status = String.format("游戏结束 - %s (黑棋:%.1f目 白棋:%.1f目)", 
+                                         result.getResultDescription(), result.blackScore, result.whiteScore);
+                    
+                    // 记录游戏结果到AI日志
+                    if (aiLogPanel != null) {
+                        aiLogPanel.addLogEntry("=== 游戏结束 ===", GoAILogPanel.LogLevel.HIGHLIGHT);
+                        aiLogPanel.addLogEntry("最终结果: " + result.getResultDescription(), GoAILogPanel.LogLevel.INFO);
+                        aiLogPanel.addLogEntry(String.format("黑棋得分: %.1f目 (领地:%d + 吃子:%d)", 
+                                        result.blackScore, result.blackTerritory, game.getWhiteCaptured()), GoAILogPanel.LogLevel.INFO);
+                        aiLogPanel.addLogEntry(String.format("白棋得分: %.1f目 (领地:%d + 吃子:%d + 贴目:6.5)", 
+                                        result.whiteScore, result.whiteTerritory, game.getBlackCaptured()), GoAILogPanel.LogLevel.INFO);
+                    }
+                    
+                    // 停止AI对AI模式
+                    if (aiVsAIMode) {
+                        disableAIvsAI();
+                    }
+                } else {
+                    status = "游戏结束";
+                }
             } else if (thinking) {
                 if (aiVsAIMode) {
                     String currentPlayerName = (game.getCurrentPlayer() == GoGame.BLACK) ? "黑棋" : "白棋";
@@ -326,6 +413,7 @@ public class GoBoardPanel extends JPanel {
             callback.onGameStateChanged(status);
             callback.onMoveCount(game.getBlackCaptured(), game.getWhiteCaptured());
             callback.onTitleUpdateNeeded();
+            callback.onGameStatsUpdate();
         }
     }
     
@@ -343,6 +431,10 @@ public class GoBoardPanel extends JPanel {
         
         if (lastMove != null) {
             drawLastMoveMarker(g2d);
+        }
+        
+        if (suggestedMove != null) {
+            drawSuggestedMoveMarker(g2d);
         }
         
         g2d.dispose();
@@ -458,28 +550,30 @@ public class GoBoardPanel extends JPanel {
         g2d.setFont(new Font("微软雅黑", Font.BOLD, 14));
         FontMetrics fm = g2d.getFontMetrics();
         
-        // 绘制列坐标 (1-19) - 横坐标
+        // 绘制列坐标 (1-19) - 横坐标，在上方和下方都显示
         for (int i = 0; i < BOARD_SIZE; i++) {
             String label = String.valueOf(i + 1); // 1-19
             int x = MARGIN + i * CELL_SIZE;
             int labelWidth = fm.stringWidth(label);
             
-            // 上方坐标
+            // 上方显示坐标
             g2d.drawString(label, x - labelWidth / 2, MARGIN - 10);
-            // 下方坐标
+            
+            // 下方显示坐标
             g2d.drawString(label, x - labelWidth / 2, 
                           MARGIN + BOARD_SIZE * CELL_SIZE + 20);
         }
         
-        // 绘制行坐标 (1-19) - 纵坐标
+        // 绘制行坐标 (1-19) - 纵坐标，在左侧和右侧都显示
         for (int i = 0; i < BOARD_SIZE; i++) {
             String label = String.valueOf(BOARD_SIZE - i); // 19-1 (从上到下)
             int y = MARGIN + i * CELL_SIZE;
             int labelWidth = fm.stringWidth(label);
             
-            // 左侧坐标
+            // 左侧显示坐标
             g2d.drawString(label, MARGIN - labelWidth - 10, y + 4);
-            // 右侧坐标
+            
+            // 右侧显示坐标
             g2d.drawString(label, MARGIN + BOARD_SIZE * CELL_SIZE + 10, y + 4);
         }
     }
@@ -497,6 +591,30 @@ public class GoBoardPanel extends JPanel {
         g2d.setStroke(new BasicStroke(2.0f));
         g2d.drawOval(x - STONE_RADIUS - 2, y - STONE_RADIUS - 2, 
                    (STONE_RADIUS + 2) * 2, (STONE_RADIUS + 2) * 2);
+    }
+    
+    /**
+     * 绘制推荐落子位置的虚线标记
+     */
+    private void drawSuggestedMoveMarker(Graphics2D g2d) {
+        if (suggestedMove == null) return;
+        
+        int x = MARGIN + suggestedMove.col * CELL_SIZE;
+        int y = MARGIN + suggestedMove.row * CELL_SIZE;
+        
+        // 设置虚线样式
+        g2d.setColor(new Color(0, 150, 255)); // 蓝色
+        float[] dashPattern = {5.0f, 5.0f}; // 虚线模式：5像素实线，5像素空白
+        g2d.setStroke(new BasicStroke(3.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, dashPattern, 0));
+        
+        // 绘制虚线圆圈
+        g2d.drawOval(x - STONE_RADIUS - 3, y - STONE_RADIUS - 3, 
+                   (STONE_RADIUS + 3) * 2, (STONE_RADIUS + 3) * 2);
+        
+        // 绘制十字标记
+        g2d.setStroke(new BasicStroke(2.0f));
+        g2d.drawLine(x - 8, y, x + 8, y); // 横线
+        g2d.drawLine(x, y - 8, x, y + 8); // 竖线
     }
     
     // Getter方法
@@ -518,6 +636,22 @@ public class GoBoardPanel extends JPanel {
     
     public void setShowCoordinates(boolean show) {
         this.showCoordinates = show;
+        repaint();
+    }
+    
+    /**
+     * 设置推荐落子位置
+     */
+    public void setSuggestedMove(GoPosition position) {
+        this.suggestedMove = position;
+        repaint();
+    }
+    
+    /**
+     * 清除推荐落子位置
+     */
+    public void clearSuggestedMove() {
+        this.suggestedMove = null;
         repaint();
     }
     

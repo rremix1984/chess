@@ -25,18 +25,18 @@
       <groupId>com.example</groupId>
       <artifactId>chinese-chess</artifactId>
     </dependency>
-    <!-- <dependency>
+    <dependency>
       <groupId>com.example</groupId>
       <artifactId>gomoku</artifactId>
-    </dependency> -->
+    </dependency>
     <dependency>
       <groupId>com.example</groupId>
       <artifactId>go-game</artifactId>
     </dependency>
-    <!-- <dependency>
+    <dependency>
       <groupId>com.example</groupId>
       <artifactId>international-chess</artifactId>
-    </dependency> -->
+    </dependency>
     <dependency>
       <groupId>com.example</groupId>
       <artifactId>flight-chess</artifactId>

@@ -20,6 +20,10 @@ public class GoGame {
     private boolean gameEnded;
     private int consecutivePasses;
     
+    // 劫争检测相关
+    private String lastBoardState;
+    private GoPosition lastCapturePosition;
+    
     public GoGame() {
         board = new int[BOARD_SIZE][BOARD_SIZE];
         currentPlayer = BLACK; // 黑棋先行
@@ -50,6 +54,9 @@ public class GoGame {
         
         // 重置连续弃权计数
         consecutivePasses = 0;
+        
+        // 保存当前棋盘状态用于劫争检测
+        String currentBoardState = getBoardStateString();
         
         // 放置棋子
         board[row][col] = currentPlayer;
@@ -90,10 +97,35 @@ public class GoGame {
             return false;
         }
         
+        // 劫争检测：如果这步棋导致棋盘状态回到上一步的状态，则禁止
+        String newBoardState = getBoardStateString();
+        if (capturedStones.size() == 1 && lastBoardState != null && newBoardState.equals(lastBoardState)) {
+            // 撤销移动
+            board[row][col] = EMPTY;
+            // 恢复被吃掉的棋子
+            for (GoPosition pos : capturedStones) {
+                board[pos.row][pos.col] = opponent;
+                if (opponent == BLACK) {
+                    blackCaptured--;
+                } else {
+                    whiteCaptured--;
+                }
+            }
+            return false; // 劫争，禁止此步
+        }
+        
         // 记录移动
         GoMove move = new GoMove(new GoPosition(row, col), currentPlayer);
         move.capturedStones.addAll(capturedStones);
         moveHistory.add(move);
+        
+        // 更新劫争检测状态
+        lastBoardState = currentBoardState;
+        if (capturedStones.size() == 1) {
+            lastCapturePosition = new GoPosition(row, col);
+        } else {
+            lastCapturePosition = null;
+        }
         
         // 切换玩家
         currentPlayer = (currentPlayer == BLACK) ? WHITE : BLACK;
@@ -227,6 +259,19 @@ public class GoGame {
         return true; // 没有气
     }
     
+    /**
+     * 获取棋盘状态的字符串表示，用于劫争检测
+     */
+    private String getBoardStateString() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            for (int j = 0; j < BOARD_SIZE; j++) {
+                sb.append(board[i][j]);
+            }
+        }
+        return sb.toString();
+    }
+    
     // Getters
     public int[][] getBoard() {
         return board;
@@ -257,6 +302,119 @@ public class GoGame {
     }
     
     /**
+     * 计算围棋目数和胜负结果
+     */
+    public GoGameResult calculateGameResult() {
+        if (!gameEnded) {
+            return null; // 游戏未结束
+        }
+        
+        // 计算领地
+        int[][] territory = calculateTerritory();
+        
+        // 计算目数
+        int blackTerritory = 0;
+        int whiteTerritory = 0;
+        
+        for (int row = 0; row < BOARD_SIZE; row++) {
+            for (int col = 0; col < BOARD_SIZE; col++) {
+                if (territory[row][col] == BLACK) {
+                    blackTerritory++;
+                } else if (territory[row][col] == WHITE) {
+                    whiteTerritory++;
+                }
+            }
+        }
+        
+        // 计算总分：领地 + 吃掉的对方棋子
+        double blackScore = blackTerritory + whiteCaptured;
+        double whiteScore = whiteTerritory + blackCaptured + 6.5; // 白棋贴目6.5
+        
+        // 判断胜负
+        int winner;
+        double scoreDifference;
+        if (blackScore > whiteScore) {
+            winner = BLACK;
+            scoreDifference = blackScore - whiteScore;
+        } else {
+            winner = WHITE;
+            scoreDifference = whiteScore - blackScore;
+        }
+        
+        return new GoGameResult(winner, blackScore, whiteScore, scoreDifference, 
+                               blackTerritory, whiteTerritory, blackCaptured, whiteCaptured);
+    }
+    
+    /**
+     * 计算领地归属
+     * 返回数组：EMPTY=中性区域，BLACK=黑棋领地，WHITE=白棋领地
+     */
+    private int[][] calculateTerritory() {
+        int[][] territory = new int[BOARD_SIZE][BOARD_SIZE];
+        boolean[][] visited = new boolean[BOARD_SIZE][BOARD_SIZE];
+        
+        for (int row = 0; row < BOARD_SIZE; row++) {
+            for (int col = 0; col < BOARD_SIZE; col++) {
+                if (board[row][col] == EMPTY && !visited[row][col]) {
+                    // 找到一个空白区域，计算其归属
+                    Set<GoPosition> emptyArea = new HashSet<>();
+                    Set<Integer> surroundingColors = new HashSet<>();
+                    
+                    floodFillTerritory(row, col, emptyArea, surroundingColors, visited);
+                    
+                    // 判断这个空白区域的归属
+                    int owner = EMPTY; // 默认中性
+                    if (surroundingColors.size() == 1) {
+                        // 只被一种颜色的棋子包围，属于该颜色
+                        owner = surroundingColors.iterator().next();
+                    }
+                    // 如果被两种颜色包围，则为中性区域
+                    
+                    // 标记这个区域的归属
+                    for (GoPosition pos : emptyArea) {
+                        territory[pos.row][pos.col] = owner;
+                    }
+                }
+            }
+        }
+        
+        return territory;
+    }
+    
+    /**
+     * 洪水填充算法计算连通的空白区域
+     */
+    private void floodFillTerritory(int row, int col, Set<GoPosition> emptyArea, 
+                                   Set<Integer> surroundingColors, boolean[][] visited) {
+        if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE || visited[row][col]) {
+            return;
+        }
+        
+        if (board[row][col] != EMPTY) {
+            // 遇到棋子，记录颜色
+            surroundingColors.add(board[row][col]);
+            return;
+        }
+        
+        // 标记为已访问
+        visited[row][col] = true;
+        emptyArea.add(new GoPosition(row, col));
+        
+        // 递归访问四个方向
+        floodFillTerritory(row - 1, col, emptyArea, surroundingColors, visited);
+        floodFillTerritory(row + 1, col, emptyArea, surroundingColors, visited);
+        floodFillTerritory(row, col - 1, emptyArea, surroundingColors, visited);
+        floodFillTerritory(row, col + 1, emptyArea, surroundingColors, visited);
+    }
+    
+    /**
+     * 强制结束游戏并计算结果
+     */
+    public void forceEndGame() {
+        gameEnded = true;
+    }
+    
+    /**
      * 重新开始游戏
      */
     public void restart() {
@@ -268,5 +426,41 @@ public class GoGame {
         whiteCaptured = 0;
         gameEnded = false;
         consecutivePasses = 0;
+        lastBoardState = null;
+        lastCapturePosition = null;
+    }
+    
+    /**
+     * 围棋游戏结果类
+     */
+    public static class GoGameResult {
+        public final int winner; // BLACK 或 WHITE
+        public final double blackScore;
+        public final double whiteScore;
+        public final double scoreDifference;
+        public final int blackTerritory;
+        public final int whiteTerritory;
+        public final int blackCaptured;
+        public final int whiteCaptured;
+        
+        public GoGameResult(int winner, double blackScore, double whiteScore, double scoreDifference,
+                           int blackTerritory, int whiteTerritory, int blackCaptured, int whiteCaptured) {
+            this.winner = winner;
+            this.blackScore = blackScore;
+            this.whiteScore = whiteScore;
+            this.scoreDifference = scoreDifference;
+            this.blackTerritory = blackTerritory;
+            this.whiteTerritory = whiteTerritory;
+            this.blackCaptured = blackCaptured;
+            this.whiteCaptured = whiteCaptured;
+        }
+        
+        public String getWinnerName() {
+            return winner == BLACK ? "黑棋" : "白棋";
+        }
+        
+        public String getResultDescription() {
+            return String.format("%s胜 %.1f目", getWinnerName(), scoreDifference);
+        }
     }
 }

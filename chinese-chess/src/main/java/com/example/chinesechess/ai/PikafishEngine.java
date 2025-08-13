@@ -59,10 +59,30 @@ public class PikafishEngine {
      */
     public boolean initialize() {
         try {
-            // 检查引擎文件是否存在
+            // 检查引擎文件是否存在（支持相对路径和系统命令）
+            boolean engineExists = false;
             File engineFile = new File(enginePath);
-            if (!engineFile.exists()) {
-                System.err.println("Pikafish引擎文件不存在: " + enginePath);
+            
+            if (engineFile.exists()) {
+                engineExists = true;
+                System.out.println("✅ 找到Pikafish引擎文件: " + enginePath);
+            } else if (enginePath.equals("pikafish")) {
+                // 检查系统PATH中是否有pikafish
+                try {
+                    Process checkProcess = new ProcessBuilder("which", "pikafish").start();
+                    int exitCode = checkProcess.waitFor();
+                    if (exitCode == 0) {
+                        engineExists = true;
+                        System.out.println("✅ 在系统PATH中找到Pikafish引擎");
+                    }
+                } catch (Exception e) {
+                    System.out.println("⚠️ 无法检查系统PATH: " + e.getMessage());
+                }
+            }
+            
+            if (!engineExists) {
+                System.err.println("❌ Pikafish引擎文件不存在: " + enginePath);
+                System.err.println("请确保Pikafish已安装并在系统PATH中，或提供正确的文件路径");
                 return false;
             }
             
@@ -89,22 +109,50 @@ public class PikafishEngine {
             sendCommand("setoption name Hash value 64");    // 减少内存使用
             
             // 尝试设置神经网络文件路径
-            File nnueFile = new File("pikafish.nnue");
-            if (nnueFile.exists()) {
+            // 首先尝试从配置管理器获取NNUE文件路径
+            String nnueFilePath = null;
+            try {
+                com.example.common.config.ConfigurationManager config = 
+                    com.example.common.config.ConfigurationManager.getInstance();
+                nnueFilePath = config.getPikafishConfig().neuralNetworkPath;
+                System.out.println("从配置文件获取NNUE路径: " + nnueFilePath);
+            } catch (Exception e) {
+                System.out.println("无法获取配置管理器，使用默认路径");
+            }
+            
+            // 如果配置路径不存在，尝试多个可能的位置
+            File nnueFile = null;
+            if (nnueFilePath != null) {
+                nnueFile = new File(nnueFilePath);
+            }
+            
+            // 如果配置的路径不存在，尝试其他位置
+            if (nnueFile == null || !nnueFile.exists()) {
+                String[] possiblePaths = {
+                    "chinese-chess/pikafish.nnue",
+                    "pikafish.nnue", 
+                    "../chinese-chess/pikafish.nnue",
+                    System.getProperty("user.dir") + "/chinese-chess/pikafish.nnue",
+                    System.getProperty("user.dir") + "/pikafish.nnue"
+                };
+                
+                for (String path : possiblePaths) {
+                    File candidate = new File(path);
+                    if (candidate.exists()) {
+                        nnueFile = candidate;
+                        System.out.println("在位置找到NNUE文件: " + path);
+                        break;
+                    }
+                }
+            }
+            
+            if (nnueFile != null && nnueFile.exists()) {
                 String nnuePath = nnueFile.getAbsolutePath();
                 sendCommand("setoption name EvalFile value " + nnuePath);
-                System.out.println("设置神经网络文件: " + nnuePath);
+                System.out.println("✅ 设置神经网络文件: " + nnuePath);
             } else {
-                System.out.println("警告: 未找到pikafish.nnue文件，尝试创建空文件");
-                try {
-                    // 创建一个空的神经网络文件来绕过检查
-                    nnueFile.createNewFile();
-                    String nnuePath = nnueFile.getAbsolutePath();
-                    sendCommand("setoption name EvalFile value " + nnuePath);
-                    System.out.println("创建并设置空神经网络文件: " + nnuePath);
-                } catch (IOException e) {
-                    System.out.println("无法创建神经网络文件，引擎可能无法正常工作");
-                }
+                System.out.println("⚠️ 警告: 未找到pikafish.nnue文件，引擎将使用默认评估");
+                System.out.println("ℹ️ 这不会阻止引擎工作，但可能影响棋力");
             }
             
             sendCommand("isready");
@@ -384,10 +432,12 @@ public class PikafishEngine {
                     }
                     break;
                 }
-                // 防止无限等待 - 优化超时机制
-                if (System.currentTimeMillis() - startTime > thinkTime + 1000) {
-                    log("计算超时，已用时: " + (System.currentTimeMillis() - startTime) + "ms");
-                    System.err.println("获取最佳走法超时");
+                // 防止无限等待 - 优化超时机制（深度搜索需要更多时间）
+                long maxWaitTime = Math.max(thinkTime * 2, 5000); // 至少给5秒，或者思考时间的2倍
+                if (System.currentTimeMillis() - startTime > maxWaitTime) {
+                    log("计算超时，已用时: " + (System.currentTimeMillis() - startTime) + "ms，超时限制: " + maxWaitTime + "ms");
+                    // 不记录为错误，因为深度搜索可能需要更多时间
+                    log("引擎仍在计算中，可能需要更长时间完成深度搜索");
                     break;
                 }
             }
