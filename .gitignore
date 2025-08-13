@@ -68,3 +68,7 @@ StreetFighterNew/
 # 引擎文件
 pikafish_engine/*/
 *.exe
+*.nnue
+*.bin.gz
+# AI模型文件
+model.bin.gz
