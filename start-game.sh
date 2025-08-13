@@ -16,18 +16,18 @@ if ! command -v java &> /dev/null; then
 fi
 
 # 检查Maven环境
-if ! command -v mvn &> /dev/null; then
-    echo "错误: 未找到Maven环境，请先安装Maven"
-    echo "请从 https://maven.apache.org/download.cgi 下载并安装Maven"
-    exit 1
-fi
+#if ! command -v mvn &> /dev/null; then
+#    echo "错误: 未找到Maven环境，请先安装Maven"
+#    echo "请从 https://maven.apache.org/download.cgi 下载并安装Maven"
+#    exit 1
+#fi
 
-echo "正在编译和打包项目..."
-mvn clean package -DskipTests -q
-if [ $? -ne 0 ]; then
-    echo "编译失败，请检查代码"
-    exit 1
-fi
+#echo "正在编译和打包项目..."
+#mvn clean package -DskipTests -q
+#if [ $? -ne 0 ]; then
+#    echo "编译失败，请检查代码"
+#    exit 1
+#fi
 
 echo "编译完成，启动游戏选择界面..."
 
