@@ -343,7 +343,7 @@ public class PikafishEngine {
                 if (response.startsWith("info string") || response.startsWith("bestmove")) {
                     log("📥 " + response);
                 } else if (response.startsWith("info depth")) {
-                    // 解析和显示搜索进度信息
+                    // 解析搜索进度信息 (只显示关键深度)
                     String[] parts = response.split(" ");
                     int currentDepth = 0;
                     String score = "";
@@ -368,7 +368,8 @@ public class PikafishEngine {
                         }
                     }
                     
-                    if (currentDepth > lastDepth) {
+                    // 只显示关键深度信息：每5层显示一次，或者是最终深度
+                    if (currentDepth > lastDepth && (currentDepth % 5 == 0 || currentDepth >= 30)) {
                         lastDepth = currentDepth;
                         String logMessage = "🔍 深度 " + currentDepth;
                         if (!score.isEmpty()) {

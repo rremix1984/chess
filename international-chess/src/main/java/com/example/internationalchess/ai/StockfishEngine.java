@@ -126,13 +126,29 @@ public class StockfishEngine {
             
             // 查找最佳移动
             String line;
+            int lastDepth = 0;
             while ((line = reader.readLine()) != null) {
-                if (config.isLogEngineOutput()) {
+                // 过滤冗长的引擎输出，只显示关键信息
+                boolean shouldLog = shouldLogEngineLine(line);
+                
+                if (config.isLogEngineOutput() && shouldLog) {
                     System.out.println("引擎: " + line);
                 }
                 
                 if (logPanel != null) {
-                    logPanel.addEngineOutput(line);
+                    // 对日志面板也进行过滤，只显示关键深度和结果
+                    if (shouldLog || line.startsWith("bestmove")) {
+                        // 如果是深度信息，只显示每5层或重要变化
+                        if (line.startsWith("info depth")) {
+                            int currentDepth = extractDepthFromLine(line);
+                            if (currentDepth > lastDepth && (currentDepth % 5 == 0 || currentDepth >= 25)) {
+                                logPanel.addEngineOutput("📊 深度 " + currentDepth + " - " + extractKeyInfoFromLine(line));
+                                lastDepth = currentDepth;
+                            }
+                        } else {
+                            logPanel.addEngineOutput(line);
+                        }
+                    }
                 }
                 
                 if (line.startsWith("bestmove")) {
@@ -386,5 +402,71 @@ public class StockfishEngine {
      */
     public String debugBoardToFEN(InternationalChessBoard board, PieceColor currentPlayer) {
         return boardToFEN(board, currentPlayer);
+    }
+    
+    /**
+     * 判断是否应该记录引擎输出行
+     * 过滤掉冗长的分析信息，只保留关键信息
+     */
+    private boolean shouldLogEngineLine(String line) {
+        if (line == null) return false;
+        
+        // 总是记录的重要信息
+        if (line.startsWith("bestmove") || 
+            line.startsWith("info string") ||
+            line.startsWith("id name") ||
+            line.startsWith("id author") ||
+            line.contains("mate")) {
+            return true;
+        }
+        
+        // 对深度信息进行过滤，只显示每5层或高深度
+        if (line.startsWith("info depth")) {
+            int depth = extractDepthFromLine(line);
+            return depth % 5 == 0 || depth >= 25;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 从引擎输出行中提取深度信息
+     */
+    private int extractDepthFromLine(String line) {
+        String[] parts = line.split(" ");
+        for (int i = 0; i < parts.length - 1; i++) {
+            if ("depth".equals(parts[i])) {
+                try {
+                    return Integer.parseInt(parts[i + 1]);
+                } catch (NumberFormatException e) {
+                    return 0;
+                }
+            }
+        }
+        return 0;
+    }
+    
+    /**
+     * 从引擎输出行中提取关键信息（分数、主变等）
+     */
+    private String extractKeyInfoFromLine(String line) {
+        StringBuilder keyInfo = new StringBuilder();
+        String[] parts = line.split(" ");
+        
+        for (int i = 0; i < parts.length - 1; i++) {
+            if ("cp".equals(parts[i])) {
+                try {
+                    int cp = Integer.parseInt(parts[i + 1]);
+                    keyInfo.append("分数: ").append(String.format("%.2f", cp / 100.0));
+                } catch (NumberFormatException e) {
+                    // 忽略
+                }
+            } else if ("pv".equals(parts[i]) && i + 1 < parts.length) {
+                keyInfo.append(" 主变: ").append(parts[i + 1]);
+                break; // 只取第一个主变
+            }
+        }
+        
+        return keyInfo.toString();
     }
 }
