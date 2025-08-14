@@ -13,6 +13,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 import java.util.List;
 
 /**
@@ -58,6 +59,14 @@ public class GameFrame extends JFrame {
     private JButton startEndgameButton;
     private JButton aiVsAiEndgameButton;
     private boolean isInEndgameSetup = false;
+    
+    // AI对AI配置面板相关组件
+    private JPanel aiVsAiConfigPanel;
+    private JComboBox<String> redAIDifficultyComboBox;
+    private JComboBox<String> redAIModelComboBox;
+    private JComboBox<String> blackAIDifficultyComboBox;
+    private JComboBox<String> blackAIModelComboBox;
+    private boolean isAiVsAiConfigVisible = false;
 
     public GameFrame() {
         setTitle("🏮 中国象棋 - AI对弈版");
@@ -93,15 +102,43 @@ public class GameFrame extends JFrame {
         rightTabbedPane.setForeground(Color.BLACK);
         rightTabbedPane.setFont(new Font("微软雅黑", Font.PLAIN, 12));
         
+        // 创建右侧面板容器
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.add(rightTabbedPane, BorderLayout.CENTER);
+        
+        // 创建分析按钮面板
+        JPanel analysisButtonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
+        analysisButtonPanel.setBorder(BorderFactory.createTitledBorder("🔍 智能分析"));
+        
+        // Pikafish 分析按钮
+        JButton pikafishAnalysisButton = new JButton("🐟 Pikafish分析");
+        pikafishAnalysisButton.setToolTipText("使用Pikafish引擎分析当前局面");
+        pikafishAnalysisButton.addActionListener(e -> performPikafishAnalysis());
+        styleButton(pikafishAnalysisButton);
+        
+        // Fairy 分析按钮
+        JButton fairyAnalysisButton = new JButton("🧚 Fairy分析");
+        fairyAnalysisButton.setToolTipText("使用Fairy-Stockfish引擎分析当前局面");
+        fairyAnalysisButton.addActionListener(e -> performFairyAnalysis());
+        styleButton(fairyAnalysisButton);
+        
+        analysisButtonPanel.add(pikafishAnalysisButton);
+        analysisButtonPanel.add(fairyAnalysisButton);
+        
+        rightPanel.add(analysisButtonPanel, BorderLayout.SOUTH);
+        
         // 创建主要内容面板（棋盘+右侧面板）
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.add(boardPanel, BorderLayout.CENTER);
-        mainPanel.add(rightTabbedPane, BorderLayout.EAST);
+        mainPanel.add(rightPanel, BorderLayout.EAST);
         add(mainPanel, BorderLayout.CENTER);
 
-        // 创建控制面板
-        JPanel controlPanel = createControlPanel();
-        add(controlPanel, BorderLayout.NORTH);
+    // 创建控制面板
+    JPanel controlPanel = createControlPanel();
+    add(controlPanel, BorderLayout.NORTH);
+    
+    // 创建AI对AI配置面板
+    createAIvsAIConfigPanel();
 
         // 创建状态栏
         statusLabel = new JLabel("🔴 当前玩家: 红方", JLabel.CENTER);
@@ -194,7 +231,7 @@ public class GameFrame extends JFrame {
 
         // AI类型选择
         leftPanel.add(new JLabel("AI:"));
-        aiTypeComboBox = new JComboBox<>(new String[]{"传统AI", "增强AI", "大模型AI", "混合AI", "DeepSeek+Pikafish"});
+        aiTypeComboBox = new JComboBox<>(new String[]{"传统AI", "增强AI", "大模型AI", "混合AI", "DeepSeek+Pikafish", "Fairy-Stockfish", "Pikafish"});
         aiTypeComboBox.setSelectedIndex(3); // 默认选择混合AI
         aiTypeComboBox.setPreferredSize(new Dimension(80, 25));
         aiTypeComboBox.addActionListener(e -> updateModelComboBox());
@@ -358,6 +395,105 @@ public class GameFrame extends JFrame {
         return panel;
     }
     
+    /**
+     * 创建AI对AI配置面板
+     */
+    private void createAIvsAIConfigPanel() {
+        // 创建AI对AI配置面板
+        aiVsAiConfigPanel = new JPanel();
+        aiVsAiConfigPanel.setBorder(BorderFactory.createTitledBorder("🤖 AI对AI配置"));
+        aiVsAiConfigPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        aiVsAiConfigPanel.setPreferredSize(new Dimension(1300, 50));
+        
+        // 红方AI配置
+        aiVsAiConfigPanel.add(new JLabel("🔴红方:"));
+        
+        aiVsAiConfigPanel.add(new JLabel("难度:"));
+        String[] difficultyOptions = {"简单", "普通", "困难", "专家", "大师", "特级", "超级", "顶级", "传奇", "神级"};
+        redAIDifficultyComboBox = new JComboBox<>(difficultyOptions);
+        redAIDifficultyComboBox.setSelectedIndex(2); // 默认困难
+        redAIDifficultyComboBox.setPreferredSize(new Dimension(60, 25));
+        aiVsAiConfigPanel.add(redAIDifficultyComboBox);
+        
+        aiVsAiConfigPanel.add(new JLabel("模型:"));
+        List<String> availableModels = OllamaModelManager.getAvailableModels();
+        redAIModelComboBox = new JComboBox<>(availableModels.toArray(new String[0]));
+        redAIModelComboBox.setSelectedIndex(0); // 默认第一个模型
+        redAIModelComboBox.setPreferredSize(new Dimension(150, 25));
+        aiVsAiConfigPanel.add(redAIModelComboBox);
+        
+        // 分隔符
+        aiVsAiConfigPanel.add(new JLabel("   |   "));
+        
+        // 黑方AI配置
+        aiVsAiConfigPanel.add(new JLabel("⚫黑方:"));
+        
+        aiVsAiConfigPanel.add(new JLabel("难度:"));
+        blackAIDifficultyComboBox = new JComboBox<>(difficultyOptions);
+        blackAIDifficultyComboBox.setSelectedIndex(2); // 默认困难
+        blackAIDifficultyComboBox.setPreferredSize(new Dimension(60, 25));
+        aiVsAiConfigPanel.add(blackAIDifficultyComboBox);
+        
+        aiVsAiConfigPanel.add(new JLabel("模型:"));
+        blackAIModelComboBox = new JComboBox<>(availableModels.toArray(new String[0]));
+        blackAIModelComboBox.setSelectedIndex(0); // 默认第一个模型
+        blackAIModelComboBox.setPreferredSize(new Dimension(150, 25));
+        aiVsAiConfigPanel.add(blackAIModelComboBox);
+        
+        // 初始隐藏面板
+        aiVsAiConfigPanel.setVisible(false);
+        
+        // 将面板添加到主布局（在控制面板和状态栏之间）
+        add(aiVsAiConfigPanel, BorderLayout.CENTER);
+    }
+    
+    /**
+     * 显示或隐藏AI对AI配置面板
+     */
+    private void toggleAIvsAIConfigPanel(boolean visible) {
+        if (aiVsAiConfigPanel != null) {
+            aiVsAiConfigPanel.setVisible(visible);
+            isAiVsAiConfigVisible = visible;
+            
+            // 调整主面板布局
+            if (visible) {
+                // 移除现有的主面板
+                Component[] components = getContentPane().getComponents();
+                JPanel existingMainPanel = null;
+                for (Component comp : components) {
+                    if (comp instanceof JPanel && comp != aiVsAiConfigPanel) {
+                        // 查找包含棋盘的主面板
+                        Container container = (Container) comp;
+                        for (Component subComp : container.getComponents()) {
+                            if (subComp instanceof BoardPanel) {
+                                existingMainPanel = (JPanel) comp;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (existingMainPanel != null) {
+                    // 创建新的中央面板，包含AI配置面板和原有主面板
+                    JPanel newCenterPanel = new JPanel(new BorderLayout());
+                    newCenterPanel.add(aiVsAiConfigPanel, BorderLayout.NORTH);
+                    newCenterPanel.add(existingMainPanel, BorderLayout.CENTER);
+                    
+                    // 移除旧的主面板并添加新的中央面板
+                    remove(existingMainPanel);
+                    add(newCenterPanel, BorderLayout.CENTER);
+                }
+            } else {
+                // 隐藏时恢复原有布局
+                aiVsAiConfigPanel.setVisible(false);
+            }
+            
+            // 刷新界面
+            revalidate();
+            repaint();
+        }
+    }
+    
     private void updateModelComboBox() {
         int aiTypeIndex = aiTypeComboBox.getSelectedIndex();
         boolean needsModel = (aiTypeIndex == 2) || (aiTypeIndex == 3) || (aiTypeIndex == 4); // 大模型AI、混合AI或DeepSeek+Pikafish
@@ -471,15 +607,49 @@ public class GameFrame extends JFrame {
             aiTypeComboBox.setSelectedIndex(4);
             
             // 设置模型
-            String modelName = "deepseek-coder"; // 默认使用 deepseek-coder
+            String modelName = "deepseek-r1:7b"; // 更新为可用的模型
             modelComboBox.setSelectedItem(modelName);
             
-            // 设置默认游戏模式为玩家对AI
-            setGameMode(GameMode.PLAYER_VS_AI);
+            // 确保玩家对AI单选框被选中
+            playerVsAIRadio.setSelected(true);
+            currentGameMode = GameMode.PLAYER_VS_AI;
             
-            // 强制刷新界面，确保下拉框显示正确
+            // 确保棋盘面板可见和正确配置
+            if (boardPanel != null) {
+                boardPanel.setVisible(true);
+                boardPanel.setPreferredSize(new Dimension(800, 700)); // 明确设置棋盘大小
+                boardPanel.revalidate();
+                boardPanel.repaint();
+                
+                // 确保棋盘有正确的边界和大小
+                System.out.println("✅ 棋盘面板尺寸: " + boardPanel.getSize());
+                System.out.println("✅ 棋盘面板可见性: " + boardPanel.isVisible());
+            }
+            
+            // 立即启动默认游戏模式，确保棋盘可见
+            try {
+                setupPlayerVsAIMode();
+                System.out.println("✅ 默认启动玩家对AI模式完成");
+            } catch (Exception e) {
+                System.err.println("⚠️ 启动默认模式失败: " + e.getMessage());
+                e.printStackTrace();
+            }
+            
+            // 强制刷新整个界面，确保棋盘显示
             revalidate();
             repaint();
+            
+            // 额外的延迟确保界面完全加载
+            Timer visibilityTimer = new Timer(100, e -> {
+                if (boardPanel != null) {
+                    boardPanel.setVisible(true);
+                    boardPanel.repaint();
+                }
+                revalidate();
+                repaint();
+            });
+            visibilityTimer.setRepeats(false);
+            visibilityTimer.start();
         });
     }
     
@@ -846,6 +1016,13 @@ public class GameFrame extends JFrame {
     private void selectGameMode(GameMode mode) {
         currentGameMode = mode;
         updateGameModeRadios();
+        
+        // 根据选择的模式显示/隐藏AI对AI配置面板
+        if (mode == GameMode.AI_VS_AI) {
+            toggleAIvsAIConfigPanel(true);
+        } else {
+            toggleAIvsAIConfigPanel(false);
+        }
     }
     
     // 启动游戏
@@ -936,7 +1113,11 @@ public class GameFrame extends JFrame {
                 
                 // 根据AI类型启用相应的AI
                  int aiTypeIndex = aiTypeComboBox.getSelectedIndex();
-                 if (aiTypeIndex == 4) { // DeepSeek+Pikafish
+                 if (aiTypeIndex == 6) { // Pikafish
+                     boardPanel.enablePikafishAI(playerColor, difficulty);
+                 } else if (aiTypeIndex == 5) { // Fairy-Stockfish
+                     boardPanel.enableFairyStockfishAI(playerColor, difficulty);
+                 } else if (aiTypeIndex == 4) { // DeepSeek+Pikafish
                      boardPanel.enableDeepSeekPikafishAI(playerColor, difficulty, modelName);
                  } else if (aiTypeIndex == 3) { // 混合AI
                      boardPanel.enableHybridAI(playerColor, difficulty, modelName);
@@ -963,10 +1144,13 @@ public class GameFrame extends JFrame {
                 break;
                 
             case AI_VS_AI:
-                // 启用AI对AI模式
-                int aiDifficulty = getDifficulty();
-                String aiModelName = getSelectedModel();
-                boardPanel.enableAIvsAI(aiDifficulty, aiModelName);
+                // 启用AI对AI模式，使用配置面板中的设置
+                int redDifficulty = redAIDifficultyComboBox.getSelectedIndex() + 1;
+                String redModelName = (String) redAIModelComboBox.getSelectedItem();
+                int blackDifficulty = blackAIDifficultyComboBox.getSelectedIndex() + 1;
+                String blackModelName = (String) blackAIModelComboBox.getSelectedItem();
+                
+                boardPanel.enableAIvsAI(redDifficulty, redModelName, blackDifficulty, blackModelName);
                 
                 // 启用聊天面板和AI日志面板
                 chatPanel.setEnabled(true);
@@ -1019,6 +1203,12 @@ public class GameFrame extends JFrame {
             case 4: // DeepSeek+Pikafish
                 boardPanel.enableDeepSeekPikafishAI(humanColor, difficulty, modelName);
                 break;
+            case 5: // Fairy-Stockfish
+                boardPanel.enableFairyStockfishAI(humanColor, difficulty);
+                break;
+            case 6: // Pikafish
+                boardPanel.enablePikafishAI(humanColor, difficulty);
+                break;
         }
         
         // 启用聊天面板和AI日志面板（在使用大模型AI、混合AI或DeepSeek+Pikafish时）
@@ -1036,34 +1226,28 @@ public class GameFrame extends JFrame {
      * 设置AI对AI模式
      */
     private void setupAIvsAIMode() {
-        // 显示AI对AI配置对话框
-        AIvsAIConfigDialog dialog = showAIvsAIConfigDialog();
+        // 使用配置面板的设置启动AI vs AI模式
+        int redDifficulty = redAIDifficultyComboBox.getSelectedIndex() + 1;
+        String redModelName = (String) redAIModelComboBox.getSelectedItem();
+        int blackDifficulty = blackAIDifficultyComboBox.getSelectedIndex() + 1;
+        String blackModelName = (String) blackAIModelComboBox.getSelectedItem();
         
-        if (dialog != null && dialog.isConfirmed()) {
-            int difficulty = dialog.getDifficulty();
-            String modelName = dialog.getModelName();
-            
-            // 启动AI vs AI模式
-            boardPanel.enableAIvsAI(difficulty, modelName);
-            
-            // 禁用相关控件（AI对AI模式下不需要用户选择）
-            aiTypeComboBox.setEnabled(false);
-            difficultyComboBox.setEnabled(false);
-            modelComboBox.setEnabled(false);
-            playerColorComboBox.setEnabled(false);
-            
-            // 启用聊天面板和AI日志面板
-            chatPanel.setEnabled(true);
-            aiLogPanel.setEnabled(true);
-            
-            String difficultyName = getDifficultyName(difficulty);
-            updateStatus("🤖 AI对AI模式 - 红方AI vs 黑方AI (" + difficultyName + ", " + modelName + ")");
-        } else {
-            // 用户取消了配置，恢复到玩家对AI模式
-            currentGameMode = GameMode.PLAYER_VS_AI;
-            playerVsAIRadio.setSelected(true);
-            updateStatus("已取消AI对AI模式");
-        }
+        // 启动AI vs AI模式（传入红方和黑方的配置）
+        boardPanel.enableAIvsAI(redDifficulty, redModelName, blackDifficulty, blackModelName);
+        
+        // 禁用相关控件（AI对AI模式下不需要用户选择）
+        aiTypeComboBox.setEnabled(false);
+        difficultyComboBox.setEnabled(false);
+        modelComboBox.setEnabled(false);
+        playerColorComboBox.setEnabled(false);
+        
+        // 启用聊天面板和AI日志面板
+        chatPanel.setEnabled(true);
+        aiLogPanel.setEnabled(true);
+        
+        String redDifficultyName = getDifficultyName(redDifficulty);
+        String blackDifficultyName = getDifficultyName(blackDifficulty);
+        updateStatus("🤖 AI对AI模式 - 🔴红方AI(" + redDifficultyName + ", " + redModelName + ") vs ⚫黑方AI(" + blackDifficultyName + ", " + blackModelName + ")");
     }
     
     /**
@@ -1345,6 +1529,120 @@ public class GameFrame extends JFrame {
                 modelComboBox.setSelectedItem(modelName);
             }
         }
+    }
+    
+    /**
+     * 执行 Pikafish 分析
+     */
+    private void performPikafishAnalysis() {
+        if (boardPanel == null || boardPanel.getBoard() == null) {
+            JOptionPane.showMessageDialog(this, "请先开始游戏！", "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        // 在后台线程中执行分析，避免阻塞UI
+        SwingWorker<String, Void> analysisWorker = new SwingWorker<String, Void>() {
+            @Override
+            protected String doInBackground() throws Exception {
+                updateStatus("🐟 Pikafish 正在分析当前局面...");
+                
+                try {
+                    // 获取当前局面的最佳走法
+                    String bestMove = boardPanel.getBestMoveFromPikafish();
+                    
+                    if (bestMove != null && !bestMove.isEmpty()) {
+                        return "🐟 Pikafish 推荐走法: " + bestMove;
+                    } else {
+                        return "🐟 Pikafish 未能找到推荐走法";
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return "🐟 Pikafish 分析出错: " + e.getMessage();
+                }
+            }
+            
+            @Override
+            protected void done() {
+                try {
+                    String result = get();
+                    
+                    // 在AI日志面板中显示分析结果
+                    if (aiLogPanel != null) {
+                        aiLogPanel.addAnalysis(result);
+                    }
+                    
+                    // 更新状态
+                    String currentPlayer = boardPanel.getCurrentPlayer() == PieceColor.RED ? "红方" : "黑方";
+                    updateStatus("🔴 当前玩家: " + currentPlayer + " | " + result);
+                    
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    updateStatus("🐟 Pikafish 分析失败: " + e.getMessage());
+                    if (aiLogPanel != null) {
+                        aiLogPanel.addAnalysis("🐟 Pikafish 分析失败: " + e.getMessage());
+                    }
+                }
+            }
+        };
+        
+        analysisWorker.execute();
+    }
+    
+    /**
+     * 执行 Fairy-Stockfish 分析
+     */
+    private void performFairyAnalysis() {
+        if (boardPanel == null || boardPanel.getBoard() == null) {
+            JOptionPane.showMessageDialog(this, "请先开始游戏！", "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        // 在后台线程中执行分析，避免阻塞UI
+        SwingWorker<String, Void> analysisWorker = new SwingWorker<String, Void>() {
+            @Override
+            protected String doInBackground() throws Exception {
+                updateStatus("🧚 Fairy-Stockfish 正在分析当前局面...");
+                
+                try {
+                    // 获取当前局面的最佳走法
+                    String bestMove = boardPanel.getBestMoveFromFairyStockfish();
+                    
+                    if (bestMove != null && !bestMove.isEmpty()) {
+                        return "🧚 Fairy-Stockfish 推荐走法: " + bestMove;
+                    } else {
+                        return "🧚 Fairy-Stockfish 未能找到推荐走法";
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return "🧚 Fairy-Stockfish 分析出错: " + e.getMessage();
+                }
+            }
+            
+            @Override
+            protected void done() {
+                try {
+                    String result = get();
+                    
+                    // 在AI日志面板中显示分析结果
+                    if (aiLogPanel != null) {
+                        aiLogPanel.addAnalysis(result);
+                    }
+                    
+                    // 更新状态
+                    String currentPlayer = boardPanel.getCurrentPlayer() == PieceColor.RED ? "红方" : "黑方";
+                    updateStatus("🔴 当前玩家: " + currentPlayer + " | " + result);
+                    
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    updateStatus("🧚 Fairy-Stockfish 分析失败: " + e.getMessage());
+                    if (aiLogPanel != null) {
+                        aiLogPanel.addAnalysis("🧚 Fairy-Stockfish 分析失败: " + e.getMessage());
+                    }
+                }
+            }
+        };
+        
+        analysisWorker.execute();
     }
 
 }

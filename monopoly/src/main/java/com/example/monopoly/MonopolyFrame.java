@@ -278,15 +278,8 @@ public class MonopolyFrame extends JFrame {
     
     private void returnToGameSelection() {
         dispose();
-        SwingUtilities.invokeLater(() -> {
-            try {
-                Class<?> frameClass = Class.forName("com.example.launcher.GameSelectionFrame");
-                Object frame = frameClass.getDeclaredConstructor().newInstance();
-                frameClass.getMethod("setVisible", boolean.class).invoke(frame, true);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        // 直接退出程序，因为这是独立运行的大富翁游戏
+        System.exit(0);
     }
     
     /**

@@ -9,6 +9,8 @@ import com.example.chinesechess.ai.LLMChessAI;
 import com.example.chinesechess.ai.HybridChessAI;
 import com.example.chinesechess.ai.EnhancedChessAI;
 import com.example.chinesechess.ai.DeepSeekPikafishAI;
+import com.example.chinesechess.ai.FairyStockfishAI;
+import com.example.chinesechess.ai.PikafishAI;
 import com.example.chinesechess.core.Move;
 import com.example.common.utils.ExceptionHandler;
 import com.example.common.utils.PerformanceMonitor;
@@ -67,11 +69,15 @@ public class BoardPanel extends JPanel {
     private EnhancedChessAI enhancedAI;
     private HybridChessAI hybridAI;
     private DeepSeekPikafishAI deepSeekPikafishAI;
+    private FairyStockfishAI fairyStockfishAI;
+    private PikafishAI pikafishAI;
     private boolean isAIEnabled = false;
     private boolean useLLM = false;
     private boolean useEnhanced = false;
     private boolean useHybrid = false;
     private boolean useDeepSeekPikafish = false;
+    private boolean useFairyStockfish = false;
+    private boolean usePikafish = false;
     private PieceColor humanPlayer = PieceColor.RED; // 默认人类执红棋
     private boolean isAIThinking = false;
     private volatile boolean isGamePaused = false; // 游戏暂停标志
@@ -258,6 +264,81 @@ public class BoardPanel extends JPanel {
     }
     
     /**
+     * 启用Fairy-Stockfish AI对弈
+     * @param humanColor 人类玩家颜色
+     * @param difficulty AI难度 (1-10)
+     */
+    public void enableFairyStockfishAI(PieceColor humanColor, int difficulty) {
+        this.humanPlayer = humanColor;
+        this.useFairyStockfish = true;
+        this.useLLM = false;
+        this.useEnhanced = false;
+        this.useHybrid = false;
+        this.useDeepSeekPikafish = false;
+
+        PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
+        this.fairyStockfishAI = new FairyStockfishAI(aiColor, difficulty);
+        
+        // 设置AI日志面板
+        if (this.aiLogPanel != null) {
+            this.fairyStockfishAI.setAILogPanel(this.aiLogPanel);
+        }
+        
+        this.isAIEnabled = true;
+
+        // 添加调试信息
+        String humanColorName = (humanColor == PieceColor.RED) ? "红方" : "黑方";
+        String aiColorName = (aiColor == PieceColor.RED) ? "红方" : "黑方";
+        System.out.println("🧚 Fairy-Stockfish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+        addAILog("system", "Fairy-Stockfish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+
+        // 如果当前轮到AI，立即开始AI回合
+        if (aiColor == currentPlayer) {
+            SwingUtilities.invokeLater(this::performAIMove);
+        }
+
+        updateStatus();
+    }
+    
+    /**
+     * 启用纯 Pikafish AI对弈
+     * @param humanColor 人类玩家颜色
+     * @param difficulty AI难度 (1-10)
+     */
+    public void enablePikafishAI(PieceColor humanColor, int difficulty) {
+        this.humanPlayer = humanColor;
+        this.usePikafish = true;
+        this.useLLM = false;
+        this.useEnhanced = false;
+        this.useHybrid = false;
+        this.useDeepSeekPikafish = false;
+        this.useFairyStockfish = false;
+
+        PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
+        this.pikafishAI = new PikafishAI(aiColor, difficulty);
+        
+        // 设置AI日志面板
+        if (this.aiLogPanel != null) {
+            this.pikafishAI.setAILogPanel(this.aiLogPanel);
+        }
+        
+        this.isAIEnabled = true;
+
+        // 添加调试信息
+        String humanColorName = (humanColor == PieceColor.RED) ? "红方" : "黑方";
+        String aiColorName = (aiColor == PieceColor.RED) ? "红方" : "黑方";
+        System.out.println("🐟 Pikafish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+        addAILog("system", "Pikafish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+
+        // 如果当前轮到AI，立即开始AI回合
+        if (aiColor == currentPlayer) {
+            SwingUtilities.invokeLater(this::performAIMove);
+        }
+
+        updateStatus();
+    }
+    
+    /**
      * 禁用AI对弈
      */
     public void disableAI() {
@@ -266,6 +347,8 @@ public class BoardPanel extends JPanel {
         this.useEnhanced = false;
         this.useHybrid = false;
         this.useDeepSeekPikafish = false;
+        this.useFairyStockfish = false;
+        this.usePikafish = false;
         
         // 清理AI实例
         this.ai = null;
@@ -282,6 +365,18 @@ public class BoardPanel extends JPanel {
         if (this.deepSeekPikafishAI != null) {
             // this.deepSeekPikafishAI.close(); // 该AI引擎可能不需要手动关闭资源
             this.deepSeekPikafishAI = null;
+        }
+        
+        // 关闭FairyStockfishAI资源
+        if (this.fairyStockfishAI != null) {
+            this.fairyStockfishAI.cleanup();
+            this.fairyStockfishAI = null;
+        }
+        
+        // 关闭PikafishAI资源
+        if (this.pikafishAI != null) {
+            this.pikafishAI.cleanup();
+            this.pikafishAI = null;
         }
         
         this.isAIThinking = false;
@@ -316,7 +411,11 @@ public class BoardPanel extends JPanel {
             } else if (isAIEnabled) {
                 if (isAITurn()) {
                     String aiType = "";
-                    if (useDeepSeekPikafish) {
+                    if (usePikafish) {
+                        aiType = "Pikafish";
+                    } else if (useFairyStockfish) {
+                        aiType = "Fairy-Stockfish";
+                    } else if (useDeepSeekPikafish) {
                         aiType = "DeepSeek+Pikafish";
                     } else if (useHybrid) {
                         aiType = "混合AI";
@@ -1616,6 +1715,8 @@ public class BoardPanel extends JPanel {
      * 获取当前AI类型描述
      */
     private String getCurrentAIType() {
+        if (usePikafish) return "Pikafish";
+        if (useFairyStockfish) return "Fairy-Stockfish";
         if (useDeepSeekPikafish) return "DeepSeek+Pikafish";
         if (useHybrid) return "混合AI";
         if (useEnhanced) return "增强AI";
@@ -1627,7 +1728,11 @@ public class BoardPanel extends JPanel {
      * 计算AI移动
      */
     private Move calculateAIMove() throws Exception {
-        if (useDeepSeekPikafish && deepSeekPikafishAI != null) {
+        if (usePikafish && pikafishAI != null) {
+            return pikafishAI.getBestMove(board);
+        } else if (useFairyStockfish && fairyStockfishAI != null) {
+            return fairyStockfishAI.getBestMove(board);
+        } else if (useDeepSeekPikafish && deepSeekPikafishAI != null) {
             return deepSeekPikafishAI.getBestMove(board);
         } else if (useHybrid && hybridAI != null) {
             return hybridAI.getBestMove(board);
@@ -3502,6 +3607,58 @@ public class BoardPanel extends JPanel {
     }
     
     /**
+     * 启用AI vs AI对弈模式（分别配置红方和黑方AI）
+     */
+    public void enableAIvsAI(int redDifficulty, String redModelName, int blackDifficulty, String blackModelName) {
+        // 禁用原有的AI
+        disableAI();
+        
+        // 设置AI vs AI模式
+        isAIvsAIMode = true;
+        isAIEnabled = false; // 禁用原有的单AI模式
+        
+        try {
+            // 创建双AI实例，分别使用不同的配置
+            redAI = new DeepSeekPikafishAI(PieceColor.RED, redDifficulty, redModelName != null ? redModelName : "deepseek-r1");
+            blackAI = new DeepSeekPikafishAI(PieceColor.BLACK, blackDifficulty, blackModelName != null ? blackModelName : "deepseek-r1");
+            
+            // 设置AI日志面板
+            if (aiLogPanel != null) {
+                redAI.setAILogPanel(aiLogPanel);
+                blackAI.setAILogPanel(aiLogPanel);
+            }
+            
+            String redDifficultyName = getDifficultyName(redDifficulty);
+            String blackDifficultyName = getDifficultyName(blackDifficulty);
+            addAILog("system", "AI vs AI对弈模式已启用 - 🔴红方AI(" + redDifficultyName + ", " + redModelName + ") vs ⚫黑方AI(" + blackDifficultyName + ", " + blackModelName + ")");
+            System.out.println("🤖 AI vs AI对弈模式已启用 - 红方AI(" + redDifficultyName + ", " + redModelName + ") vs 黑方AI(" + blackDifficultyName + ", " + blackModelName + ")");
+            
+            // 如果当前是红方回合，让红方AI先走
+            if (currentPlayer == PieceColor.RED) {
+                SwingUtilities.invokeLater(this::performAIvsAIMove);
+            }
+            
+        } catch (Exception e) {
+            showErrorInfo("AI初始化失败：" + e.getMessage());
+            isAIvsAIMode = false;
+            ExceptionHandler.logError("AI vs AI模式初始化失败: " + e.getMessage(), "BoardPanel");
+        }
+        
+        updateStatus();
+    }
+    
+    /**
+     * 获取难度名称
+     */
+    private String getDifficultyName(int difficulty) {
+        String[] difficultyNames = {"简单", "普通", "困难", "专家", "大师", "特级", "超级", "顶级", "传奇", "神级"};
+        if (difficulty >= 1 && difficulty <= difficultyNames.length) {
+            return difficultyNames[difficulty - 1];
+        }
+        return "未知";
+    }
+    
+    /**
      * 禁用AI vs AI对弈模式
      */
     public void disableAIvsAI() {
@@ -3543,6 +3700,124 @@ public class BoardPanel extends JPanel {
     public void setCurrentPlayer(PieceColor player) {
         this.currentPlayer = player;
         updateStatus();
+    }
+    
+    /**
+     * 从 Pikafish 获取当前局面的最佳走法
+     */
+    public String getBestMoveFromPikafish() {
+        try {
+            // 如果已有 DeepSeekPikafish AI，使用它
+            if (deepSeekPikafishAI != null) {
+                Move bestMove = deepSeekPikafishAI.getBestMove(board);
+                if (bestMove != null) {
+                    return formatMoveForDisplay(bestMove);
+                }
+            } else {
+                // 创建临时的 Pikafish AI 实例进行分析
+                DeepSeekPikafishAI tempAI = new DeepSeekPikafishAI(currentPlayer, 5, "deepseek-r1:7b");
+                if (aiLogPanel != null) {
+                    tempAI.setAILogPanel(aiLogPanel);
+                }
+                Move bestMove = tempAI.getBestMove(board);
+                tempAI.shutdown(); // 清理临时实例
+                if (bestMove != null) {
+                    return formatMoveForDisplay(bestMove);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Pikafish 分析出错: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Pikafish 分析失败", e);
+        }
+        return null;
+    }
+    
+    /**
+     * 从 Fairy-Stockfish 获取当前局面的最佳走法
+     */
+    public String getBestMoveFromFairyStockfish() {
+        try {
+            // 如果已有 Fairy-Stockfish AI，使用它
+            if (fairyStockfishAI != null) {
+                Move bestMove = fairyStockfishAI.getBestMove(board);
+                if (bestMove != null) {
+                    return formatMoveForDisplay(bestMove);
+                }
+            } else {
+                // 创建临时的 Fairy-Stockfish AI 实例进行分析
+                FairyStockfishAI tempAI = new FairyStockfishAI(currentPlayer, 5);
+                if (aiLogPanel != null) {
+                    tempAI.setAILogPanel(aiLogPanel);
+                }
+                Move bestMove = tempAI.findBestMove(board);
+                tempAI.shutdown(); // 清理临时实例
+                if (bestMove != null) {
+                    return formatMoveForDisplay(bestMove);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Fairy-Stockfish 分析出错: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Fairy-Stockfish 分析失败", e);
+        }
+        return null;
+    }
+    
+    /**
+     * 格式化走法以供显示
+     */
+    private String formatMoveForDisplay(Move move) {
+        if (move == null) return null;
+        
+        Position from = move.getStart();
+        Position to = move.getEnd();
+        
+        // 获取棋子信息
+        Piece piece = board.getPiece(from.getX(), from.getY());
+        String pieceName = "";
+        if (piece != null) {
+            pieceName = getPieceDisplayName(piece);
+        }
+        
+        // 格式化位置信息
+        String fromPos = formatPosition(from);
+        String toPos = formatPosition(to);
+        
+        return String.format("%s %s → %s", pieceName, fromPos, toPos);
+    }
+    
+    /**
+     * 获取棋子显示名称
+     */
+    private String getPieceDisplayName(Piece piece) {
+        if (piece == null) return "";
+        
+        String colorPrefix = (piece.getColor() == PieceColor.RED) ? "红" : "黑";
+        
+        switch (piece.getType()) {
+            case KING: return colorPrefix + (piece.getColor() == PieceColor.RED ? "帅" : "将");
+            case ADVISOR: return colorPrefix + (piece.getColor() == PieceColor.RED ? "仕" : "士");
+            case ELEPHANT: return colorPrefix + (piece.getColor() == PieceColor.RED ? "相" : "象");
+            case HORSE: return colorPrefix + "马";
+            case ROOK: return colorPrefix + "车";
+            case CANNON: return colorPrefix + "炮";
+            case PAWN: return colorPrefix + (piece.getColor() == PieceColor.RED ? "兵" : "卒");
+            default: return colorPrefix + "？";
+        }
+    }
+    
+    /**
+     * 格式化位置信息
+     */
+    private String formatPosition(Position pos) {
+        if (pos == null) return "？？";
+        
+        // 转换为中国象棋标准表示法
+        char file = (char)('a' + pos.getY());
+        int rank = 10 - pos.getX();
+        
+        return String.format("%c%d", file, rank);
     }
     
     /**

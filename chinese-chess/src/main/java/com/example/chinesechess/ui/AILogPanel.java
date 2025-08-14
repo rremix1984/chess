@@ -118,6 +118,53 @@ public class AILogPanel extends JPanel {
     }
     
     /**
+     * 智能添加AI决策日志（自动识别红方/黑方并使用对应颜色）
+     */
+    public void addAIDecisionWithColorDetection(String message) {
+        if (!enabled) {
+            return;
+        }
+        
+        String title;
+        Color textColor;
+        
+        // 自动检测消息中的方色信息
+        if (message.contains("红方") || message.contains("红")) {
+            title = "红方AI";
+            textColor = Color.RED; // 红方用红色
+        } else if (message.contains("黑方") || message.contains("黑")) {
+            title = "黑方AI";
+            textColor = Color.BLACK; // 黑方用黑色
+        } else {
+            title = "AI决策";
+            textColor = new Color(0, 153, 0); // 其他信息用绿色
+        }
+        
+        addLogMessage(title, message, textColor);
+    }
+    
+    /**
+     * 添加红方AI决策日志
+     */
+    public void addRedPlayerDecision(String message) {
+        addLogMessage("红方AI", message, Color.RED);
+    }
+    
+    /**
+     * 添加黑方AI决策日志
+     */
+    public void addBlackPlayerDecision(String message) {
+        addLogMessage("黑方AI", message, Color.BLACK);
+    }
+    
+    /**
+     * 添加一般信息（绿色）
+     */
+    public void addGeneralInfo(String message) {
+        addLogMessage("系统信息", message, new Color(0, 153, 0));
+    }
+    
+    /**
      * 清理旧日志条目
      */
     private void clearOldLogs() {

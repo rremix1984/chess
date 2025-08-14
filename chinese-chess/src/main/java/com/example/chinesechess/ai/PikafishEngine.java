@@ -104,9 +104,12 @@ public class PikafishEngine {
                 return false;
             }
             
-            // 设置引擎选项
-            sendCommand("setoption name Threads value 2"); // 减少线程数以提高兼容性
-            sendCommand("setoption name Hash value 64");    // 减少内存使用
+            // 设置引擎选项（针对棋力优化）
+            sendCommand("setoption name Threads value 4");     // 增加线程数提升计算速度
+            sendCommand("setoption name Hash value 256");      // 增加哈希表大小提升搜索效率
+            sendCommand("setoption name Move Overhead value 100"); // 设置走法开销，提高精度
+            sendCommand("setoption name Skill Level value 20"); // 设置最高技能等级
+            sendCommand("setoption name MultiPV value 1");     // 保证专注于最优走法
             
             // 尝试设置神经网络文件路径
             // 首先尝试从配置管理器获取NNUE文件路径
@@ -391,14 +394,16 @@ public class PikafishEngine {
                     
                     if (currentDepth > lastDepth) {
                         lastDepth = currentDepth;
-                        // 只显示重要的深度里程碑，减少日志噪声
-                        if (currentDepth == 15 || currentDepth == 20 || currentDepth == 25 || currentDepth >= 30) {
+                        // 极简日志：仅显示关键深度节点
+                        if (shouldLogDepth(currentDepth)) {
                             String logMessage = "🔍 深度 " + currentDepth;
                             if (!score.isEmpty()) {
-                                logMessage += ", 分数: " + score;
+                                logMessage += ", 评分: " + score;
                             }
+                            // 只显示主变的第一手，减少输出
                             if (!pv.isEmpty()) {
-                                logMessage += ", 主变: " + pv;
+                                String shortPv = pv.length() > 6 ? pv.substring(0, 6) + "..." : pv;
+                                logMessage += ", 主变: " + shortPv;
                             }
                             log(logMessage);
                         }
@@ -676,6 +681,25 @@ public class PikafishEngine {
     }
     
     private String lastAnalysisInfo = "";
+    
+    /**
+     * 智能判断是否应该记录当前深度的日志
+     * 系统性减少日志输出，只保留关键深度信息
+     * @param depth 当前深度
+     * @return 是否应该记录日志
+     */
+    private boolean shouldLogDepth(int depth) {
+        // 极简策略：只记录关键深度节点
+        if (depth <= 10) {
+            return false; // 浅层搜索不记录
+        } else if (depth <= 20) {
+            return depth % 10 == 0; // 10, 20
+        } else if (depth <= 30) {
+            return depth % 5 == 0; // 25, 30
+        } else {
+            return depth % 10 == 0; // 40, 50, 60...
+        }
+    }
     
     /**
      * 获取最后一次分析的详细信息

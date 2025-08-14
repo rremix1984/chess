@@ -732,6 +732,60 @@ public class DeepSeekPikafishAI {
     }
     
     /**
+     * 智能计算增强思考时间
+     * 根据难度级别动态调整引擎性能，提升棋力
+     */
+    private int calculateEnhancedThinkTime(int difficulty) {
+        int baseTime = thinkTimes[Math.min(difficulty - 1, thinkTimes.length - 1)];
+        
+        // 根据难度级别智能调整思考时间倍数
+        double multiplier;
+        switch (difficulty) {
+            case 1: // 入门级
+                multiplier = 1.5; // 轻微提升
+                break;
+            case 2: // 初级
+                multiplier = 2.0; // 双倍时间
+                break;
+            case 3: // 中级
+                multiplier = 2.5; // 2.5倍时间
+                break;
+            case 4: // 高级
+                multiplier = 3.0; // 3倍时间
+                break;
+            case 5: // 专家级
+                multiplier = 4.0; // 4倍时间，确保最强棋力
+                break;
+            case 6:
+            case 7:
+            case 8:
+                multiplier = 5.0; // 5倍时间，超级专家级
+                break;
+            case 9:
+            case 10:
+                multiplier = 6.0; // 6倍时间，大师级
+                break;
+            default:
+                multiplier = 2.0; // 默认双倍时间
+                break;
+        }
+        
+        int enhancedTime = (int)(baseTime * multiplier);
+        
+        // 设置最小和最大思考时间限制
+        int minTime = 1000; // 最少1秒
+        int maxTime = 30000; // 最多30秒
+        
+        enhancedTime = Math.max(minTime, Math.min(enhancedTime, maxTime));
+        
+        System.out.println(String.format(
+            "🎯 智能思考时间计算: 难度%d, 基础时间%dms, 倍数%.1f, 最终时间%dms", 
+            difficulty, baseTime, multiplier, enhancedTime));
+        
+        return enhancedTime;
+    }
+    
+    /**
      * 获取AI颜色
      */
     public PieceColor getColor() {
@@ -1078,9 +1132,9 @@ public class DeepSeekPikafishAI {
         
         addToAILog("——— 获取Pikafish候选走法 ———");
         
-        // 增强的超时参数，给引擎更多时间
-        int extendedThinkTime = thinkTimes[difficulty - 1] * 2; // 翻倍时间
-        addToAILog("使用增强的思考时间: " + extendedThinkTime + "ms");
+        // 智能增强的超时参数，给引擎更多时间提升棋力
+        int extendedThinkTime = calculateEnhancedThinkTime(difficulty);
+        addToAILog("使用增强的思考时间: " + extendedThinkTime + "ms（难度级别: " + difficulty + "）");
         
         List<String> moves = pikafishEngine.getBestMoves(fen, extendedThinkTime, count);
         

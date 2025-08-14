@@ -64,7 +64,7 @@ public class MonopolyBoard extends JPanel {
      */
     private void loadBackgroundImage() {
         try {
-            // 尝试多个可能的路径和格式来查找背景图片
+            // 尝试多个可能的路径和格式来查找背景图片（PNG优先）
             String[] possiblePaths = {
                 "1.png",   // PNG格式（优先）
                 "1.jpg",   // JPG格式
@@ -72,9 +72,11 @@ public class MonopolyBoard extends JPanel {
                 "1.webp",  // WEBP格式
                 "../1.png", "../1.jpg", "../1.jpeg", "../1.webp",  // 上级目录
                 "../../1.png", "../../1.jpg", "../../1.jpeg", "../../1.webp",  // 上两级目录
+                "/Users/wangxiaozhe/workspace/chinese-chess-game/monopoly/1.png", // monopoly目录中的PNG
+                "/Users/wangxiaozhe/workspace/chinese-chess-game/monopoly/1.webp", // monopoly目录中的WEBP
                 "/Users/wangxiaozhe/workspace/chinese-chess-game/1.png",  // 绝对路径 PNG
-                "/Users/wangxiaozhe/workspace/chinese-chess-game/1.jpg",  // 绝对路径 JPG
                 "/Users/wangxiaozhe/workspace/chinese-chess-game/1.webp", // 绝对路径 WEBP
+                "/Users/wangxiaozhe/workspace/chinese-chess-game/1.jpg",  // 绝对路径 JPG
                 System.getProperty("user.dir") + "/1.png",   // 当前目录 PNG
                 System.getProperty("user.dir") + "/1.jpg",   // 当前目录 JPG
                 System.getProperty("user.dir") + "/1.webp",  // 当前目录 WEBP
@@ -122,6 +124,9 @@ public class MonopolyBoard extends JPanel {
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         
+        // 先绘制全屏背景图片
+        drawFullScreenBackground(g2d);
+        
         // 绘制棋盘
         drawBoard(g2d);
         
@@ -132,6 +137,33 @@ public class MonopolyBoard extends JPanel {
         drawPlayers(g2d);
         
         g2d.dispose();
+    }
+    
+    /**
+     * 绘制全屏背景图片
+     */
+    private void drawFullScreenBackground(Graphics2D g2d) {
+        if (backgroundImage != null) {
+            int width = getWidth();
+            int height = getHeight();
+            
+            // 计算缩放比例以铺满整个界面
+            double scaleX = (double) width / backgroundImage.getWidth();
+            double scaleY = (double) height / backgroundImage.getHeight();
+            double scale = Math.max(scaleX, scaleY); // 使用较大的缩放比例确保铺满
+            
+            int scaledWidth = (int)(backgroundImage.getWidth() * scale);
+            int scaledHeight = (int)(backgroundImage.getHeight() * scale);
+            
+            // 居中绘制，如果图片比面板大，则裁剪多余部分
+            int imgX = (width - scaledWidth) / 2;
+            int imgY = (height - scaledHeight) / 2;
+            
+            // 添加半透明效果，让背景图片不会过于突出，便于看清棋盘格子
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
+            g2d.drawImage(backgroundImage, imgX, imgY, scaledWidth, scaledHeight, this);
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+        }
     }
     
     private void drawBoard(Graphics2D g2d) {
@@ -274,44 +306,16 @@ public class MonopolyBoard extends JPanel {
         int centerY = height / 2;
         int logoSize = Math.min(width, height) / 3;
         
-        // 如果有背景图片，绘制背景图片
-        if (backgroundImage != null) {
-            // 计算图片缩放比例，保持纵横比
-            double scaleX = (double) logoSize / backgroundImage.getWidth();
-            double scaleY = (double) logoSize / backgroundImage.getHeight();
-            double scale = Math.min(scaleX, scaleY); // 保持原始纵横比
-            
-            int scaledWidth = (int)(backgroundImage.getWidth() * scale);
-            int scaledHeight = (int)(backgroundImage.getHeight() * scale);
-            
-            int imgX = centerX - scaledWidth / 2;
-            int imgY = centerY - scaledHeight / 2;
-            
-            // 绘制缩放后的背景图片
-            g2d.drawImage(backgroundImage, imgX, imgY, scaledWidth, scaledHeight, this);
-            
-            // 在图片上方添加半透明的标题背景
-            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f));
-            g2d.setColor(new Color(255, 255, 255, 200));
-            int titleBgHeight = 60;
-            g2d.fillRect(centerX - logoSize/2, centerY - titleBgHeight/2, logoSize, titleBgHeight);
-            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
-            
-            // 绘制边框
-            g2d.setColor(new Color(139, 69, 19));
-            g2d.setStroke(new BasicStroke(3));
-            g2d.drawRect(centerX - logoSize/2, centerY - logoSize/2, logoSize, logoSize);
-            
-        } else {
-            // 如果没有背景图片，使用原来的纯色背景
-            g2d.setColor(new Color(255, 250, 240));
-            g2d.fillRect(centerX - logoSize/2, centerY - logoSize/2, logoSize, logoSize);
-            
-            // 绘制边框
-            g2d.setColor(new Color(139, 69, 19));
-            g2d.setStroke(new BasicStroke(3));
-            g2d.drawRect(centerX - logoSize/2, centerY - logoSize/2, logoSize, logoSize);
-        }
+        // 绘制半透明背景区域，使标题更清晰
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f));
+        g2d.setColor(new Color(255, 255, 255, 180));
+        g2d.fillRect(centerX - logoSize/2, centerY - logoSize/2, logoSize, logoSize);
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+        
+        // 绘制边框
+        g2d.setColor(new Color(139, 69, 19));
+        g2d.setStroke(new BasicStroke(3));
+        g2d.drawRect(centerX - logoSize/2, centerY - logoSize/2, logoSize, logoSize);
         
         // 绘制标题（使用深色和阴影增强可读性）
         // 文字阴影效果
