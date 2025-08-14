@@ -32,6 +32,14 @@ public class FairyStockfishEngine {
     }
     
     /**
+     * 设置神经网络文件路径
+     */
+    public void setNeuralNetworkPath(String neuralNetworkPath) {
+        this.neuralNetworkPath = neuralNetworkPath;
+        log("设置神经网络文件: " + neuralNetworkPath);
+    }
+    
+    /**
      * 记录日志
      */
     private void log(String message) {
@@ -94,6 +102,17 @@ public class FairyStockfishEngine {
             
             // 设置中国象棋变体
             sendCommand("setoption name UCI_Variant value xiangqi");
+            
+            // 设置神经网络文件路径（如果指定）
+            if (neuralNetworkPath != null && !neuralNetworkPath.isEmpty()) {
+                File nnFile = new File(neuralNetworkPath);
+                if (nnFile.exists()) {
+                    sendCommand("setoption name EvalFile value " + neuralNetworkPath);
+                    log("加载神经网络文件: " + neuralNetworkPath);
+                } else {
+                    log("警告：神经网络文件不存在: " + neuralNetworkPath);
+                }
+            }
             
             // === 根据专业建议进行极致优化 ===
             log("正在应用专业级引擎优化配置...");

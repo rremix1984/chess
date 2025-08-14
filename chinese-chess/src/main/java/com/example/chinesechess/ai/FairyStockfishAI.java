@@ -26,6 +26,16 @@ public class FairyStockfishAI {
      * 构造函数
      */
     public FairyStockfishAI(PieceColor aiColor, int difficulty) {
+        this(aiColor, difficulty, null);
+    }
+    
+    /**
+     * 构造函数（支持神经网络文件）
+     * @param aiColor AI颜色
+     * @param difficulty 难度等级 (1-10)
+     * @param neuralNetworkPath 神经网络文件路径（可为null）
+     */
+    public FairyStockfishAI(PieceColor aiColor, int difficulty, String neuralNetworkPath) {
         this.aiColor = aiColor;
         this.difficulty = Math.max(1, Math.min(10, difficulty)); // 支持1-10级难度
         
@@ -36,6 +46,11 @@ public class FairyStockfishAI {
         // 初始化 Fairy-Stockfish 引擎
         this.fairyStockfishEngine = new FairyStockfishEngine("fairy-stockfish");
         
+        // 设置神经网络文件路径（如果指定）
+        if (neuralNetworkPath != null && !neuralNetworkPath.isEmpty()) {
+            this.fairyStockfishEngine.setNeuralNetworkPath(neuralNetworkPath);
+        }
+        
         // 初始化备用AI
         this.fallbackAI = new EnhancedChessAI(aiColor, difficulty);
         
@@ -43,6 +58,9 @@ public class FairyStockfishAI {
         System.out.println("   - AI颜色: " + (aiColor == PieceColor.RED ? "红方" : "黑方"));
         System.out.println("   - 难度: " + difficulty + "/10");
         System.out.println("   - 引擎路径: fairy-stockfish");
+        if (neuralNetworkPath != null && !neuralNetworkPath.isEmpty()) {
+            System.out.println("   - 神经网络: " + neuralNetworkPath);
+        }
         
         // 尝试初始化引擎
         initializeFairyStockfishEngine();
