@@ -96,7 +96,23 @@ public class FairyStockfishAI {
             System.out.println("🔍 [调试] FEN: " + fen);
             addToAILog("分析局面: " + fen);
             
-            int thinkTime = thinkTimes[difficulty - 1];
+            // 添加棋盘状态调试信息
+            System.out.println("🔍 [调试] 棋盘状态检查:");
+            for (int row = 5; row <= 7; row++) {
+                for (int col = 0; col < 9; col++) {
+                    Piece piece = board.getPiece(row, col);
+                    if (piece != null) {
+                        System.out.println("  位置(" + row + "," + col + "): " + piece.getClass().getSimpleName() + " " + piece.getColor());
+                    }
+                }
+            }
+            addToAILog("AI难度: " + difficulty + "/10 (" + getDifficultyName() + ")");
+            
+            // 根据难度动态调整思考时间，高难度级别获得更多思考时间
+            int baseThinkTime = thinkTimes[difficulty - 1];
+            // 为高难度级别额外增加50%的思考时间，确保更强的棋力
+            int thinkTime = difficulty >= 7 ? (int)(baseThinkTime * 1.5) : baseThinkTime;
+            addToAILog("基础思考时间: " + baseThinkTime + "ms, 实际思考时间: " + thinkTime + "ms");
             
             // 优先尝试Fairy-Stockfish引擎
             if (fairyStockfishEngine != null && fairyStockfishEngine.isAvailable()) {
@@ -150,43 +166,40 @@ public class FairyStockfishAI {
     private Move convertUciToMove(String uciMove, Board board) {
         try {
             if (uciMove == null || uciMove.length() < 4) {
+                addToAILog("UCI走法无效: " + uciMove);
                 return null;
             }
             
-            // UCI格式: e2e4 (从e2到e4)
-            // 转换为数组坐标
-            char fromFile = uciMove.charAt(0);
-            char fromRank = uciMove.charAt(1);
-            char toFile = uciMove.charAt(2);
-            char toRank = uciMove.charAt(3);
+            System.out.println("🔍 [调试] 转换UCI走法: " + uciMove);
+            addToAILog("转换UCI走法: " + uciMove);
             
-            // 将国际象棋坐标转换为中国象棋坐标
-            // 文件: a-i (0-8)
-            // 排: 1-10 (但在中国象棋FEN中是0-9)
-            int fromCol = fromFile - 'a';
-            int fromRow = Character.getNumericValue(fromRank);
-            int toCol = toFile - 'a';
-            int toRow = Character.getNumericValue(toRank);
-            
-            // 验证坐标范围
-            if (fromCol < 0 || fromCol >= 9 || fromRow < 0 || fromRow >= 10 ||
-                toCol < 0 || toCol >= 9 || toRow < 0 || toRow >= 10) {
-                System.out.println("⚠️ 坐标超出范围: " + uciMove);
+            // 使用FenConverter的UCI转换方法
+            Position[] positions = FenConverter.uciToMove(uciMove);
+            if (positions == null || positions.length != 2) {
+                System.out.println("⚠️ UCI走法格式错误: " + uciMove);
+                addToAILog("UCI走法格式错误: " + uciMove);
                 return null;
             }
             
-            Position start = new Position(fromRow, fromCol);
-            Position end = new Position(toRow, toCol);
+            Position start = positions[0];
+            Position end = positions[1];
+            
+            System.out.println("🔍 [调试] UCI转换结果: " + uciMove + " -> " + 
+                "(起点: " + start.getX() + "," + start.getY() + ") " + 
+                "(终点: " + end.getX() + "," + end.getY() + ")");
+            addToAILog("UCI转换: " + uciMove + " -> (" + start.getX() + "," + start.getY() + ") to (" + end.getX() + "," + end.getY() + ")");
             
             // 验证起始位置有棋子且属于当前AI
-            Piece piece = board.getPiece(fromRow, fromCol);
+            Piece piece = board.getPiece(start.getX(), start.getY());
             if (piece == null) {
-                System.out.println("⚠️ 起始位置无棋子: " + uciMove);
+                System.out.println("⚠️ 起始位置无棋子: " + uciMove + " (位置: " + start.getX() + "," + start.getY() + ")");
+                addToAILog("起始位置无棋子: " + uciMove);
                 return null;
             }
             
             if (piece.getColor() != aiColor) {
-                System.out.println("⚠️ 棋子颜色不匹配: " + uciMove);
+                System.out.println("⚠️ 棋子颜色不匹配: " + uciMove + " (期望: " + aiColor + ", 实际: " + piece.getColor() + ")");
+                addToAILog("棋子颜色不匹配: " + uciMove);
                 return null;
             }
             
@@ -208,6 +221,20 @@ public class FairyStockfishAI {
             System.err.println("❌ UCI走法转换异常: " + e.getMessage());
             return null;
         }
+    }
+    
+    /**
+     * 获取难度等级名称
+     */
+    private String getDifficultyName() {
+        String[] difficultyNames = {
+            "简单", "普通", "困难", "专家", "大师",
+            "特级", "超级", "顶级", "传奇", "神级"
+        };
+        if (difficulty >= 1 && difficulty <= difficultyNames.length) {
+            return difficultyNames[difficulty - 1];
+        }
+        return "未知";
     }
     
     /**

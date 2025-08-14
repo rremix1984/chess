@@ -94,6 +94,25 @@ public class FairyStockfishEngine {
             // 设置中国象棋变体
             sendCommand("setoption name UCI_Variant value xiangqi");
             
+            // 配置引擎强度 - 增强游戏水平
+            // 设置Hash表大小为256MB，提升搜索效率
+            sendCommand("setoption name Hash value 256");
+            
+            // 设置线程数为4，提升多核CPU性能
+            sendCommand("setoption name Threads value 4");
+            
+            // 启用Ponder（思考对手时间），增强分析深度
+            sendCommand("setoption name Ponder value true");
+            
+            // 设置技能等级为最高（20级），确保最强棋力
+            sendCommand("setoption name Skill Level value 20");
+            
+            // 禁用随机性，确保最佳走法
+            sendCommand("setoption name UCI_LimitStrength value false");
+            
+            // 设置更深的搜索策略
+            sendCommand("setoption name Contempt value 0");
+            
             // 等待引擎准备就绪
             sendCommand("isready");
             while ((line = engineOutput.readLine()) != null) {
@@ -132,7 +151,10 @@ public class FairyStockfishEngine {
         if (engineInput != null) {
             engineInput.write(command + "\n");
             engineInput.flush();
-            log("发送命令: " + command);
+            // 只记录重要命令，避免日志过多
+            if (command.equals("uci") || command.equals("isready") || command.startsWith("go ")) {
+                log("发送命令: " + command);
+            }
         }
     }
     
@@ -149,13 +171,14 @@ public class FairyStockfishEngine {
         }
         
         try {
-            log("开始分析局面: " + fen);
-            
             // 设置位置
             sendCommand("position fen " + fen);
             
-            // 开始搜索
-            String searchCommand = String.format("go movetime %d", thinkTimeMs);
+            // 使用混合搜索策略：时间限制 + 深度限制
+            // 根据思考时间计算搜索深度
+            int searchDepth = calculateSearchDepth(thinkTimeMs);
+            String searchCommand = String.format("go movetime %d depth %d", thinkTimeMs, searchDepth);
+            log("开始搜索 - 深度: " + searchDepth + " 时间: " + thinkTimeMs + "ms");
             sendCommand(searchCommand);
             
             // 读取引擎响应
@@ -164,8 +187,7 @@ public class FairyStockfishEngine {
             long startTime = System.currentTimeMillis();
             
             while ((line = engineOutput.readLine()) != null) {
-                log("引擎输出: " + line);
-                
+                // 只记录关键信息，避免日志过于啰嗦
                 if (line.startsWith("bestmove")) {
                     String[] parts = line.split(" ");
                     if (parts.length > 1) {
@@ -174,10 +196,24 @@ public class FairyStockfishEngine {
                         break;
                     }
                 } else if (line.startsWith("info")) {
-                    // 处理搜索信息
-                    if (line.contains(" pv ")) {
-                        // 主要变化
-                        log("主要变化: " + line);
+                    // 只记录最终深度的主要变化，忽略中间搜索过程
+                    if (line.contains(" depth ")) {
+                        // 解析深度信息
+                        String[] parts = line.split(" ");
+                        for (int i = 0; i < parts.length - 1; i++) {
+                            if ("depth".equals(parts[i]) && i + 1 < parts.length) {
+                                try {
+                                    int currentDepth = Integer.parseInt(parts[i + 1]);
+                                    // 只记录每5层深度的进展
+                                    if (currentDepth % 5 == 0 && line.contains(" pv ")) {
+                                        log("搜索深度 " + currentDepth + " 层完成");
+                                    }
+                                } catch (NumberFormatException e) {
+                                    // 忽略解析错误
+                                }
+                                break;
+                            }
+                        }
                     }
                 }
                 
@@ -246,6 +282,26 @@ public class FairyStockfishEngine {
         } catch (IOException e) {
             log("评估局面时发生错误: " + e.getMessage());
             return 0;
+        }
+    }
+    
+    /**
+     * 根据思考时间计算最优搜索深度
+     * @param thinkTimeMs 思考时间（毫秒）
+     * @return 搜索深度
+     */
+    private int calculateSearchDepth(int thinkTimeMs) {
+        // 基于思考时间动态计算深度，确保强棋力
+        if (thinkTimeMs <= 2000) {
+            return 12;  // 短时间：中等深度
+        } else if (thinkTimeMs <= 5000) {
+            return 15;  // 中等时间：更深搜索
+        } else if (thinkTimeMs <= 10000) {
+            return 18;  // 较长时间：深度搜索
+        } else if (thinkTimeMs <= 20000) {
+            return 22;  // 长时间：非常深度的搜索
+        } else {
+            return 25;  // 最长时间：最深搜索，确保最强棋力
         }
     }
     

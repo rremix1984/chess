@@ -24,9 +24,9 @@ public class GameConfig {
     public static final Dimension CONTROL_PANEL_SIZE = new Dimension(300, 600);
     public static final Dimension BUTTON_SIZE = new Dimension(80, 30);
     
-    // 棋盘配置
-    public static final int BOARD_CELL_SIZE = 60;
-    public static final int BOARD_MARGIN = 50;
+    // 棋盘配置 - 修复棋盘尺寸问题
+    public static final int BOARD_CELL_SIZE = 70;  // 增加格子大小
+    public static final int BOARD_MARGIN = 80;      // 增加边距
     
     // UI配置
     public static final Color CHAT_BACKGROUND_COLOR = new Color(248, 248, 248);

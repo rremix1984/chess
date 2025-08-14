@@ -119,12 +119,26 @@ public class ChatPanel extends JPanel {
         pikafishPanel.add(difficultyLabel);
         pikafishPanel.add(pikafishDifficultyComboBox);
         
+        // Fairy-Stockfish评估按钮 - 使用绿色
+        JButton fairyEvaluateButton = new JButton("🧚 Fairy分析");
+        fairyEvaluateButton.setFont(new Font("微软雅黑", Font.BOLD, 12));
+        fairyEvaluateButton.setBackground(new Color(34, 139, 34)); // 森林绿色
+        fairyEvaluateButton.setForeground(Color.BLACK); // 黑色字体
+        fairyEvaluateButton.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createRaisedBevelBorder(),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+        fairyEvaluateButton.setFocusPainted(false);
+        fairyEvaluateButton.setToolTipText("让Fairy-Stockfish引擎评估当前棋局并给出建议");
+        fairyEvaluateButton.addActionListener(e -> requestFairyStockfishEvaluation());
+        
         sendButton = new JButton("发送");
         sendButton.setFont(new Font("SansSerif", Font.PLAIN, 12));
         sendButton.setPreferredSize(new Dimension(80, 30));
         sendButton.addActionListener(e -> sendMessage());
         
         buttonPanel.add(pikafishPanel);
+        buttonPanel.add(fairyEvaluateButton);
         buttonPanel.add(sendButton);
         
         inputPanel.add(inputField, BorderLayout.CENTER);
@@ -908,6 +922,161 @@ public class ChatPanel extends JPanel {
                 e.printStackTrace();
             }
         });
+    }
+    
+    /**
+     * 请求Fairy-Stockfish评估
+     */
+    private void requestFairyStockfishEvaluation() {
+        if (!isEnabled || board == null) {
+            appendErrorMessage("🧚 Fairy-Stockfish评估：请先启用AI对弈功能并开始游戏。");
+            return;
+        }
+        
+        System.out.println("用户请求Fairy-Stockfish评估");
+        
+        // 显示评估开始消息
+        appendUserMessage("👤 你：请Fairy-Stockfish引擎分析当前棋局");
+        
+        // 禁用输入，显示分析状态
+        setInputEnabled(false);
+        appendThinkingMessage("🧚 Fairy-Stockfish引擎：正在分析象棋棋局...");
+        
+        // 在后台线程中处理Fairy-Stockfish评估
+        new Thread(() -> {
+            try {
+                // 实际调用FairyStockfishAI进行分析
+                if (board instanceof com.example.chinesechess.core.Board) {
+                    // 创建FairyStockfishAI实例
+                    com.example.chinesechess.ai.FairyStockfishAI analyzer = new com.example.chinesechess.ai.FairyStockfishAI(
+                        com.example.chinesechess.core.PieceColor.RED, // 默认颜色
+                        5 // 中等难度
+                    );
+                    
+                    // 获取当前玩家颜色，如果无法确定则使用红方
+                    com.example.chinesechess.core.PieceColor currentPlayer = com.example.chinesechess.core.PieceColor.RED;
+                    
+                    // 获取最佳走法
+                    com.example.chinesechess.core.Move bestMove = analyzer.getBestMove(
+                        (com.example.chinesechess.core.Board) board
+                    );
+                    
+                    SwingUtilities.invokeLater(() -> {
+                        removeThinkingMessage();
+                        if (bestMove != null) {
+                            String moveDescription = formatMoveDescription(bestMove);
+                            String analysis = "🧚 **Fairy-Stockfish引擎分析**\n\n" +
+                                           "📍 **推荐走法**: " + moveDescription + "\n\n" +
+                                           "🎯 **分析说明**: Fairy-Stockfish是专门支持中国象棋的多变体引擎，" +
+                                           "能够提供准确的局面评估和走法建议。\n\n" +
+                                           "💡 **提示**: 以上分析由专业的Fairy-Stockfish引擎提供，" +
+                                           "专门针对中国象棋进行了优化。";
+                            
+                            appendAIMessage(analysis);
+                            
+                            // 显示推荐走法的视觉标记
+                            showFairyStockfishMoveHighlights(bestMove);
+                            
+                            System.out.println("Fairy-Stockfish评估完成，推荐走法: " + moveDescription);
+                        } else {
+                            appendErrorMessage("🧚 Fairy-Stockfish引擎：抱歉，无法获取有效的评估结果。请确保引擎正常运行。");
+                        }
+                        
+                        setInputEnabled(true);
+                        inputField.requestFocus();
+                    });
+                    
+                    // 清理资源
+                    analyzer.cleanup();
+                } else {
+                    SwingUtilities.invokeLater(() -> {
+                        removeThinkingMessage();
+                        appendErrorMessage("🧚 Fairy-Stockfish引擎：当前棋盘类型不支持Fairy-Stockfish分析。");
+                        setInputEnabled(true);
+                        inputField.requestFocus();
+                    });
+                }
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    removeThinkingMessage();
+                    handleFairyStockfishEvaluationError(e);
+                    setInputEnabled(true);
+                    inputField.requestFocus();
+                });
+            }
+        }).start();
+    }
+    
+    /**
+     * 格式化走法描述
+     */
+    private String formatMoveDescription(com.example.chinesechess.core.Move move) {
+        if (move == null || move.getStart() == null || move.getEnd() == null) {
+            return "未知走法";
+        }
+        
+        try {
+            // 获取起始和目标位置
+            com.example.chinesechess.core.Position from = move.getStart();
+            com.example.chinesechess.core.Position to = move.getEnd();
+            
+            // 简单的坐标描述
+            String fromDesc = "(" + (from.getX() + 1) + "," + (from.getY() + 1) + ")";
+            String toDesc = "(" + (to.getX() + 1) + "," + (to.getY() + 1) + ")";
+            
+            return fromDesc + " → " + toDesc;
+        } catch (Exception e) {
+            return "走法解析出错";
+        }
+    }
+    
+    /**
+     * 显示Fairy-Stockfish推荐走法的视觉标记
+     */
+    private void showFairyStockfishMoveHighlights(com.example.chinesechess.core.Move move) {
+        if (move == null || move.getStart() == null || move.getEnd() == null || boardPanel == null) {
+            return;
+        }
+        
+        try {
+            // 通过反射调用BoardPanel的setAISuggestion方法
+            java.lang.reflect.Method setAISuggestionMethod = boardPanel.getClass().getMethod(
+                "setAISuggestion", 
+                com.example.chinesechess.core.Position.class, 
+                com.example.chinesechess.core.Position.class
+            );
+            
+            setAISuggestionMethod.invoke(boardPanel, move.getStart(), move.getEnd());
+            
+            String moveDesc = formatMoveDescription(move);
+            System.out.println("💡 显示Fairy-Stockfish推荐走法标记: " + moveDesc);
+            
+            // 在聊天面板中也添加一条提示消息
+            appendAIMessage("💡 **走法提示**: 棋盘上已用蓝色和绿色标记显示推荐走法：" + moveDesc + 
+                          "\n🔹 蓝色圆圈标记需要移动的棋子\n🔸 绿色圆圈标记目标位置\n标记将在30秒后自动消失。");
+            
+        } catch (Exception e) {
+            System.err.println("❌ 无法显示Fairy-Stockfish推荐走法标记: " + e.getMessage());
+            // 降级方案：只在文字中提示
+            String moveDesc = formatMoveDescription(move);
+            appendAIMessage("💡 **推荐走法**: " + moveDesc);
+        }
+    }
+    
+    /**
+     * 处理Fairy-Stockfish评估错误
+     */
+    private void handleFairyStockfishEvaluationError(Throwable throwable) {
+        String errorMessage = "🧚 Fairy-Stockfish引擎：抱歉，评估过程中出现问题。";
+        
+        if (throwable instanceof InterruptedException) {
+            errorMessage += "评估被中断，请稍后重试。";
+        } else {
+            errorMessage += "请检查引擎状态和安装。";
+        }
+        
+        appendErrorMessage(errorMessage);
+        System.err.println("Fairy-Stockfish评估错误: " + throwable.getMessage());
     }
     
     // 移除了五子棋棋盘适配器

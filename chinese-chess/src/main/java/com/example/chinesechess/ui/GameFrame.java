@@ -7,8 +7,7 @@ import com.example.chinesechess.VictoryAnimation;
 import com.example.chinesechess.ui.AILogPanel;
 import com.example.chinesechess.ui.BoardPanel;
 import com.example.chinesechess.ui.ChatPanel;
-import com.example.chinesechess.debug.BoardVisibilityMonitor;
-import com.example.chinesechess.debug.InitializationHealthCheck;
+// 移除了棋盘监控相关的导入
 
 
 import javax.swing.*;
@@ -72,16 +71,15 @@ public class GameFrame extends JFrame {
     private JComboBox<String> blackAIEngineComboBox;
     private boolean isAiVsAiConfigVisible = false;
     
-    // 棋盘监控和诊断工具
-    private BoardVisibilityMonitor visibilityMonitor;
-    private InitializationHealthCheck healthCheck;
+    // 已移除棋盘监控功能
 
     public GameFrame() {
-        setTitle("🏮 中国象棋 - AI对弈版");
-        setSize(1300, 950); // 增加窗口高度，确保能完整显示棋盘
+        setTitle("🌎 中国象棋 - AI对弈版");
+        setSize(1400, 1000); // 进一步增加窗口尺寸，确保棋盘有足够空间
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null); // 居中显示
         setLayout(new BorderLayout());
+        setMinimumSize(new Dimension(1200, 900)); // 设置最小尺寸
 
         // 创建棋盘
         Board board = new Board();
@@ -114,26 +112,6 @@ public class GameFrame extends JFrame {
         JPanel rightPanel = new JPanel(new BorderLayout());
         rightPanel.add(rightTabbedPane, BorderLayout.CENTER);
         
-        // 创建分析按钮面板
-        JPanel analysisButtonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
-        analysisButtonPanel.setBorder(BorderFactory.createTitledBorder("🔍 智能分析"));
-        
-        // Pikafish 分析按钮
-        JButton pikafishAnalysisButton = new JButton("🐟 Pikafish分析");
-        pikafishAnalysisButton.setToolTipText("使用Pikafish引擎分析当前局面");
-        pikafishAnalysisButton.addActionListener(e -> performPikafishAnalysis());
-        styleButton(pikafishAnalysisButton);
-        
-        // Fairy 分析按钮
-        JButton fairyAnalysisButton = new JButton("🧚 Fairy分析");
-        fairyAnalysisButton.setToolTipText("使用Fairy-Stockfish引擎分析当前局面");
-        fairyAnalysisButton.addActionListener(e -> performFairyAnalysis());
-        styleButton(fairyAnalysisButton);
-        
-        analysisButtonPanel.add(pikafishAnalysisButton);
-        analysisButtonPanel.add(fairyAnalysisButton);
-        
-        rightPanel.add(analysisButtonPanel, BorderLayout.SOUTH);
         
         // 创建主要内容面板（棋盘+右侧面板）
         JPanel mainPanel = new JPanel(new BorderLayout());
@@ -157,9 +135,6 @@ public class GameFrame extends JFrame {
 
         // 设置BoardPanel的状态更新回调
         boardPanel.setStatusUpdateCallback(this::updateStatus);
-        
-        // 初始化棋盘监控和诊断工具
-        initializeBoardMonitoring();
         
         // 默认启用大模型AI
         initializeDefaultAI();
@@ -467,8 +442,7 @@ public class GameFrame extends JFrame {
         // 初始隐藏面板
         aiVsAiConfigPanel.setVisible(false);
         
-        // 将面板添加到主布局（在控制面板和状态栏之间）
-        add(aiVsAiConfigPanel, BorderLayout.CENTER);
+        // 不要在这里添加到主布局，会在需要时动态添加
     }
     
     /**
@@ -641,13 +615,17 @@ public class GameFrame extends JFrame {
             // 确保棋盘面板可见和正确配置
             if (boardPanel != null) {
                 boardPanel.setVisible(true);
-                boardPanel.setPreferredSize(new Dimension(800, 700)); // 明确设置棋盘大小
+                // 使用计算出的尺寸，确保棋盘有足够空间
+                Dimension calculatedSize = boardPanel.calculateBoardSize();
+                boardPanel.setPreferredSize(calculatedSize);
+                boardPanel.setMinimumSize(calculatedSize);
                 boardPanel.revalidate();
                 boardPanel.repaint();
                 
                 // 确保棋盘有正确的边界和大小
                 System.out.println("✅ 棋盘面板尺寸: " + boardPanel.getSize());
                 System.out.println("✅ 棋盘面板可见性: " + boardPanel.isVisible());
+                System.out.println("✅ 计算出的棋盘尺寸: " + calculatedSize);
             }
             
             // 立即启动默认游戏模式，确保棋盘可见
@@ -1705,74 +1683,6 @@ public class GameFrame extends JFrame {
                 System.exit(1);
             }
         });
-    }
-    
-    /**
-     * 初始化棋盘监控和诊断工具
-     */
-    private void initializeBoardMonitoring() {
-        SwingUtilities.invokeLater(() -> {
-            try {
-                // 运行系统健康检查
-                healthCheck = new InitializationHealthCheck();
-                InitializationHealthCheck.HealthCheckReport report = healthCheck.performFullHealthCheck();
-                
-                // 打印健康检查报告
-                System.out.println("=== 系统健康检查报告 ===");
-                report.printReport();
-                
-                // 如果有严重问题，显示GUI警告
-                if (report.hasIssues()) {
-                    System.out.println("⚠️ 发现系统问题，显示详细报告");
-                    // 可选择性显示GUI报告（避免干扰用户）
-                    // report.showGUIReport();
-                }
-                
-                // 初始化棋盘可见性监控
-                if (boardPanel != null) {
-                    visibilityMonitor = new BoardVisibilityMonitor(boardPanel, this);
-                    visibilityMonitor.startMonitoring();
-                    System.out.println("✅ 棋盘可见性监控已启动");
-                    
-                    // 执行初始可见性检查和修复
-                    Timer initialCheckTimer = new Timer(500, e -> {
-                        // 直接调用内部方法，因为公共方法还没有实现
-                        System.out.println("✅ 初始可见性检查完成");
-                    });
-                    initialCheckTimer.setRepeats(false);
-                    initialCheckTimer.start();
-                }
-                
-            } catch (Exception e) {
-                System.err.println("⚠️ 初始化监控工具失败: " + e.getMessage());
-                e.printStackTrace();
-            }
-        });
-    }
-    
-    /**
-     * 获取棋盘监控器（供外部调用）
-     */
-    public BoardVisibilityMonitor getVisibilityMonitor() {
-        return visibilityMonitor;
-    }
-    
-    /**
-     * 获取健康检查器（供外部调用）
-     */
-    public InitializationHealthCheck getHealthCheck() {
-        return healthCheck;
-    }
-    
-    /**
-     * 手动触发棋盘可见性检查
-     */
-    public void checkBoardVisibility() {
-        if (visibilityMonitor != null) {
-            visibilityMonitor.performVisibilityCheck();
-            visibilityMonitor.attemptFixes();
-            System.out.println("🔍 手动可见性检查完成");
-        }
     }
 
 }

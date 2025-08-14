@@ -331,4 +331,53 @@ public class FenConverter {
         // 一个中局局面的FEN，用于测试
         return "r1ba1a3/4k4/2n1b4/p1p1p1p1p/9/9/P1P1P1P1P/1C2B1N2/9/RNBAKAB1R w - - 0 1";
     }
+    
+    /**
+     * 测试UCI转换功能
+     * @param args 命令行参数
+     */
+    public static void main(String[] args) {
+        System.out.println("🔍 测试UCI转换功能");
+        
+        // 测试初始FEN
+        String initialFen = getInitialFen();
+        System.out.println("初始局面FEN: " + initialFen);
+        
+        // 测试几个UCI走法
+        String[] testMoves = {"d2d4", "e2e4", "c3c4", "g2g4", "h2h4", "a3a4"};
+        
+        for (String uciMove : testMoves) {
+            System.out.println("\n测试UCI走法: " + uciMove);
+            Position[] positions = uciToMove(uciMove);
+            if (positions != null) {
+                Position start = positions[0];
+                Position end = positions[1];
+                System.out.println("  转换结果: (" + start.getX() + "," + start.getY() + ") -> (" + end.getX() + "," + end.getY() + ")");
+                
+                // 反向转换验证
+                String backConverted = moveToUci(start, end);
+                System.out.println("  反向转换: " + backConverted);
+                System.out.println("  一致性: " + uciMove.equals(backConverted));
+            } else {
+                System.out.println("  转换失败！");
+            }
+        }
+        
+        // 测试坐标范围
+        System.out.println("\n测试坐标范围:");
+        for (int row = 0; row < 10; row++) {
+            for (int col = 0; col < 9; col++) {
+                Position pos = new Position(row, col);
+                String uci = positionToUci(pos);
+                Position converted = uciToPosition(uci);
+                boolean match = converted != null && 
+                    converted.getX() == row && converted.getY() == col;
+                if (!match) {
+                    System.out.println("  坐标转换错误: (" + row + "," + col + ") -> " + uci + " -> " + 
+                        (converted != null ? "(" + converted.getX() + "," + converted.getY() + ")" : "null"));
+                }
+            }
+        }
+        System.out.println("坐标转换测试完成");
+    }
 }

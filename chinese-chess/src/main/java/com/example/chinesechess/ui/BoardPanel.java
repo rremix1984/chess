@@ -2065,8 +2065,64 @@ public class BoardPanel extends JPanel {
             retryTimer.setRepeats(false);
             retryTimer.start();
         } else {
-            System.out.println("🔄 AI无法找到有效移动，启用兜底方案");
-            ExceptionHandler.logWarning("AI无法移动，游戏可能结束", "游戏逻辑");
+            System.out.println("🔄 AI多次未找到有效移动，处理游戏结束逻辑...");
+            ExceptionHandler.logWarning("AI无法移动，检查游戏结束条件", "游戏逻辑");
+            handleAINoValidMoveGameEnd();
+        }
+    }
+    
+    /**
+     * 处理AI无法找到有效走法时的游戏结束逻辑
+     */
+    private void handleAINoValidMoveGameEnd() {
+        System.out.println("🎯 AI无法找到有效走法，检查游戏结束条件...");
+        addAILog("system", "AI无法找到有效走法，正在检查游戏状态...");
+        
+        try {
+            // 首先检查当前游戏状态
+            gameState = board.checkGameState(currentPlayer);
+            
+            // 如果游戏状态表明游戏已经结束，直接处理
+            if (gameState != GameState.PLAYING && gameState != GameState.IN_CHECK) {
+                System.out.println("📋 游戏状态已确定: " + gameState);
+                addAILog("system", "游戏结束状态: " + gameState);
+                
+                // 播放胜利音效
+                SoundPlayer.getInstance().playSound("game_win");
+                
+                // 检查并显示游戏结束画面
+                checkGameEnd();
+                return;
+            }
+            
+            // 如果游戏状态显示还在进行，但AI无法找到走法，说明AI可能遇到问题
+            // 这种情况下，宣布AI败负
+            System.out.println("🏆 AI无法找到有效走法，判定对方获胜");
+            String winnerColorName = (currentPlayer == PieceColor.RED) ? "黑方" : "红方";
+            PieceColor winnerColor = (currentPlayer == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
+            
+            // 设置游戏状态为对方获胜
+            gameState = (winnerColor == PieceColor.RED) ? GameState.RED_WINS : GameState.BLACK_WINS;
+            
+            // 记录游戏结束原因
+            String aiColorName = (currentPlayer == PieceColor.RED) ? "红方" : "黑方";
+            addAILog("game_end", aiColorName + "AI无法找到有效走法，" + winnerColorName + "获胜！");
+            System.out.println("🎊 游戏结束: " + aiColorName + "AI无法走棋，" + winnerColorName + "获胜！");
+            
+            // 播放胜利音效
+            SoundPlayer.getInstance().playSound("game_win");
+            
+            // 显示游戏结束画面
+            SwingUtilities.invokeLater(() -> {
+                showGameEndDialog(winnerColorName + "获胜！");
+                updateStatus();
+            });
+            
+        } catch (Exception e) {
+            System.err.println("❌ 处理AI无效走法游戏结束逻辑失败: " + e.getMessage());
+            ExceptionHandler.handleException(e, "AI游戏结束处理");
+            
+            // 作为最后的兜底，尝试原有的兜底方案
             handleAIFallback();
         }
     }
@@ -2087,16 +2143,9 @@ public class BoardPanel extends JPanel {
                 // 向用户显示AI已完成思考，不暴露是兜底方案
                 addAILog("success", "AI移动完成");
             } else {
-                // 如果连随机移动都找不到，说明游戏可能已经结束
-                System.out.println("⚠️ 无法生成任何有效移动，检查游戏状态");
-                gameState = board.checkGameState(currentPlayer);
-                
-                if (gameState == GameState.PLAYING) {
-                    // 如果游戏状态显示还在进行，但找不到移动，可能是bug
-                    System.out.println("❌ 游戏状态异常，强制切换玩家");
-                    currentPlayer = (currentPlayer == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
-                    updateStatus();
-                }
+                // 如果连随机移动都找不到，说明游戏真的已经结束
+                System.out.println("⚠️ 无法生成任何有效移动，处理游戏结束");
+                handleAINoValidMoveGameEnd();
             }
         } catch (Exception e) {
             System.out.println("❌ 兜底方案执行失败: " + e.getMessage());
@@ -4064,15 +4113,17 @@ public class BoardPanel extends JPanel {
      * 计算棋盘面板的合理大小
      * 确保棋盘有足够的空间显示完整的棋盘和坐标
      */
-    private Dimension calculateBoardSize() {
-        // 计算棋盘本身的大小：8列 × 9行 的格子
-        int boardWidth = 8 * CELL_SIZE;
-        int boardHeight = 9 * CELL_SIZE;
+    public Dimension calculateBoardSize() {
+        // 计算棋盘本身的大小：9列 × 10行 的格子
+        // 中国象棋棋盘是9条纵线，10条横线，形成8×9的格子
+        // 但为了显示棋盘线条，我们需要9×10的空间
+        int boardWidth = 8 * CELL_SIZE;   // 8个格子宽度
+        int boardHeight = 9 * CELL_SIZE;  // 9个格子高度
         
         // 加上边距：左右各MARGIN，上下各MARGIN
         // 还要加上坐标显示的额外空间
-        int totalWidth = boardWidth + 2 * MARGIN + 40; // 额外40像素用于坐标显示
-        int totalHeight = boardHeight + 2 * MARGIN + 80; // 额外80像素用于坐标显示
+        int totalWidth = boardWidth + 2 * MARGIN;
+        int totalHeight = boardHeight + 2 * MARGIN;
         
         // 确保最小尺寸
         int minWidth = Math.max(totalWidth, 600);
