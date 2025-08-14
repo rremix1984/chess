@@ -31,6 +31,7 @@ public class GoChatPanel extends JPanel {
     // 围棋引擎引用
     private KataGoAI katagoEngine;
     private GoGame currentGame;
+    private GoBoardPanel boardPanel; // 棋盘面板引用
     
     public GoChatPanel() {
         initializeUI();
@@ -223,6 +224,13 @@ public class GoChatPanel extends JPanel {
     }
     
     /**
+     * 设置棋盘面板引用
+     */
+    public void setBoardPanel(GoBoardPanel boardPanel) {
+        this.boardPanel = boardPanel;
+    }
+    
+    /**
      * 发送消息
      */
     private void sendMessage() {
@@ -318,6 +326,14 @@ public class GoChatPanel extends JPanel {
             
             System.out.println("🎯 KataGo建议移动: " + nextMove);
             
+            // 在棋盘上显示AI建议的位置
+            if (boardPanel != null && nextMovePos != null) {
+                SwingUtilities.invokeLater(() -> {
+                    boardPanel.setSuggestedMove(nextMovePos);
+                    System.out.println("🎯 已在棋盘上标记建议位置: (" + nextMovePos.row + ", " + nextMovePos.col + ")");
+                });
+            }
+            
             StringBuilder analysis = new StringBuilder();
             analysis.append("💡 推荐落子: ").append(nextMove).append("\n");
             
@@ -335,6 +351,7 @@ public class GoChatPanel extends JPanel {
             analysis.append("• 这是基于KataGo神经网络的深度分析\n");
             analysis.append("• 考虑了全局形势和局部战术\n");
             analysis.append("• 建议结合实际棋力调整策略\n");
+            analysis.append("• 推荐位置已在棋盘上高亮显示\n");
             
             return analysis.toString();
         } catch (Exception e) {

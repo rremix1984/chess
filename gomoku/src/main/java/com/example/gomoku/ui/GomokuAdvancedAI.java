@@ -1,6 +1,8 @@
 package com.example.gomoku.ui;
 
 import com.example.gomoku.core.GomokuBoard;
+import com.example.gomoku.ai.ThreatDetector;
+import com.example.gomoku.ai.ThreatDetector.ThreatInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,13 +38,40 @@ public class GomokuAdvancedAI {
     public int[] getNextMove(GomokuBoard board) {
         thinking = "🤖 高级AI正在思考...\n";
         
-        // 根据难度设置搜索深度
-        int searchDepth = getSearchDepth();
-        thinking += "搜索深度: " + searchDepth + "层\n";
-        
         long startTime = System.currentTimeMillis();
         
-        // 使用Minimax算法配合Alpha-Beta剪枝
+        char currentPlayer = board.isBlackTurn() ? GomokuBoard.BLACK : GomokuBoard.WHITE;
+        char opponent = board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK;
+        
+        // 首先使用威胁检测系统进行快速分析
+        thinking += "⚙️ 正在分析威胁模式...\n";
+        
+        // 1. 检查直接获胜走法
+        ThreatInfo winMove = ThreatDetector.findBestAttackMove(board, currentPlayer);
+        if (winMove != null && winMove.level >= ThreatDetector.THREAT_FOUR_OPEN) {
+            thinking += "🏆 找到必胜走法：" + winMove.description + "\n";
+            return new int[]{winMove.row, winMove.col};
+        }
+        
+        // 2. 检查需要防守的紧急威胁
+        ThreatInfo defenseMove = ThreatDetector.findBestDefenseMove(board, currentPlayer);
+        if (defenseMove != null && defenseMove.level >= ThreatDetector.THREAT_FOUR_HALF) {
+            thinking += "🛡️ 找到紧急防守走法：防守" + defenseMove.description + "\n";
+            return new int[]{defenseMove.row, defenseMove.col};
+        }
+        
+        // 3. 检查双重威胁机会
+        List<int[]> doubleThreatMoves = findDoubleThreatMoves(board, currentPlayer);
+        if (!doubleThreatMoves.isEmpty()) {
+            thinking += "⚡ 找到双重威胁机会！\n";
+            return doubleThreatMoves.get(0);
+        }
+        
+        // 4. 如果没有紧急情况，使用Minimax算法进行深度搜索
+        int searchDepth = getSearchDepth();
+        thinking += "搜索深度: " + searchDepth + "层\n";
+        thinking += "正在使用Minimax算法进行深度分析...\n";
+        
         MinimaxResult result = minimax(board, searchDepth, -INFINITY, INFINITY, true);
         
         long endTime = System.currentTimeMillis();
@@ -56,6 +85,26 @@ public class GomokuAdvancedAI {
         }
         
         return result.bestMove;
+    }
+    
+    /**
+     * 寻找双重威胁走法
+     */
+    private List<int[]> findDoubleThreatMoves(GomokuBoard board, char player) {
+        List<int[]> doubleThreatMoves = new ArrayList<>();
+        
+        // 检查每个空位置是否能形成双重威胁
+        for (int row = 0; row < GomokuBoard.BOARD_SIZE; row++) {
+            for (int col = 0; col < GomokuBoard.BOARD_SIZE; col++) {
+                if (board.getPiece(row, col) == ' ' && hasNeighbor(board, row, col)) {
+                    if (ThreatDetector.hasDoubleThreat(board, row, col, player)) {
+                        doubleThreatMoves.add(new int[]{row, col});
+                    }
+                }
+            }
+        }
+        
+        return doubleThreatMoves;
     }
     
     /**

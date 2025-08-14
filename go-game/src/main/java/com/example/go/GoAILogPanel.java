@@ -389,19 +389,26 @@ public class GoAILogPanel extends JPanel {
     }
     
     /**
-     * 添加AI思考过程日志
+     * 添加AI思考过程日志（简化版）
      */
     public void logAIThinking(String message) {
-        addLogEntry("🧠 " + message, LogLevel.HIGHLIGHT);
+        // 只记录关键思考信息，过滤掉过于详细的分析
+        if (message.contains("开始分析") || message.contains("胜率") || message.contains("推荐变化")) {
+            addLogEntry("🧠 " + message, LogLevel.HIGHLIGHT);
+        }
     }
     
     /**
-     * 添加AI决策日志
+     * 添加AI决策日志（简化版）
      */
     public void logAIDecision(String move, long thinkTime, String analysis) {
-        addLogEntry(String.format("🎯 决策: %s (用时: %dms)", move, thinkTime), LogLevel.INFO);
-        if (analysis != null && !analysis.isEmpty()) {
-            addLogEntry("📊 分析: " + analysis, LogLevel.DEBUG);
+        // 简化决策日志，只显示最终结果
+        String timeStr = thinkTime > 1000 ? String.format("%.1fs", thinkTime / 1000.0) : thinkTime + "ms";
+        addLogEntry(String.format("🎯 %s (%s)", move, timeStr), LogLevel.INFO);
+        
+        // 只在分析包含胜率信息时显示
+        if (analysis != null && analysis.contains("胜率")) {
+            addLogEntry("📊 " + analysis, LogLevel.DEBUG);
         }
     }
     
@@ -409,7 +416,19 @@ public class GoAILogPanel extends JPanel {
      * 添加引擎状态日志
      */
     public void logEngineStatus(String status) {
-        addLogEntry("⚙️ 引擎: " + status, LogLevel.INFO);
+        // 只记录重要的引擎状态变化
+        if (!status.contains("思考中") && !status.contains("计算")) {
+            addLogEntry("⚙️ " + status, LogLevel.INFO);
+        }
+    }
+    
+    /**
+     * 添加简化的游戏状态日志
+     */
+    public void logGameMove(String player, String move, String aiType) {
+        String icon = player.contains("黑") ? "⚫" : "⚪";
+        String typeInfo = aiType != null ? " (" + aiType + ")" : "";
+        addLogEntry(String.format("%s %s: %s%s", icon, player, move, typeInfo), LogLevel.INFO);
     }
     
     /**

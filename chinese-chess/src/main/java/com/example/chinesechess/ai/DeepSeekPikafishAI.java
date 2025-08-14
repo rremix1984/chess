@@ -124,30 +124,13 @@ public class DeepSeekPikafishAI {
             System.out.println("⚠️ 真实Pikafish引擎初始化失败，尝试使用模拟引擎");
             addToAILog("真实Pikafish引擎初始化失败，尝试使用模拟引擎");
             
-            // 尝试使用模拟引擎
-            try {
-                String mockEnginePath = "python3 " + System.getProperty("user.dir") + "/pikafish_mock.py";
-                System.out.println("🔄 尝试初始化模拟引擎: " + mockEnginePath);
-                addToAILog("尝试初始化模拟引擎: " + mockEnginePath);
-                
-                this.pikafishEngine = new PikafishEngine(mockEnginePath);
-                this.pikafishEngine.setLogCallback(this::addToAILog);
-                
-                System.out.println("🔄 开始初始化模拟引擎...");
-                addToAILog("开始初始化模拟引擎...");
-                
-                if (this.pikafishEngine.initialize()) {
-                    System.out.println("✅ 模拟Pikafish引擎初始化成功");
-                    addToAILog("模拟Pikafish引擎初始化成功");
-                } else {
-                    System.err.println("❌ 模拟引擎也初始化失败，将使用备用AI");
-                    addToAILog("模拟引擎也初始化失败，将使用备用AI");
-                }
-            } catch (Exception e) {
-                System.err.println("❌ 创建模拟引擎失败: " + e.getMessage());
-                addToAILog("创建模拟引擎失败: " + e.getMessage());
-                e.printStackTrace();
-            }
+            // Pikafish不可用时会自动使用备用AI
+            System.out.println("⚠️ Pikafish引擎不可用，将使用增强AI作为备用方案");
+            addToAILog("Pikafish引擎不可用，将使用增强AI作为备用方案");
+            addToAILog("💡 提示：请参考 PIKAFISH_INSTALL.md 安装 Pikafish 引擎");
+            
+            // 不要将引擎设置为null，保持引用但标记为不可用
+            // this.pikafishEngine = null; // 移除这行，避免空指针异常
         }
     }
     
@@ -883,6 +866,160 @@ public class DeepSeekPikafishAI {
             System.err.println("❌ Pikafish评估失败: " + e.getMessage());
             return "❌ 抱歉，Pikafish引擎暂时无法分析当前棋局。请检查引擎状态。";
         }
+    }
+    
+    /**
+     * 评估棋局并获取推荐走法的详细信息（包含位置坐标）
+     * @param board 棋盘
+     * @param playerColor 玩家颜色
+     * @return 包含推荐走法详细信息的结果
+     */
+    public EvaluationResult evaluateGameWithDetails(Board board, PieceColor playerColor) {
+        try {
+            System.out.println("🔍 Pikafish开始详细评估棋局...");
+            
+            // 转换为FEN格式
+            String fen = FenConverter.boardToFen(board, playerColor);
+            
+            // 使用Pikafish引擎分析当前局面
+            String engineAnalysis = analyzePositionWithPikafish(fen, 2000);
+            
+            // 获取多个候选走法
+            List<String> candidateMoves = getCandidateMovesFromPikafish(fen, 3);
+            
+            // 创建评估结果
+            EvaluationResult result = new EvaluationResult();
+            result.setEngineAnalysis(engineAnalysis);
+            result.setEvaluation(parseEngineEvaluation(engineAnalysis));
+            
+            // 解析推荐走法
+            List<RecommendedMove> recommendedMoves = new ArrayList<>();
+            if (candidateMoves != null && !candidateMoves.isEmpty()) {
+                for (int i = 0; i < candidateMoves.size(); i++) {
+                    String uciMove = candidateMoves.get(i);
+                    RecommendedMove recMove = parseRecommendedMove(uciMove, board, i + 1);
+                    if (recMove != null) {
+                        recommendedMoves.add(recMove);
+                    }
+                }
+            }
+            result.setRecommendedMoves(recommendedMoves);
+            
+            // 生成文本报告
+            StringBuilder advice = new StringBuilder();
+            advice.append("🐟 **Pikafish引擎分析报告**\n\n");
+            
+            if (result.getEvaluation() != null && !result.getEvaluation().isEmpty()) {
+                advice.append("📊 **局面评估**：\n");
+                advice.append(result.getEvaluation()).append("\n\n");
+            }
+            
+            if (!recommendedMoves.isEmpty()) {
+                advice.append("🎯 **推荐走法**：\n");
+                for (RecommendedMove recMove : recommendedMoves) {
+                    advice.append(String.format("%d. %s (%s)\n", 
+                        recMove.getRank(), recMove.getDescription(), recMove.getUciMove()));
+                }
+                advice.append("\n");
+            }
+            
+            advice.append("💡 **战术建议**：\n");
+            advice.append(generateTacticalAdvice(engineAnalysis, candidateMoves, board, playerColor));
+            
+            result.setAdviceText(advice.toString());
+            
+            return result;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Pikafish详细评估失败: " + e.getMessage());
+            EvaluationResult errorResult = new EvaluationResult();
+            errorResult.setAdviceText("❌ 抱歉，Pikafish引擎暂时无法分析当前棋局。请检查引擎状态。");
+            return errorResult;
+        }
+    }
+    
+    /**
+     * 解析推荐走法，转换为包含位置坐标的对象
+     */
+    private RecommendedMove parseRecommendedMove(String uciMove, Board board, int rank) {
+        try {
+            Position[] positions = FenConverter.uciToMove(uciMove);
+            if (positions != null && positions.length == 2) {
+                Position startPos = positions[0];
+                Position endPos = positions[1];
+                
+                // 验证位置有效性
+                if (isValidPosition(startPos) && isValidPosition(endPos)) {
+                    String description = describeMoveInChinese(uciMove, board);
+                    
+                    RecommendedMove recMove = new RecommendedMove();
+                    recMove.setUciMove(uciMove);
+                    recMove.setStartPosition(startPos);
+                    recMove.setEndPosition(endPos);
+                    recMove.setDescription(description);
+                    recMove.setRank(rank);
+                    
+                    return recMove;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ 解析推荐走法失败: " + uciMove + ", " + e.getMessage());
+        }
+        return null;
+    }
+    
+    /**
+     * 推荐走法数据类
+     */
+    public static class RecommendedMove {
+        private String uciMove;
+        private Position startPosition;
+        private Position endPosition;
+        private String description;
+        private int rank;
+        
+        // Getters and setters
+        public String getUciMove() { return uciMove; }
+        public void setUciMove(String uciMove) { this.uciMove = uciMove; }
+        
+        public Position getStartPosition() { return startPosition; }
+        public void setStartPosition(Position startPosition) { this.startPosition = startPosition; }
+        
+        public Position getEndPosition() { return endPosition; }
+        public void setEndPosition(Position endPosition) { this.endPosition = endPosition; }
+        
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+        
+        public int getRank() { return rank; }
+        public void setRank(int rank) { this.rank = rank; }
+    }
+    
+    /**
+     * 评估结果数据类
+     */
+    public static class EvaluationResult {
+        private String engineAnalysis;
+        private String evaluation;
+        private List<RecommendedMove> recommendedMoves;
+        private String adviceText;
+        
+        public EvaluationResult() {
+            this.recommendedMoves = new ArrayList<>();
+        }
+        
+        // Getters and setters
+        public String getEngineAnalysis() { return engineAnalysis; }
+        public void setEngineAnalysis(String engineAnalysis) { this.engineAnalysis = engineAnalysis; }
+        
+        public String getEvaluation() { return evaluation; }
+        public void setEvaluation(String evaluation) { this.evaluation = evaluation; }
+        
+        public List<RecommendedMove> getRecommendedMoves() { return recommendedMoves; }
+        public void setRecommendedMoves(List<RecommendedMove> recommendedMoves) { this.recommendedMoves = recommendedMoves; }
+        
+        public String getAdviceText() { return adviceText; }
+        public void setAdviceText(String adviceText) { this.adviceText = adviceText; }
     }
     
     /**

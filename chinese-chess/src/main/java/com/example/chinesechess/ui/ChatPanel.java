@@ -34,6 +34,7 @@ public class ChatPanel extends JPanel {
     // 移除了五子棋棋盘引用
     private JComboBox<String> pikafishDifficultyComboBox; // Pikafish难度选择
     // 棋盘面板引用已移除，简化实现
+    private Object boardPanel; // 棋盘面板引用，用于显示推荐走法标记
     private String modelName;
     private boolean isEnabled;
     
@@ -741,7 +742,7 @@ public class ChatPanel extends JPanel {
     }
     
     /**
-     * 请求Pikafish引擎评估当前棋局
+     * 请求Pikafish评估
      */
     private void requestPikafishEvaluation() {
         if (!isEnabled || board == null) {
@@ -780,13 +781,20 @@ public class ChatPanel extends JPanel {
                     com.example.chinesechess.core.PieceColor currentPlayer = com.example.chinesechess.core.PieceColor.RED;
                     // 注意：Board类没有getCurrentPlayer方法，这里使用默认的红方颜色
                     
-                    String evaluation = analyzer.evaluateGameAndGiveAdvice((com.example.chinesechess.core.Board) board, currentPlayer);
+                    // 使用新的详细评估方法
+                    com.example.chinesechess.ai.DeepSeekPikafishAI.EvaluationResult result = 
+                        analyzer.evaluateGameWithDetails((com.example.chinesechess.core.Board) board, currentPlayer);
                     
                     SwingUtilities.invokeLater(() -> {
                         removeThinkingMessage();
-                        if (evaluation != null && !evaluation.trim().isEmpty()) {
-                            appendAIMessage("🐟 Pikafish引擎分析：\n\n" + evaluation + "\n\n💡 提示：以上分析由专业的Pikafish引擎提供，包含精确的局面评估和最佳走法推荐。");
-                            System.out.println("Pikafish评估完成");
+                        if (result != null && result.getAdviceText() != null && !result.getAdviceText().trim().isEmpty()) {
+                            // 显示评估结果
+                            appendAIMessage("🐟 Pikafish引擎分析：\n\n" + result.getAdviceText() + "\n\n💡 提示：以上分析由专业的Pikafish引擎提供，包含精确的局面评估和最佳走法推荐。");
+                            
+                            // 显示推荐走法的视觉标记
+                            showRecommendedMoveHighlights(result);
+                            
+                            System.out.println("Pikafish评估完成，推荐走法数量: " + result.getRecommendedMoves().size());
                         } else {
                             appendErrorMessage("🐟 Pikafish引擎：抱歉，无法获取有效的评估结果。请确保引擎正常运行。");
                         }
@@ -817,6 +825,49 @@ public class ChatPanel extends JPanel {
     }
     
     /**
+     * 显示推荐走法的视觉标记
+     */
+    private void showRecommendedMoveHighlights(com.example.chinesechess.ai.DeepSeekPikafishAI.EvaluationResult result) {
+        if (result == null || result.getRecommendedMoves().isEmpty() || boardPanel == null) {
+            return;
+        }
+        
+        // 获取最佳推荐走法（排名第一的）
+        com.example.chinesechess.ai.DeepSeekPikafishAI.RecommendedMove bestMove = 
+            result.getRecommendedMoves().get(0);
+        
+        if (bestMove.getStartPosition() != null && bestMove.getEndPosition() != null) {
+            // 调用棋盘面板的AI建议标记功能
+            try {
+                // 通过反射调用BoardPanel的setAISuggestion方法
+                java.lang.reflect.Method setAISuggestionMethod = boardPanel.getClass().getMethod(
+                    "setAISuggestion", 
+                    com.example.chinesechess.core.Position.class, 
+                    com.example.chinesechess.core.Position.class
+                );
+                
+                setAISuggestionMethod.invoke(boardPanel, 
+                    bestMove.getStartPosition(), bestMove.getEndPosition());
+                
+                System.out.println("💡 显示推荐走法标记: " + bestMove.getDescription());
+                
+                // 在聊天面板中也添加一条提示消息
+                appendAIMessage("💡 **走法提示**: 棋盘上已用蓝色和绿色标记显示推荐走法：" + bestMove.getDescription() + 
+                              "\n🔹 蓝色圆圈标记需要移动的棋子\n🔸 绿色圆圈标记目标位置\n标记将在30秒后自动消失。");
+                
+            } catch (Exception e) {
+                System.err.println("❌ 无法显示推荐走法标记: " + e.getMessage());
+                // 降级方案：只在文字中提示
+                appendAIMessage("💡 **推荐走法**: " + bestMove.getDescription() + 
+                              " (起始位置: (" + (bestMove.getStartPosition().getX() + 1) + "," + 
+                              (bestMove.getStartPosition().getY() + 1) + ") → 目标位置: (" + 
+                              (bestMove.getEndPosition().getX() + 1) + "," + 
+                              (bestMove.getEndPosition().getY() + 1) + "))");
+            }
+        }
+    }
+    
+    /**
      * 处理Pikafish评估错误
      */
     private void handlePikafishEvaluationError(Throwable throwable) {
@@ -833,10 +884,11 @@ public class ChatPanel extends JPanel {
     }
     
     /**
-     * 设置棋盘面板引用（已简化）
+     * 设置棋盘面板引用
      */
     public void setBoardPanel(Object boardPanel) {
-        // 简化实现，不再依赖具体的BoardPanel类
+        this.boardPanel = boardPanel;
+        System.out.println("🎯 设置棋盘面板引用: " + (boardPanel != null ? boardPanel.getClass().getSimpleName() : "null"));
     }
     
     /**

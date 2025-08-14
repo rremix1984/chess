@@ -4,6 +4,9 @@ import com.example.internationalchess.ui.InternationalBoardPanel;
 import com.example.internationalchess.ui.ChatPanel;
 import com.example.internationalchess.ui.AILogPanel;
 import com.example.internationalchess.ui.StockfishLogPanel;
+import com.example.internationalchess.ai.StockfishAI;
+import com.example.internationalchess.core.InternationalChessBoard;
+import com.example.internationalchess.core.PieceColor;
 import com.example.common.utils.OllamaModelManager;
 
 import javax.swing.*;
@@ -453,35 +456,15 @@ public class InternationalChessFrame extends JFrame {
     }
 
     /**
-     * 初始化默认AI设置
+     * 初始化默认AI设置（不自动启用AI）
      */
     private void initializeDefaultAI() {
-        // 延迟执行，确保界面完全初始化
+        // 只设置默认选项，不自动启用AI
         SwingUtilities.invokeLater(() -> {
-            // 自动启用大模型AI
-            aiToggleButton.setText("禁用AI对弈");
-            playerColorComboBox.setEnabled(false);
-            difficultyComboBox.setEnabled(false);
-            aiTypeComboBox.setEnabled(false);
-            modelComboBox.setEnabled(false);
-
-            // 启用聊天面板
-            chatPanel.setEnabled(true);
-            String modelName = (String) modelComboBox.getSelectedItem();
-            chatPanel.setModelName(modelName);
-
-            // 实际启用AI并设置人类玩家颜色
-            boardPanel.setAIEnabled(true);
-            // 默认人类玩家为白方，AI为黑方
-            char humanColor = 'W'; // 白方
-            boardPanel.setHumanPlayer(humanColor);
-
-            // 设置AI类型为大模型AI
-            aiTypeComboBox.setSelectedIndex(2); // "大模型AI"
-            int difficulty = difficultyComboBox.getSelectedIndex() + 1; // 难度级别
-            boardPanel.setAIType("大模型AI", difficulty, modelName);
-
-            updateStatus("AI对弈已启用 - 大模型AI");
+            // 设置默认选择为Stockfish AI
+            aiTypeComboBox.setSelectedIndex(0); // "Stockfish"
+            difficultyComboBox.setSelectedIndex(2); // "困难"
+            updateStatus("国际象棋游戏已就绪，请选择游戏模式并点击'启用AI对弈'开始");
         });
     }
 
@@ -541,27 +524,67 @@ public class InternationalChessFrame extends JFrame {
      * 执行AI分析
      */
     private void performAIAnalysis() {
-        if (stockfishLogPanel != null) {
-            stockfishLogPanel.addAIDecision("📊 AI分析开始...");
-            
-            // 获取当前棋局信息
-            String currentPlayer = boardPanel.isWhiteTurn() ? "白方" : "黑方";
-            stockfishLogPanel.addAIDecision("当前轮到: " + currentPlayer);
-            
-            // 提供建议移动（简化版）
-            String[] suggestions = {
-                "建议1: 控制中心格子 (e4, d4, e5, d5)",
-                "建议2: 开发较小棋子 (马、象)",
-                "建议3: 保护国王安全 (王车易位)",
-                "建议4: 找寻战术机会 (双重攻击, 铉住等)"
-            };
-            
-            for (String suggestion : suggestions) {
-                stockfishLogPanel.addAIDecision("💡 " + suggestion);
+        if (stockfishLogPanel == null || boardPanel == null) {
+            return;
+        }
+        
+        // 在后台线程中进行分析，避免阻塞UI
+        SwingWorker<String, Void> analysisWorker = new SwingWorker<String, Void>() {
+            @Override
+            protected String doInBackground() throws Exception {
+                String bestMoveUci = null;
+                try {
+                    stockfishLogPanel.addAIDecision("📈 Stockfish AI分析开始...");
+                    
+                    // 创建一个Stockfish AI实例用于分析
+                    StockfishAI analysisAI = new StockfishAI("困难", null, stockfishLogPanel);
+                    
+                    // 等待引擎初始化
+                    Thread.sleep(1000);
+                    
+                    if (analysisAI.isReady()) {
+                        // 获取当前棋盘和玩家
+                        InternationalChessBoard currentBoard = boardPanel.getBoard();
+                        PieceColor currentPlayer = boardPanel.isWhiteTurn() ? PieceColor.WHITE : PieceColor.BLACK;
+                        
+                        // 先获取最佳移动用于视觉标记
+                        bestMoveUci = analysisAI.getBestMoveForVisualization(currentBoard, currentPlayer);
+                        
+                        // 然后执行详细分析
+                        analysisAI.analyzeCurrentPosition(currentBoard, currentPlayer);
+                    } else {
+                        stockfishLogPanel.addErrorLog("❌ Stockfish引擎未就绪，无法进行分析");
+                    }
+                    
+                    // 关闭分析AI实例
+                    analysisAI.shutdown();
+                    
+                } catch (Exception e) {
+                    stockfishLogPanel.addErrorLog("分析过程中出现错误: " + e.getMessage());
+                    e.printStackTrace();
+                }
+                return bestMoveUci;
             }
             
-            stockfishLogPanel.addAIDecision("🏆 分析完成！请根据建议考虑下一步移动。");
-        }
+            @Override
+            protected void done() {
+                try {
+                    String bestMove = get();
+                    if (bestMove != null && bestMove.length() >= 4) {
+                        // 在UI线程中设置视觉标记
+                        SwingUtilities.invokeLater(() -> {
+                            boardPanel.setAISuggestion(bestMove);
+                            stockfishLogPanel.addAIDecision("✨ 已标记建议移动位置");
+                        });
+                    }
+                    System.out.println("🏆 Stockfish分析完成");
+                } catch (Exception e) {
+                    System.err.println("处理分析结果时出错: " + e.getMessage());
+                }
+            }
+        };
+        
+        analysisWorker.execute();
     }
     
     public void updateStatus(String status) {

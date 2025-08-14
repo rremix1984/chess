@@ -123,30 +123,45 @@ public class GomokuBoard {
      */
     private void updateGameState(int row, int col) {
         char currentPiece = board[row][col];
+        System.out.println("🔍 检查获胜条件: 落子位置(" + row + ", " + col + "), 棋子类型: " + currentPiece);
         
         // 检查横向
-        if (checkLine(row, col, 0, 1, currentPiece)) {
+        int horizontalCount = countLine(row, col, 0, 1, currentPiece);
+        System.out.println("↔️ 横向连子数: " + horizontalCount);
+        if (horizontalCount >= 5) {
+            System.out.println("🏆 横向五子连珠！");
             gameState = currentPiece == BLACK ? GameState.BLACK_WINS : GameState.RED_WINS;
             return;
         }
         
         // 检查纵向
-        if (checkLine(row, col, 1, 0, currentPiece)) {
+        int verticalCount = countLine(row, col, 1, 0, currentPiece);
+        System.out.println("↕️ 纵向连子数: " + verticalCount);
+        if (verticalCount >= 5) {
+            System.out.println("🏆 纵向五子连珠！");
             gameState = currentPiece == BLACK ? GameState.BLACK_WINS : GameState.RED_WINS;
             return;
         }
         
-        // 检查左上到右下对角线
-        if (checkLine(row, col, 1, 1, currentPiece)) {
+        // 检查左上到右下对角線
+        int diagonal1Count = countLine(row, col, 1, 1, currentPiece);
+        System.out.println("↖️↘️ 对角線1连子数: " + diagonal1Count);
+        if (diagonal1Count >= 5) {
+            System.out.println("🏆 对角線1五子连珠！");
             gameState = currentPiece == BLACK ? GameState.BLACK_WINS : GameState.RED_WINS;
             return;
         }
         
-        // 检查右上到左下对角线
-        if (checkLine(row, col, 1, -1, currentPiece)) {
+        // 检查右上到左下对角線
+        int diagonal2Count = countLine(row, col, 1, -1, currentPiece);
+        System.out.println("↗️↙️ 对角線2连子数: " + diagonal2Count);
+        if (diagonal2Count >= 5) {
+            System.out.println("🏆 对角線2五子连珠！");
             gameState = currentPiece == BLACK ? GameState.BLACK_WINS : GameState.RED_WINS;
             return;
         }
+        
+        System.out.println("✅ 没有获胜，游戏继续...");
         
         // 检查是否和棋（棋盘已满）
         boolean isFull = true;
@@ -166,19 +181,19 @@ public class GomokuBoard {
     }
     
     /**
-     * 检查一条线上是否有五子连珠
+     * 計算一条線上的連續棋子數量
      * @param row 起始行
      * @param col 起始列
      * @param rowDelta 行方向增量
      * @param colDelta 列方向增量
-     * @param piece 棋子类型
-     * @return 是否有五子连珠
+     * @param piece 棋子類型
+     * @return 連續棋子數量
      */
-    private boolean checkLine(int row, int col, int rowDelta, int colDelta, char piece) {
-        // 计算连续棋子数量
-        int count = 1; // 当前位置已有一个棋子
+    private int countLine(int row, int col, int rowDelta, int colDelta, char piece) {
+        // 計算連續棋子數量
+        int count = 1; // 當前位置已有一個棋子
         
-        // 向一个方向检查
+        // 向一個方向检查
         int r = row + rowDelta;
         int c = col + colDelta;
         while (isValidPosition(r, c) && board[r][c] == piece) {
@@ -196,8 +211,20 @@ public class GomokuBoard {
             c -= colDelta;
         }
         
-        // 五子连珠
-        return count >= 5;
+        return count;
+    }
+    
+    /**
+     * 检查一条線上是否有五子連珠
+     * @param row 起始行
+     * @param col 起始列
+     * @param rowDelta 行方向增量
+     * @param colDelta 列方向增量
+     * @param piece 棋子類型
+     * @return 是否有五子連珠
+     */
+    private boolean checkLine(int row, int col, int rowDelta, int colDelta, char piece) {
+        return countLine(row, col, rowDelta, colDelta, piece) >= 5;
     }
     
     /**
@@ -464,6 +491,13 @@ public class GomokuBoard {
      */
     public void switchTurn() {
         isBlackTurn = !isBlackTurn;
+    }
+    
+    /**
+     * 获取棋盘大小
+     */
+    public int getBoardSize() {
+        return BOARD_SIZE;
     }
     
     /**

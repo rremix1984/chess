@@ -289,20 +289,8 @@ public class ConfigurationManager {
      * 获取Pikafish配置
      */
     public PikafishConfig getPikafishConfig() {
-        // 根据操作系统选择引擎路径
-        String osName = System.getProperty("os.name").toLowerCase();
-        String enginePath;
-        
-        if (osName.contains("windows")) {
-            enginePath = getString("pikafish.engine.path.windows");
-        } else if (osName.contains("linux")) {
-            enginePath = getString("pikafish.engine.path.linux");
-        } else {
-            enginePath = getString("pikafish.engine.path.default");
-        }
-        
         return new PikafishConfig(
-            enginePath,
+            getString("pikafish.engine.path", "pikafish"),
             getString("pikafish.engine.neural.network.path"),
             getInt("pikafish.engine.threads", 2),
             getInt("pikafish.engine.hash.size", 64)

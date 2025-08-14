@@ -357,62 +357,198 @@ public class GomokuBoardPanel extends JPanel {
     }
     
     /**
-     * 绘制棋子
+     * 绘制棋子（专业立体效果 - 参考国际象棋和围棋）
      */
     private void drawPiece(Graphics2D g2d, int row, int col, char piece) {
-        int x = MARGIN + col * CELL_SIZE - PIECE_SIZE / 2;
-        int y = MARGIN + row * CELL_SIZE - PIECE_SIZE / 2;
+        int centerX = MARGIN + col * CELL_SIZE;
+        int centerY = MARGIN + row * CELL_SIZE;
+        int pieceRadius = PIECE_SIZE / 2;
+        int x = centerX - pieceRadius;
+        int y = centerY - pieceRadius;
         
         // 保存原始状态
         Composite originalComposite = g2d.getComposite();
         Stroke originalStroke = g2d.getStroke();
+        Paint originalPaint = g2d.getPaint();
         
-        // 绘制棋子阴影
-        g2d.setColor(new Color(0, 0, 0, 50));
-        g2d.fillOval(x + 2, y + 2, PIECE_SIZE, PIECE_SIZE);
+        // 绘制环境阴影（多层柔和阴影）
+        drawEnvironmentShadow(g2d, centerX, centerY, PIECE_SIZE);
         
-        // 设置棋子基本颜色
         if (piece == GomokuBoard.BLACK) {
-            // 黑子 - 使用渐变色增加立体感
-            Paint originalPaint = g2d.getPaint();
-            RadialGradientPaint blackGradient = new RadialGradientPaint(
-                x + PIECE_SIZE / 3, y + PIECE_SIZE / 3, PIECE_SIZE,
-                new float[]{0.1f, 0.3f, 1.0f},
-                new Color[]{new Color(90, 90, 90), new Color(40, 40, 40), Color.BLACK}
-            );
-            g2d.setPaint(blackGradient);
-            g2d.fillOval(x, y, PIECE_SIZE, PIECE_SIZE);
-            
-            // 添加高光
-            g2d.setColor(new Color(255, 255, 255, 80));
-            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.2f));
-            g2d.fillOval(x + PIECE_SIZE / 5, y + PIECE_SIZE / 5, PIECE_SIZE / 4, PIECE_SIZE / 4);
-            
-            // 恢复原始画笔
-            g2d.setPaint(originalPaint);
+            drawProfessionalBlackPiece(g2d, centerX, centerY, pieceRadius);
         } else {
-            // 白子 - 使用渐变色增加立体感
-            Paint originalPaint = g2d.getPaint();
-            RadialGradientPaint whiteGradient = new RadialGradientPaint(
-                x + PIECE_SIZE / 3, y + PIECE_SIZE / 3, PIECE_SIZE,
-                new float[]{0.1f, 0.3f, 1.0f},
-                new Color[]{Color.WHITE, new Color(240, 240, 240), new Color(210, 210, 210)}
-            );
-            g2d.setPaint(whiteGradient);
-            g2d.fillOval(x, y, PIECE_SIZE, PIECE_SIZE);
-            
-            // 为白子添加边框
-            g2d.setColor(new Color(120, 120, 120));
-            g2d.setStroke(new BasicStroke(1.0f));
-            g2d.drawOval(x, y, PIECE_SIZE, PIECE_SIZE);
-            
-            // 恢复原始画笔
-            g2d.setPaint(originalPaint);
+            drawProfessionalWhitePiece(g2d, centerX, centerY, pieceRadius);
         }
+        
+        // 绘制表面光照效果
+        drawSurfaceLighting(g2d, centerX, centerY, pieceRadius, piece == GomokuBoard.WHITE);
         
         // 恢复原始状态
         g2d.setComposite(originalComposite);
         g2d.setStroke(originalStroke);
+        g2d.setPaint(originalPaint);
+    }
+    
+    /**
+     * 绘制专业黑子（改进的深灰色而非纯黑）
+     */
+    private void drawProfessionalBlackPiece(Graphics2D g2d, int centerX, int centerY, int radius) {
+        int size = radius * 2;
+        int x = centerX - radius;
+        int y = centerY - radius;
+        
+        // 绘制深度阴影
+        g2d.setColor(new Color(0, 0, 0, 120));
+        g2d.fillOval(x + 3, y + 3, size, size);
+        
+        // 绘制次级阴影
+        g2d.setColor(new Color(0, 0, 0, 60));
+        g2d.fillOval(x + 1, y + 1, size, size);
+        
+        // 主体渐变（改善的黑棋颜色）
+        RadialGradientPaint blackGradient = new RadialGradientPaint(
+            centerX - radius/3, centerY - radius/3, radius,
+            new float[]{0f, 0.4f, 0.8f, 1f},
+            new Color[]{
+                new Color(130, 130, 135),  // 高光
+                new Color(100, 100, 105),  // 中间调
+                new Color(70, 70, 75),     // 暗部
+                new Color(50, 50, 55)      // 最暗部
+            }
+        );
+        g2d.setPaint(blackGradient);
+        g2d.fillOval(x, y, size, size);
+        
+        // 内部高光圈
+        g2d.setStroke(new BasicStroke(1f));
+        g2d.setColor(new Color(160, 160, 165, 100));
+        g2d.drawOval(x + 4, y + 4, size - 8, size - 8);
+        
+        // 主边框
+        g2d.setStroke(new BasicStroke(2f));
+        g2d.setColor(new Color(40, 40, 45));
+        g2d.drawOval(x, y, size, size);
+        
+        // 外边框高亮
+        g2d.setStroke(new BasicStroke(1f));
+        g2d.setColor(new Color(255, 255, 255, 40));
+        g2d.drawOval(x - 1, y - 1, size + 2, size + 2);
+    }
+    
+    /**
+     * 绘制专业白子
+     */
+    private void drawProfessionalWhitePiece(Graphics2D g2d, int centerX, int centerY, int radius) {
+        int size = radius * 2;
+        int x = centerX - radius;
+        int y = centerY - radius;
+        
+        // 绘制深度阴影
+        g2d.setColor(new Color(0, 0, 0, 120));
+        g2d.fillOval(x + 3, y + 3, size, size);
+        
+        // 绘制次级阴影
+        g2d.setColor(new Color(0, 0, 0, 60));
+        g2d.fillOval(x + 1, y + 1, size, size);
+        
+        // 主体渐变
+        RadialGradientPaint whiteGradient = new RadialGradientPaint(
+            centerX - radius/3, centerY - radius/3, radius,
+            new float[]{0f, 0.4f, 0.8f, 1f},
+            new Color[]{
+                Color.WHITE,                    // 高光
+                new Color(248, 248, 248),      // 中间调
+                new Color(235, 235, 235),      // 暗部
+                new Color(220, 220, 220)       // 最暗部
+            }
+        );
+        g2d.setPaint(whiteGradient);
+        g2d.fillOval(x, y, size, size);
+        
+        // 内部高光圈
+        g2d.setStroke(new BasicStroke(1f));
+        g2d.setColor(new Color(255, 255, 255, 150));
+        g2d.drawOval(x + 4, y + 4, size - 8, size - 8);
+        
+        // 主边框
+        g2d.setStroke(new BasicStroke(2f));
+        g2d.setColor(new Color(160, 160, 160));
+        g2d.drawOval(x, y, size, size);
+        
+        // 外边框高亮
+        g2d.setStroke(new BasicStroke(1f));
+        g2d.setColor(new Color(255, 255, 255, 80));
+        g2d.drawOval(x - 1, y - 1, size + 2, size + 2);
+    }
+    
+    /**
+     * 绘制环境阴影（柔和的远距离阴影）
+     */
+    private void drawEnvironmentShadow(Graphics2D g2d, int centerX, int centerY, int size) {
+        int radius = size / 2;
+        int shadowOffset = 4;
+        int shadowSize = size + 8;
+        
+        // 绘制多层环境阴影，创造柔和的阴影效果
+        for (int i = 3; i >= 0; i--) {
+            int shadowAlpha = 8 + i * 6; // 递减的透明度
+            int currentOffset = shadowOffset + i;
+            int currentSize = shadowSize + i * 2;
+            
+            g2d.setColor(new Color(0, 0, 0, shadowAlpha));
+            g2d.fillOval(
+                centerX - currentSize / 2 + currentOffset,
+                centerY - currentSize / 2 + currentOffset,
+                currentSize,
+                currentSize
+            );
+        }
+    }
+    
+    /**
+     * 绘制表面光照效果
+     */
+    private void drawSurfaceLighting(Graphics2D g2d, int centerX, int centerY, int radius, boolean isWhite) {
+        // 光源位置（左上方）
+        int lightX = centerX - radius / 2;
+        int lightY = centerY - radius / 2;
+        
+        // 绘制主要高光
+        RadialGradientPaint highlight = new RadialGradientPaint(
+            lightX, lightY, radius / 3,
+            new float[]{0f, 0.7f, 1f},
+            new Color[]{
+                new Color(255, 255, 255, isWhite ? 200 : 140),
+                new Color(255, 255, 255, isWhite ? 100 : 60),
+                new Color(255, 255, 255, 0)
+            }
+        );
+        g2d.setPaint(highlight);
+        g2d.fillOval(
+            lightX - radius / 3,
+            lightY - radius / 3,
+            (radius * 2) / 3,
+            (radius * 2) / 3
+        );
+        
+        // 绘制边缘光晕
+        g2d.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(new Color(255, 255, 255, isWhite ? 80 : 40));
+        g2d.drawOval(centerX - radius + 2, centerY - radius + 2, radius * 2 - 4, radius * 2 - 4);
+        
+        // 绘制反射光（底部右侧）
+        int reflectX = centerX + radius / 3;
+        int reflectY = centerY + radius / 3;
+        g2d.setColor(new Color(255, 255, 255, isWhite ? 60 : 30));
+        g2d.fillOval(
+            reflectX - radius / 6,
+            reflectY - radius / 6,
+            radius / 3,
+            radius / 3
+        );
+        
+        // 重置画笔
+        g2d.setStroke(new BasicStroke(1f));
     }
     
     /**
@@ -439,8 +575,9 @@ public class GomokuBoardPanel extends JPanel {
             initializeAI();
         }
         
-        // 如果启用AI且当前是AI回合，让AI走棋
-        if (enabled && ((isPlayerBlack && !board.isBlackTurn()) || (!isPlayerBlack && board.isBlackTurn()))) {
+        // 只在棋盘不为空且当前是AI回合时，让AI走棋
+        if (enabled && !isBoardEmpty() && 
+            ((isPlayerBlack && !board.isBlackTurn()) || (!isPlayerBlack && board.isBlackTurn()))) {
             SwingUtilities.invokeLater(this::makeAIMove);
         }
     }
@@ -502,6 +639,20 @@ public class GomokuBoardPanel extends JPanel {
     }
     
     /**
+     * 检查棋盘是否为空
+     */
+    private boolean isBoardEmpty() {
+        for (int row = 0; row < GomokuBoard.BOARD_SIZE; row++) {
+            for (int col = 0; col < GomokuBoard.BOARD_SIZE; col++) {
+                if (board.getPiece(row, col) != ' ') {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    
+    /**
      * 获取棋盘对象
      */
     public GomokuBoard getBoard() {
@@ -517,10 +668,8 @@ public class GomokuBoardPanel extends JPanel {
         repaint();
         updateStatus();
         
-        // 如果AI已启用且当前是AI回合，让AI走棋
-        if (aiEnabled && ((isPlayerBlack && !board.isBlackTurn()) || (!isPlayerBlack && board.isBlackTurn()))) {
-            SwingUtilities.invokeLater(this::makeAIMove);
-        }
+        // 重置时不自动让AI走棋，等待玩家先手
+        // 注意：五子棋黑棋先手，所以重置后应该是黑方下棋
     }
     
     /**

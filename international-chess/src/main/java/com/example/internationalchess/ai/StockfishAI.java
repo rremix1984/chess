@@ -165,6 +165,22 @@ public class StockfishAI {
     }
     
     /**
+     * 分析当前棋局并提供具体建议
+     */
+    public void analyzeCurrentPosition(InternationalChessBoard board, PieceColor currentPlayer) {
+        if (engine == null || !engine.isReady()) {
+            System.err.println("❌ Stockfish引擎未就绪");
+            if (logPanel != null) {
+                logPanel.addErrorLog("❌ Stockfish引擎未就绪，无法进行分析");
+            }
+            return;
+        }
+        
+        System.out.println("📈 开始分析当前棋局...");
+        engine.analyzePosition(board, currentPlayer);
+    }
+    
+    /**
      * 关闭AI引擎
      */
     public void shutdown() {
@@ -176,11 +192,17 @@ public class StockfishAI {
     }
     
     /**
-     * 析构函数 - 确保引擎正确关闭
+     * 获取最佳移动用于可视化标记（返回UCI格式）
      */
-    @Override
-    protected void finalize() throws Throwable {
-        shutdown();
-        super.finalize();
+    public String getBestMoveForVisualization(InternationalChessBoard board, PieceColor currentPlayer) {
+        if (engine == null || !engine.isReady()) {
+            System.err.println("❌ Stockfish引擎未就绪");
+            return null;
+        }
+        
+        return engine.getBestMoveForAnalysis(board, currentPlayer);
     }
+    
+    // 注意：不再使用finalize()方法，因为它会导致AI引擎过早关闭
+    // 请手动调用shutdown()方法来清理资源
 }

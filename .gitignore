@@ -60,11 +60,6 @@ test_output.log
 application-local.properties
 
 # 大文件排除
-*.nnue
 *.zip
 external/
 StreetFighterNew/
-
-# 引擎文件
-pikafish_engine/*/
-*.exe

@@ -85,17 +85,17 @@ public class GameConfig {
     }
     
     public String findNnueFile() {
-        // 首先检查您提供的具体路径
-        String specificPath = "/Users/wangxiaozhe/workspace/chinese-chess-game/international-chess/nn-1c0000000000.nnue";
-        if (Files.exists(Paths.get(specificPath))) {
-            return specificPath;
-        }
-        
         String fileName = properties.getProperty("nnue.file.name", "nn-1c0000000000.nnue");
-        String projectDir = properties.getProperty("nnue.project.dir", "international-chess");
         String userDir = properties.getProperty("nnue.user.dir", ".stockfish");
         
-        // 检查项目目录
+        // 优先检查用户主目录下的.stockfish目录
+        Path userPath = Paths.get(System.getProperty("user.home")).resolve(userDir).resolve(fileName);
+        if (Files.exists(userPath)) {
+            return userPath.toString();
+        }
+        
+        // 检查当前项目目录（为了向后兼容）
+        String projectDir = properties.getProperty("nnue.project.dir", "international-chess");
         Path projectPath = Paths.get(System.getProperty("user.dir")).resolve(projectDir).resolve(fileName);
         if (Files.exists(projectPath)) {
             return projectPath.toString();
@@ -106,12 +106,6 @@ public class GameConfig {
                               .resolve("chinese-chess-game").resolve(projectDir).resolve(fileName);
         if (Files.exists(rootProjectPath)) {
             return rootProjectPath.toString();
-        }
-        
-        // 检查用户目录
-        Path userPath = Paths.get(System.getProperty("user.home")).resolve(userDir).resolve(fileName);
-        if (Files.exists(userPath)) {
-            return userPath.toString();
         }
         
         System.out.println("警告: 未找到NNUE文件，将使用Stockfish默认评估");

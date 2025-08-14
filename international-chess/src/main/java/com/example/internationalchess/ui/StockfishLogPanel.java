@@ -94,56 +94,57 @@ public class StockfishLogPanel extends JPanel {
             
             // 解析不同类型的引擎输出
             if (output.startsWith("info depth")) {
-                // 搜索深度信息
+                // 只记录重要深度信息（深度 >= 10 且是5的倍数，或者最终深度）
                 String[] parts = output.split(" ");
-                StringBuilder info = new StringBuilder();
+                int depth = -1;
                 
+                // 先获取深度值
                 for (int i = 0; i < parts.length; i++) {
-                    String part = parts[i];
-                    switch (part) {
-                        case "depth":
-                            if (i + 1 < parts.length) {
-                                info.append("深度: ").append(parts[i + 1]).append(" ");
-                            }
-                            break;
-                        case "score":
-                            if (i + 2 < parts.length && "cp".equals(parts[i + 1])) {
-                                double score = Integer.parseInt(parts[i + 2]) / 100.0;
-                                info.append("评分: ").append(String.format("%.2f", score)).append(" ");
-                            } else if (i + 2 < parts.length && "mate".equals(parts[i + 1])) {
-                                info.append("将死: ").append(parts[i + 2]).append("步 ");
-                            }
-                            break;
-                        case "nodes":
-                            if (i + 1 < parts.length) {
-                                info.append("节点: ").append(parts[i + 1]).append(" ");
-                            }
-                            break;
-                        case "nps":
-                            if (i + 1 < parts.length) {
-                                long nps = Long.parseLong(parts[i + 1]);
-                                info.append("速度: ").append(String.format("%.1fK/s", nps / 1000.0)).append(" ");
-                            }
-                            break;
-                        case "time":
-                            if (i + 1 < parts.length) {
-                                info.append("时间: ").append(parts[i + 1]).append("ms ");
-                            }
-                            break;
-                        case "pv":
-                            // 主要变化
-                            StringBuilder pv = new StringBuilder("主线: ");
-                            for (int j = i + 1; j < Math.min(i + 6, parts.length); j++) {
-                                pv.append(parts[j]).append(" ");
-                            }
-                            info.append(pv.toString());
-                            break;
+                    if ("depth".equals(parts[i]) && i + 1 < parts.length) {
+                        try {
+                            depth = Integer.parseInt(parts[i + 1]);
+                        } catch (NumberFormatException e) {
+                            // 忽略解析错误
+                        }
+                        break;
                     }
                 }
                 
-                if (info.length() > 0) {
-                    String logEntry = String.format("[%s] 🧠 %s%n", timestamp, info.toString().trim());
-                    logArea.append(logEntry);
+                // 只记录重要深度：5的倍数且 >= 10
+                if (depth > 0 && (depth >= 10 && depth % 5 == 0)) {
+                    StringBuilder info = new StringBuilder();
+                    
+                    for (int i = 0; i < parts.length; i++) {
+                        String part = parts[i];
+                        switch (part) {
+                            case "depth":
+                                if (i + 1 < parts.length) {
+                                    info.append("深度: ").append(parts[i + 1]).append(" ");
+                                }
+                                break;
+                            case "score":
+                                if (i + 2 < parts.length && "cp".equals(parts[i + 1])) {
+                                    double score = Integer.parseInt(parts[i + 2]) / 100.0;
+                                    info.append("评分: ").append(String.format("%.2f", score)).append(" ");
+                                } else if (i + 2 < parts.length && "mate".equals(parts[i + 1])) {
+                                    info.append("将死: ").append(parts[i + 2]).append("步 ");
+                                }
+                                break;
+                            case "pv":
+                                // 主要变化（只显示前3步）
+                                StringBuilder pv = new StringBuilder("主线: ");
+                                for (int j = i + 1; j < Math.min(i + 4, parts.length); j++) {
+                                    pv.append(parts[j]).append(" ");
+                                }
+                                info.append(pv.toString().trim());
+                                break;
+                        }
+                    }
+                    
+                    if (info.length() > 0) {
+                        String logEntry = String.format("[%s] 🧠 %s%n", timestamp, info.toString().trim());
+                        logArea.append(logEntry);
+                    }
                 }
                 
             } else if (output.startsWith("bestmove")) {

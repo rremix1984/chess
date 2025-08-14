@@ -20,11 +20,15 @@ import java.util.function.Consumer;
 public class InternationalBoardPanel extends JPanel {
     
     private static final int BOARD_SIZE = 8;
-    private static final int CELL_SIZE = 70;
-    private static final Color LIGHT_COLOR = new Color(240, 217, 181);
-    private static final Color DARK_COLOR = new Color(181, 136, 99);
-    private static final Color SELECTED_COLOR = new Color(255, 255, 0, 128);
-    private static final Color POSSIBLE_MOVE_COLOR = new Color(0, 255, 0, 128);
+    private static final int CELL_SIZE = 80; // 增大格子尺寸
+    private static final Color LIGHT_COLOR = new Color(255, 206, 158); // 更加温暖的浅色
+    private static final Color DARK_COLOR = new Color(139, 69, 19); // 深棕色
+    private static final Color SELECTED_COLOR = new Color(0, 191, 255, 150); // 天蓝色高亮
+    private static final Color POSSIBLE_MOVE_COLOR = new Color(50, 205, 50, 100); // 绿色可移动提示
+    private static final Color AI_SUGGESTION_FROM_COLOR = new Color(255, 215, 0, 180); // AI建议起始位置（金色）
+    private static final Color AI_SUGGESTION_TO_COLOR = new Color(255, 69, 0, 150); // AI建议目标位置（橙红色）
+    private static final Color BORDER_COLOR = new Color(101, 67, 33); // 边框颜色
+    private static final Color PIECE_SHADOW_COLOR = new Color(0, 0, 0, 80); // 棋子阴影
     
     private InternationalChessBoard board;
     private int selectedRow = -1;
@@ -40,6 +44,13 @@ public class InternationalBoardPanel extends JPanel {
     private StockfishAIAdapter stockfishAI;
     private String aiType = "Stockfish";
     private int difficulty = 2; // 默认中等难度
+    
+    // AI建议移动的显示
+    private int aiSuggestionFromRow = -1;
+    private int aiSuggestionFromCol = -1;
+    private int aiSuggestionToRow = -1;
+    private int aiSuggestionToCol = -1;
+    private Timer aiSuggestionTimer; // 用于定时清除建议高亮
     
     public InternationalBoardPanel() {
         this.board = new InternationalChessBoard();
@@ -61,53 +72,465 @@ public class InternationalBoardPanel extends JPanel {
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         
         drawBoard(g2d);
+        drawAISuggestionHighlight(g2d);
         drawPieces(g2d);
         drawSelection(g2d);
     }
     
     private void drawBoard(Graphics2D g2d) {
+        // 启用高质量渲染
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_QUALITY);
+        
         for (int row = 0; row < BOARD_SIZE; row++) {
             for (int col = 0; col < BOARD_SIZE; col++) {
                 Color cellColor = (row + col) % 2 == 0 ? LIGHT_COLOR : DARK_COLOR;
-                g2d.setColor(cellColor);
-                g2d.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                 
-                // 绘制边框
-                g2d.setColor(Color.BLACK);
+                // 绘制木纹背景
+                drawWoodGrainCell(g2d, col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, cellColor);
+                
+                // 绘制精细边框
+                g2d.setStroke(new BasicStroke(1.5f));
+                g2d.setColor(BORDER_COLOR);
                 g2d.drawRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
             }
         }
+        
+        // 重置画笔
+        g2d.setStroke(new BasicStroke(1f));
+    }
+    
+    /**
+     * 绘制木纹纹理的格子
+     */
+    private void drawWoodGrainCell(Graphics2D g2d, int x, int y, int size, Color baseColor) {
+        // 绘制基本渐变背景
+        GradientPaint baseGradient = new GradientPaint(
+            x, y, baseColor.brighter(),
+            x + size, y + size, baseColor.darker()
+        );
+        g2d.setPaint(baseGradient);
+        g2d.fillRect(x, y, size, size);
+        
+        // 添加木纹纹理
+        drawWoodGrainTexture(g2d, x, y, size, baseColor);
+    }
+    
+    /**
+     * 绘制木纹纹理
+     */
+    private void drawWoodGrainTexture(Graphics2D g2d, int x, int y, int size, Color baseColor) {
+        // 保存原始状态
+        Stroke originalStroke = g2d.getStroke();
+        
+        // 绘制横向木纹线条
+        g2d.setStroke(new BasicStroke(0.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        
+        for (int i = 0; i < size; i += 8) {
+            // 创建随机木纹颜色
+            int alpha = 15 + (i % 25);
+            Color grainColor = new Color(
+                Math.max(0, Math.min(255, baseColor.getRed() - 20 + (i % 40))),
+                Math.max(0, Math.min(255, baseColor.getGreen() - 15 + (i % 30))),
+                Math.max(0, Math.min(255, baseColor.getBlue() - 10 + (i % 20))),
+                alpha
+            );
+            g2d.setColor(grainColor);
+            
+            // 绘制曲线木纹
+            int startY = y + i;
+            int endY = y + i;
+            int startX = x;
+            int endX = x + size;
+            
+            // 添加微妙的波浪效果
+            for (int segX = startX; segX < endX - 5; segX += 5) {
+                int wave1 = (int)(Math.sin((segX - x) * 0.1) * 1.5);
+                int wave2 = (int)(Math.sin((segX - x) * 0.05) * 0.8);
+                g2d.drawLine(segX, startY + wave1 + wave2, segX + 5, startY + wave1 + wave2);
+            }
+        }
+        
+        // 添加垂直木纹（较淡）
+        g2d.setStroke(new BasicStroke(0.3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        for (int i = 0; i < size; i += 12) {
+            Color verticalGrainColor = new Color(
+                baseColor.getRed(), baseColor.getGreen(), baseColor.getBlue(), 10
+            );
+            g2d.setColor(verticalGrainColor);
+            g2d.drawLine(x + i, y, x + i, y + size);
+        }
+        
+        // 恢复原始状态
+        g2d.setStroke(originalStroke);
     }
     
     private void drawPieces(Graphics2D g2d) {
-        g2d.setFont(new Font("Arial Unicode MS", Font.BOLD, 36));
+        // 使用更大的字体和更好的渲染
+        g2d.setFont(new Font("Arial Unicode MS", Font.BOLD, 48));
+        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         FontMetrics fm = g2d.getFontMetrics();
         
         for (int row = 0; row < BOARD_SIZE; row++) {
             for (int col = 0; col < BOARD_SIZE; col++) {
                 String piece = board.getPiece(row, col);
                 if (piece != null && !piece.trim().isEmpty()) {
-                    String symbol = getPieceSymbol(piece);
-                    if (!symbol.isEmpty()) {
-                        int x = col * CELL_SIZE + (CELL_SIZE - fm.stringWidth(symbol)) / 2;
-                        int y = row * CELL_SIZE + (CELL_SIZE + fm.getAscent()) / 2;
-                        
-                        // 设置棋子颜色
-                        if (piece.charAt(0) == 'W') {
-                            g2d.setColor(Color.WHITE);
-                            // 绘制黑色边框
-                            g2d.drawString(symbol, x-1, y-1);
-                            g2d.drawString(symbol, x-1, y+1);
-                            g2d.drawString(symbol, x+1, y-1);
-                            g2d.drawString(symbol, x+1, y+1);
-                            g2d.setColor(Color.BLACK);
-                        } else {
-                            g2d.setColor(Color.BLACK);
-                        }
-                        g2d.drawString(symbol, x, y);
-                    }
+                    drawProfessionalPiece(g2d, piece, col, row, fm);
                 }
             }
+        }
+    }
+    
+    /**
+     * 绘制专业的棋子（带立体效果）
+     */
+    private void drawProfessionalPiece(Graphics2D g2d, String piece, int col, int row, FontMetrics fm) {
+        String symbol = getPieceSymbol(piece);
+        if (symbol.isEmpty()) return;
+        
+        int centerX = col * CELL_SIZE + CELL_SIZE / 2;
+        int centerY = row * CELL_SIZE + CELL_SIZE / 2;
+        int pieceSize = (int)(CELL_SIZE * 0.7); // 棋子占格子70%
+        
+        boolean isWhite = piece.charAt(0) == 'W';
+        
+        // 绘制远距离阴影（环境光阴影）
+        drawEnvironmentShadow(g2d, centerX, centerY, pieceSize);
+        
+        // 绘制棋子底座（圆形或方形）
+        drawPieceBase(g2d, centerX, centerY, pieceSize, isWhite);
+        
+        // 绘制棋子符号
+        drawPieceSymbol(g2d, symbol, centerX, centerY, fm, isWhite);
+        
+        // 绘制高亮和阴影效果
+        drawPieceEffects(g2d, centerX, centerY, pieceSize, isWhite);
+        
+        // 绘制表面光照效果
+        drawSurfaceLighting(g2d, centerX, centerY, pieceSize, isWhite);
+    }
+    
+    /**
+     * 绘制棋子底座（专业版）
+     */
+    private void drawPieceBase(Graphics2D g2d, int centerX, int centerY, int size, boolean isWhite) {
+        int radius = size / 2;
+        
+        // 绘制深度阴影
+        g2d.setColor(new Color(0, 0, 0, 120));
+        g2d.fillOval(centerX - radius + 3, centerY - radius + 3, size, size);
+        
+        // 绘制次级阴影
+        g2d.setColor(new Color(0, 0, 0, 60));
+        g2d.fillOval(centerX - radius + 1, centerY - radius + 1, size, size);
+        
+        // 绘制主体（改进黑棋颜色）
+        Color baseColor, highlightColor, midColor;
+        if (isWhite) {
+            baseColor = new Color(248, 248, 248);
+            highlightColor = Color.WHITE;
+            midColor = new Color(240, 240, 240);
+        } else {
+            // 改善黑棋颜色：使用深灰色而非纯黑
+            baseColor = new Color(80, 80, 85);
+            highlightColor = new Color(130, 130, 135);
+            midColor = new Color(100, 100, 105);
+        }
+        
+        // 多层渐变效果
+        RadialGradientPaint radialGradient = new RadialGradientPaint(
+            centerX - radius/3, centerY - radius/3, radius,
+            new float[]{0f, 0.6f, 1f},
+            new Color[]{highlightColor, midColor, baseColor}
+        );
+        g2d.setPaint(radialGradient);
+        g2d.fillOval(centerX - radius, centerY - radius, size, size);
+        
+        // 绘制内部高亮圈
+        g2d.setStroke(new BasicStroke(1f));
+        g2d.setColor(new Color(255, 255, 255, isWhite ? 120 : 80));
+        g2d.drawOval(centerX - radius + 4, centerY - radius + 4, size - 8, size - 8);
+        
+        // 绘制主边框
+        g2d.setStroke(new BasicStroke(2f));
+        g2d.setColor(isWhite ? new Color(160, 160, 160) : new Color(40, 40, 45));
+        g2d.drawOval(centerX - radius, centerY - radius, size, size);
+        
+        // 绘制外边框高亮
+        g2d.setStroke(new BasicStroke(1f));
+        g2d.setColor(new Color(255, 255, 255, isWhite ? 100 : 60));
+        g2d.drawOval(centerX - radius - 1, centerY - radius - 1, size + 2, size + 2);
+        
+        // 重置画笔
+        g2d.setStroke(new BasicStroke(1f));
+    }
+    
+    /**
+     * 绘制棋子符号
+     */
+    private void drawPieceSymbol(Graphics2D g2d, String symbol, int centerX, int centerY, FontMetrics fm, boolean isWhite) {
+        int x = centerX - fm.stringWidth(symbol) / 2;
+        int y = centerY + fm.getAscent() / 2 - fm.getDescent();
+        
+        // 绘制符号阴影
+        g2d.setColor(new Color(0, 0, 0, 100));
+        g2d.drawString(symbol, x + 1, y + 1);
+        
+        // 绘制主符号
+        if (isWhite) {
+            // 白棋：黑色符号带白色边框
+            g2d.setColor(Color.WHITE);
+            g2d.drawString(symbol, x-1, y-1);
+            g2d.drawString(symbol, x-1, y+1);
+            g2d.drawString(symbol, x+1, y-1);
+            g2d.drawString(symbol, x+1, y+1);
+            g2d.setColor(new Color(20, 20, 20));
+            g2d.drawString(symbol, x, y);
+        } else {
+            // 黑棋：纯黑色符号
+            g2d.setColor(new Color(10, 10, 10));
+            g2d.drawString(symbol, x, y);
+        }
+    }
+    
+    /**
+     * 绘制环境阴影（远距离软阴影）
+     */
+    private void drawEnvironmentShadow(Graphics2D g2d, int centerX, int centerY, int size) {
+        int radius = size / 2;
+        int shadowOffset = 4;
+        int shadowSize = size + 8;
+        
+        // 绘制多层环境阴影，创造柔和的阴影效果
+        for (int i = 3; i >= 0; i--) {
+            int shadowAlpha = 8 + i * 4; // 递减的透明度
+            int currentOffset = shadowOffset + i;
+            int currentSize = shadowSize + i * 2;
+            
+            g2d.setColor(new Color(0, 0, 0, shadowAlpha));
+            g2d.fillOval(
+                centerX - currentSize / 2 + currentOffset,
+                centerY - currentSize / 2 + currentOffset,
+                currentSize,
+                currentSize
+            );
+        }
+    }
+    
+    /**
+     * 绘制表面光照效果
+     */
+    private void drawSurfaceLighting(Graphics2D g2d, int centerX, int centerY, int size, boolean isWhite) {
+        int radius = size / 2;
+        
+        // 光源位置（左上方）
+        int lightX = centerX - radius / 2;
+        int lightY = centerY - radius / 2;
+        
+        // 绘制主要高光
+        RadialGradientPaint highlight = new RadialGradientPaint(
+            lightX, lightY, radius / 3,
+            new float[]{0f, 0.7f, 1f},
+            new Color[]{
+                new Color(255, 255, 255, isWhite ? 180 : 120),
+                new Color(255, 255, 255, isWhite ? 80 : 40),
+                new Color(255, 255, 255, 0)
+            }
+        );
+        g2d.setPaint(highlight);
+        g2d.fillOval(
+            lightX - radius / 3,
+            lightY - radius / 3,
+            (radius * 2) / 3,
+            (radius * 2) / 3
+        );
+        
+        // 绘制边缘光晕
+        g2d.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(new Color(255, 255, 255, isWhite ? 60 : 30));
+        g2d.drawOval(centerX - radius + 2, centerY - radius + 2, size - 4, size - 4);
+        
+        // 绘制反射光（底部右侧）
+        int reflectX = centerX + radius / 3;
+        int reflectY = centerY + radius / 3;
+        g2d.setColor(new Color(255, 255, 255, isWhite ? 40 : 20));
+        g2d.fillOval(
+            reflectX - radius / 6,
+            reflectY - radius / 6,
+            radius / 3,
+            radius / 3
+        );
+        
+        // 重置画笔
+        g2d.setStroke(new BasicStroke(1f));
+    }
+    
+    /**
+     * 绘制棋子特效（高亮和阴影）
+     */
+    private void drawPieceEffects(Graphics2D g2d, int centerX, int centerY, int size, boolean isWhite) {
+        int radius = size / 2;
+        
+        // 绘制内部阴影（创造深度感）
+        g2d.setColor(new Color(0, 0, 0, isWhite ? 30 : 50));
+        g2d.fillOval(
+            centerX - radius + radius / 4,
+            centerY - radius + radius / 4,
+            size - radius / 2,
+            size - radius / 2
+        );
+        
+        // 绘制边缘高光
+        g2d.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(new Color(255, 255, 255, isWhite ? 100 : 50));
+        g2d.drawOval(centerX - radius + 3, centerY - radius + 3, size - 6, size - 6);
+        
+        // 重置画笔
+        g2d.setStroke(new BasicStroke(1f));
+    }
+    
+    /**
+     * 绘制AI建议移动高亮
+     */
+    private void drawAISuggestionHighlight(Graphics2D g2d) {
+        // 绘制AI建议的起始位置
+        if (aiSuggestionFromRow >= 0 && aiSuggestionFromCol >= 0) {
+            drawSuggestionCell(g2d, aiSuggestionFromCol, aiSuggestionFromRow, AI_SUGGESTION_FROM_COLOR, "★"); // 星号标记起始位置
+        }
+        
+        // 绘制AI建议的目标位置
+        if (aiSuggestionToRow >= 0 && aiSuggestionToCol >= 0) {
+            drawSuggestionCell(g2d, aiSuggestionToCol, aiSuggestionToRow, AI_SUGGESTION_TO_COLOR, "▶"); // 箭头标记目标位置
+        }
+        
+        // 绘制连接线
+        if (aiSuggestionFromRow >= 0 && aiSuggestionFromCol >= 0 &&
+            aiSuggestionToRow >= 0 && aiSuggestionToCol >= 0) {
+            drawSuggestionArrow(g2d, 
+                aiSuggestionFromCol * CELL_SIZE + CELL_SIZE / 2,
+                aiSuggestionFromRow * CELL_SIZE + CELL_SIZE / 2,
+                aiSuggestionToCol * CELL_SIZE + CELL_SIZE / 2,
+                aiSuggestionToRow * CELL_SIZE + CELL_SIZE / 2
+            );
+        }
+    }
+    
+    /**
+     * 绘制建议单元格
+     */
+    private void drawSuggestionCell(Graphics2D g2d, int col, int row, Color highlightColor, String symbol) {
+        int x = col * CELL_SIZE;
+        int y = row * CELL_SIZE;
+        
+        // 绘制高亮背景
+        g2d.setColor(highlightColor);
+        g2d.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+        
+        // 绘制装饰性边框
+        g2d.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(new Color(highlightColor.getRed(), highlightColor.getGreen(), highlightColor.getBlue(), 255));
+        g2d.drawRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+        
+        // 绘制中心标记符号
+        g2d.setFont(new Font("微软雅黑", Font.BOLD, 16));
+        FontMetrics fm = g2d.getFontMetrics();
+        int symbolX = x + (CELL_SIZE - fm.stringWidth(symbol)) / 2;
+        int symbolY = y + (CELL_SIZE + fm.getAscent() - fm.getDescent()) / 2;
+        
+        // 添加文本阴影效果
+        g2d.setColor(new Color(0, 0, 0, 150));
+        g2d.drawString(symbol, symbolX + 1, symbolY + 1);
+        
+        // 绘制主文本
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(symbol, symbolX, symbolY);
+        
+        // 重置画笔
+        g2d.setStroke(new BasicStroke(1f));
+    }
+    
+    /**
+     * 绘制建议移动箭头
+     */
+    private void drawSuggestionArrow(Graphics2D g2d, int fromX, int fromY, int toX, int toY) {
+        // 设置箭头样式
+        g2d.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(new Color(255, 140, 0, 200)); // 橙色箭头
+        
+        // 绘制主线条
+        g2d.drawLine(fromX, fromY, toX, toY);
+        
+        // 计算箭头角度
+        double angle = Math.atan2(toY - fromY, toX - fromX);
+        int arrowLength = 20;
+        double arrowAngle = Math.PI / 6; // 30度
+        
+        // 绘制箭头两侧
+        int x1 = (int)(toX - arrowLength * Math.cos(angle - arrowAngle));
+        int y1 = (int)(toY - arrowLength * Math.sin(angle - arrowAngle));
+        int x2 = (int)(toX - arrowLength * Math.cos(angle + arrowAngle));
+        int y2 = (int)(toY - arrowLength * Math.sin(angle + arrowAngle));
+        
+        g2d.drawLine(toX, toY, x1, y1);
+        g2d.drawLine(toX, toY, x2, y2);
+        
+    // 重置画笔
+        g2d.setStroke(new BasicStroke(1f));
+    }
+    
+    /**
+     * 设置AI建议的移动高亮
+     */
+    public void setAISuggestion(String move) {
+        clearAISuggestion(); // 先清除之前的建议
+        
+        if (move == null || move.length() < 4) {
+            return;
+        }
+        
+        try {
+            // 解析移动字符串，例如 "e2e4"
+            char fromFile = move.charAt(0);
+            int fromRank = Character.getNumericValue(move.charAt(1));
+            char toFile = move.charAt(2);
+            int toRank = Character.getNumericValue(move.charAt(3));
+            
+            // 转换为数组坐标（国际象棋坐标系：a1在左下角，a8在左上角）
+            aiSuggestionFromCol = fromFile - 'a';
+            aiSuggestionFromRow = 8 - fromRank;
+            aiSuggestionToCol = toFile - 'a';
+            aiSuggestionToRow = 8 - toRank;
+            
+            // 确保坐标在有效范围内
+            if (aiSuggestionFromRow >= 0 && aiSuggestionFromRow < 8 &&
+                aiSuggestionFromCol >= 0 && aiSuggestionFromCol < 8 &&
+                aiSuggestionToRow >= 0 && aiSuggestionToRow < 8 &&
+                aiSuggestionToCol >= 0 && aiSuggestionToCol < 8) {
+                
+                // 启动定时器，10秒后自动清除建议
+                if (aiSuggestionTimer != null) {
+                    aiSuggestionTimer.stop();
+                }
+                aiSuggestionTimer = new Timer(10000, e -> {
+                    clearAISuggestion();
+                    repaint();
+                });
+                aiSuggestionTimer.setRepeats(false);
+                aiSuggestionTimer.start();
+                
+                repaint();
+                
+                // 记录到日志
+                if (stockfishLogPanel != null) {
+                    String piece = board.getPiece(aiSuggestionFromRow, aiSuggestionFromCol);
+                    String pieceNameCh = piece != null ? getPieceNameChinese(piece.charAt(1)) : "棋子";
+                    stockfishLogPanel.addAIDecision("💡 建议移动: " + pieceNameCh + " " + 
+                        fromFile + fromRank + "→" + toFile + toRank);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("解析AI建议移动时出错: " + e.getMessage());
         }
     }
     
@@ -421,7 +844,7 @@ public class InternationalBoardPanel extends JPanel {
     }
     
     /**
-     * 记录AI决策信息
+     * 记录AI决策信息（精简版）
      */
     private void logAIDecision(String aiName, int[] move, String reason) {
         if (stockfishLogPanel == null) return;
@@ -432,12 +855,10 @@ public class InternationalBoardPanel extends JPanel {
         int toRank = 8 - move[2];
         String moveStr = "" + fromFile + fromRank + "→" + toFile + toRank;
         
-        stockfishLogPanel.addAIDecision(aiName + "决策: " + moveStr);
-        stockfishLogPanel.addAIDecision("原因: " + reason);
-        
-        // 分析移动价值
-        String analysis = analyzeMoveValue(move);
-        stockfishLogPanel.addAIDecision("移动分析: " + analysis);
+        // 简化日志：只记录关键信息
+        String piece = board.getPiece(move[0], move[1]);
+        String pieceNameCh = getPieceNameChinese(piece.charAt(1));
+        stockfishLogPanel.addAIDecision("🤖 " + pieceNameCh + " " + moveStr);
     }
     
     /**
@@ -787,5 +1208,110 @@ public class InternationalBoardPanel extends JPanel {
      */
     public GameState getGameState() {
         return board.getGameState();
+    }
+    
+    /**
+     * 获取棋盘对象
+     */
+    public InternationalChessBoard getBoard() {
+        return board;
+    }
+    
+    /**
+     * 显示AI建议移动
+     */
+    public void showAISuggestion(int fromRow, int fromCol, int toRow, int toCol) {
+        this.aiSuggestionFromRow = fromRow;
+        this.aiSuggestionFromCol = fromCol;
+        this.aiSuggestionToRow = toRow;
+        this.aiSuggestionToCol = toCol;
+        
+        // 停止之前的计时器
+        if (aiSuggestionTimer != null) {
+            aiSuggestionTimer.stop();
+        }
+        
+        // 设置5秒后清除建议高亮
+        aiSuggestionTimer = new Timer(5000, e -> {
+            clearAISuggestion();
+        });
+        aiSuggestionTimer.setRepeats(false);
+        aiSuggestionTimer.start();
+        
+        // 立即重绘以显示建议
+        repaint();
+        
+        // 生成建议描述
+        String piece = board.getPiece(fromRow, fromCol);
+        if (piece != null) {
+            String pieceNameCh = getPieceNameChinese(piece.charAt(1));
+            char fromFile = (char) ('a' + fromCol);
+            int fromRank = 8 - fromRow;
+            char toFile = (char) ('a' + toCol);
+            int toRank = 8 - toRow;
+            String moveStr = "" + fromFile + fromRank + "→" + toFile + toRank;
+            updateStatus("✨ AI建议: " + pieceNameCh + " " + moveStr);
+        }
+    }
+    
+    /**
+     * 清除AI建议移动高亮
+     */
+    public void clearAISuggestion() {
+        this.aiSuggestionFromRow = -1;
+        this.aiSuggestionFromCol = -1;
+        this.aiSuggestionToRow = -1;
+        this.aiSuggestionToCol = -1;
+        
+        if (aiSuggestionTimer != null) {
+            aiSuggestionTimer.stop();
+            aiSuggestionTimer = null;
+        }
+        
+        repaint();
+    }
+    
+    /**
+     * 获取AI建议移动（供外部调用）
+     */
+    public void requestAISuggestion() {
+        if (!aiEnabled || !isHumanTurn() || board.getGameState() != GameState.PLAYING) {
+            updateStatus("当前无法获取AI建议");
+            return;
+        }
+        
+        updateStatus("💭 正在获取AI建议...");
+        
+        // 在新线程中计算AI廊议
+        new SwingWorker<int[], Void>() {
+            @Override
+            protected int[] doInBackground() throws Exception {
+                try {
+                    if ("Stockfish".equals(aiType) && stockfishAI != null) {
+                        return stockfishAI.calculateNextMove(board);
+                    } else if (ai != null) {
+                        return ai.calculateNextMove(board);
+                    }
+                } catch (Exception e) {
+                    System.err.println("AI计算廚议时出错: " + e.getMessage());
+                }
+                return null;
+            }
+            
+            @Override
+            protected void done() {
+                try {
+                    int[] move = get();
+                    if (move != null && move.length == 4) {
+                        showAISuggestion(move[0], move[1], move[2], move[3]);
+                    } else {
+                        updateStatus("❌ AI无法提供廚议");
+                    }
+                } catch (Exception e) {
+                    updateStatus("❌ 获取AI廚议失败: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }.execute();
     }
 }

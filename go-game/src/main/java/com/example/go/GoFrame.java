@@ -123,6 +123,10 @@ public class GoFrame extends JFrame {
         // 创建聊天面板
         chatPanel = new GoChatPanel();
         
+        // 设置聊天面板的棋盘引用，以便显示视觉标记
+        chatPanel.setBoardPanel(boardPanel);
+        chatPanel.setCurrentGame(boardPanel.getGame());
+        
         // 状态标签
         statusLabel = new JLabel("状态: 黑棋 回合");
         statusLabel.setFont(new Font("微软雅黑", Font.BOLD, 14));

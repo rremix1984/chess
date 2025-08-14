@@ -4,7 +4,11 @@ import com.example.common.config.GameConfig;
 import com.example.common.utils.ExceptionHandler;
 import com.example.common.utils.OllamaModelManager;
 import com.example.gomoku.core.GameState;
+import com.example.gomoku.core.GomokuGameManager;
+import com.example.gomoku.core.GomokuGameManager.GameMode;
+import com.example.gomoku.core.GomokuGameManager.PlayerType;
 import com.example.gomoku.ui.*; // 导入所有UI包中的类
+import com.example.gomoku.ChatPanel;
 
 import javax.swing.*;
 import java.awt.*;
@@ -18,7 +22,7 @@ import java.util.List;
 public class GomokuFrame extends JFrame {
 
     private JLabel statusLabel;
-    private GomokuBoardPanel boardPanel;
+    private GomokuBoardPanelAdapter boardPanel;
     private ChatPanel chatPanel;
     private JTextArea aiLogArea;
     private JButton aiToggleButton;
@@ -38,6 +42,9 @@ public class GomokuFrame extends JFrame {
     private boolean isAIvsAIMode = false;
     private Object blackAI;
     private Object whiteAI;
+    
+    // 游戏管理器
+    private GomokuGameManager gameManager;
     
     // 棋局状态统计信息
     private JLabel gameStatsLabel;
@@ -93,8 +100,11 @@ public class GomokuFrame extends JFrame {
             }
         });
 
+        // 创建游戏管理器
+        gameManager = new GomokuGameManager();
+        
         // 创建棋盘
-        boardPanel = new GomokuBoardPanel();
+        boardPanel = new GomokuBoardPanelAdapter(gameManager);
         
         // 创建聊天面板
         chatPanel = new ChatPanel();
@@ -125,11 +135,11 @@ public class GomokuFrame extends JFrame {
         statusLabel.setPreferredSize(new Dimension(GameConfig.WINDOW_WIDTH, 30));
         add(statusLabel, BorderLayout.SOUTH);
 
+        // 初始化游戏管理器
+        initializeGameManager();
+        
         // 设置BoardPanel的状态更新回调
         boardPanel.setStatusUpdateCallback(this::updateStatus);
-        
-        // 默认启用大模型AI
-        initializeDefaultAI();
         
         // 初始化游戏模式设置
         updateGameModeSettings();
@@ -177,8 +187,8 @@ public class GomokuFrame extends JFrame {
         // AI类型选择
         leftPanel.add(new JLabel("AI:"));
         aiTypeComboBox = new JComboBox<>(GameConfig.AI_TYPES);
-        aiTypeComboBox.setSelectedIndex(2); // 默认选择大模型AI
-        aiTypeComboBox.setPreferredSize(new Dimension(80, 25));
+        aiTypeComboBox.setSelectedIndex(2); // 默认选择神经网络AI (GomokuZero)
+        aiTypeComboBox.setPreferredSize(new Dimension(100, 25));
         aiTypeComboBox.setFont(GameConfig.DEFAULT_FONT);
         aiTypeComboBox.addActionListener(e -> updateModelComboBox());
         leftPanel.add(aiTypeComboBox);
@@ -203,7 +213,7 @@ public class GomokuFrame extends JFrame {
             ExceptionHandler.logInfo("成功加载 " + availableModels.size() + " 个AI模型", "五子棋界面");
         } catch (Exception e) {
             ExceptionHandler.handleException(e, "加载AI模型列表", false);
-            modelComboBox = new JComboBox<>(GameConfig.DEFAULT_MODELS.toArray(new String[0]));
+            modelComboBox = new JComboBox<>(GameConfig.DEFAULT_MODELS);
             modelComboBox.setSelectedIndex(0);
         }
         modelComboBox.setPreferredSize(new Dimension(200, 25));
@@ -385,18 +395,31 @@ public class GomokuFrame extends JFrame {
      * 更新游戏模式设置
      */
     private void updateGameModeSettings() {
+        GameMode selectedMode;
         if (playerVsPlayerRadio.isSelected()) {
             currentGameMode = "玩家对玩家";
+            selectedMode = GameMode.PLAYER_VS_PLAYER;
         } else if (playerVsAIRadio.isSelected()) {
             currentGameMode = "玩家对AI";
-        } else if (aiVsAIRadio.isSelected()) {
+            selectedMode = GameMode.PLAYER_VS_AI;
+        } else {
             currentGameMode = "AI对AI";
+            selectedMode = GameMode.AI_VS_AI;
         }
         
+        // 通过GameManager设置游戏模式
+        String aiType = (String) aiTypeComboBox.getSelectedItem();
+        String difficulty = (String) difficultyComboBox.getSelectedItem();
+        String modelName = (String) modelComboBox.getSelectedItem();
+        
+        if (gameManager != null) {
+            gameManager.setGameMode(selectedMode, aiType, difficulty, modelName);
+        }
+        
+        // 更新UI状态
         switch (currentGameMode) {
             case "玩家对玩家":
                 isAIvsAIMode = false;
-                boardPanel.setAIEnabled(false);
                 aiToggleButton.setEnabled(false);
                 playerColorComboBox.setEnabled(true);
                 difficultyComboBox.setEnabled(false);
@@ -415,17 +438,16 @@ public class GomokuFrame extends JFrame {
                 
             case "AI对AI":
                 isAIvsAIMode = true;
-                boardPanel.setAIEnabled(false); // 禁用原有AI，使用新的AI对AI逻辑
                 aiToggleButton.setEnabled(false);
                 playerColorComboBox.setEnabled(false);
                 difficultyComboBox.setEnabled(true);
                 aiTypeComboBox.setEnabled(true);
                 modelComboBox.setEnabled(true);
-                initializeAIvsAI();
                 break;
         }
         
         updateStatus();
+        updatePlayerInfoLabel();
     }
     
     /**
@@ -508,7 +530,8 @@ public class GomokuFrame extends JFrame {
                     return;
                 }
                 
-                boardPanel.setAIType(aiType, difficulty, modelName);
+                // 通过GameManager设置AI配置
+                // TODO: 添加GameManager的AI配置方法
                 
                 // 启用聊天面板（当使用大模型AI或混合AI时）
                 boolean enableChat = "大模型AI".equals(aiType) || "混合AI".equals(aiType);
@@ -532,7 +555,7 @@ public class GomokuFrame extends JFrame {
                 ExceptionHandler.logInfo("AI已禁用", "五子棋界面");
             }
             
-            boardPanel.setAIEnabled(!newState);
+            // AI状态现在由GameManager管理
         } catch (Exception e) {
             ExceptionHandler.handleException(e, "切换AI状态", true);
         }
@@ -550,7 +573,8 @@ public class GomokuFrame extends JFrame {
         if (aiToggleButton.getText().equals("禁用AI")) {
             String difficulty = (String) difficultyComboBox.getSelectedItem();
             String modelName = (String) modelComboBox.getSelectedItem();
-            boardPanel.setAIType(aiType, difficulty, modelName);
+            // 通过GameManager设置AI配置
+            // TODO: 添加GameManager的setAIConfiguration方法
             
             // 更新聊天面板状态
             boolean enableChat = "大模型AI".equals(aiType) || "混合AI".equals(aiType);
@@ -568,7 +592,10 @@ public class GomokuFrame extends JFrame {
      */
     private void updatePlayerColor() {
         boolean isPlayerBlack = playerColorComboBox.getSelectedIndex() == 0;
-        boardPanel.setPlayerColor(isPlayerBlack);
+        // 通过GameManager设置玩家颜色
+        if (gameManager != null) {
+            gameManager.setPlayerColor(isPlayerBlack);
+        }
     }
     
     /**
@@ -595,7 +622,10 @@ public class GomokuFrame extends JFrame {
         try {
             // 停止AI对AI模式
             if (isAIvsAIMode) {
-                boardPanel.setAIEnabled(false);
+                // 通过GameManager禁用AI
+                if (gameManager != null) {
+                    gameManager.setGameMode(GomokuGameManager.GameMode.PLAYER_VS_PLAYER);
+                }
                 isAIvsAIMode = false;
             }
             
@@ -624,7 +654,10 @@ public class GomokuFrame extends JFrame {
             
             // 禁用AI和聊天功能
             if (boardPanel != null) {
-                boardPanel.setAIEnabled(false);
+                // 通过GameManager禁用AI
+                if (gameManager != null) {
+                    gameManager.setGameMode(GomokuGameManager.GameMode.PLAYER_VS_PLAYER);
+                }
             }
             if (chatPanel != null) {
                 chatPanel.setEnabled(false);
@@ -653,8 +686,11 @@ public class GomokuFrame extends JFrame {
         String difficulty = (String) difficultyComboBox.getSelectedItem();
         String modelName = (String) modelComboBox.getSelectedItem(); // 使用实际选中的模型
         
-        boardPanel.setAIType(aiType, difficulty, modelName);
-        boardPanel.setAIEnabled(true);
+        // 通过GameManager设置AI配置
+        if (gameManager != null) {
+            // TODO: 添加GameManager的setAIConfiguration方法
+            gameManager.setGameMode(GomokuGameManager.GameMode.PLAYER_VS_AI);
+        }
         aiToggleButton.setText("禁用AI");
         
         // 启用聊天面板（因为默认使用大模型AI）
@@ -678,16 +714,10 @@ public class GomokuFrame extends JFrame {
      * 启动游戏
      */
     private void startGame() {
-        if (boardPanel != null) {
-            boardPanel.resetGame();
-            updateStatus("⚫ 当前玩家: 黑方");
+        if (gameManager != null) {
+            gameManager.startGame();
             startButton.setEnabled(false);
             pauseButton.setEnabled(true);
-            
-            // 如果是AI对AI模式，开始AI对弈
-            if (aiVsAIRadio.isSelected()) {
-                initializeAIvsAI();
-            }
             
             ExceptionHandler.logInfo("游戏已启动", "五子棋界面");
         }
@@ -697,12 +727,10 @@ public class GomokuFrame extends JFrame {
      * 暂停游戏
      */
     private void pauseGame() {
-        if (boardPanel != null) {
-            // 暂停AI对AI模式
-            isAIvsAIMode = false;
+        if (gameManager != null) {
+            gameManager.pauseGame();
             startButton.setEnabled(true);
             pauseButton.setEnabled(false);
-            updateStatus("游戏已暂停");
             ExceptionHandler.logInfo("游戏已暂停", "五子棋界面");
         }
     }
@@ -721,6 +749,206 @@ public class GomokuFrame extends JFrame {
         
         if (option == JOptionPane.YES_OPTION) {
             handleWindowClosing();
+        }
+    }
+    
+    /**
+     * 初始化游戏管理器
+     */
+    private void initializeGameManager() {
+        // gameManager 已在构造函数中创建，不需要重复创建
+        // gameManager = new GomokuGameManager();
+        
+        // 将GameManager的棋盘设置给棋盘面板
+        if (boardPanel != null) {
+            boardPanel.setBoard(gameManager.getBoard());
+        }
+        
+        // 设置游戏回调
+        gameManager.setGameCallback(new GomokuGameManager.GameCallback() {
+            @Override
+            public void onGameStateChanged(GameState newState, String winner) {
+                SwingUtilities.invokeLater(() -> {
+                    String status;
+                    switch (newState) {
+                        case BLACK_WINS:
+                            status = "⚫ 黑方获胜！";
+                            break;
+                        case RED_WINS: // 在五子棋中代表白方
+                            status = "⚪ 白方获胜！";
+                            break;
+                        case DRAW:
+                            status = "🤝 和棋！";
+                            break;
+                        default:
+                            status = "游戏进行中...";
+                            break;
+                    }
+                    
+                    updateStatus(status);
+                    gameStatsLabel.setText("状态：" + status);
+                    
+                    // 更新统计信息
+                    updateGameStats();
+                    
+                    // 如果游戏结束，重新启用开始按钮
+                    if (newState != GameState.PLAYING) {
+                        startButton.setEnabled(true);
+                        pauseButton.setEnabled(false);
+                    }
+                });
+            }
+            
+            @Override
+            public void onTurnChanged(boolean isBlackTurn, PlayerType currentPlayerType) {
+                SwingUtilities.invokeLater(() -> {
+                    String currentPlayer = isBlackTurn ? "黑方" : "白方";
+                    String playerType = currentPlayerType == PlayerType.HUMAN ? "玩家" : "AI";
+                    String aiStatus = gameManager.isAIThinking() ? " (AI思考中...)" : "";
+                    
+                    String status = String.format("轮到: %s%s [%s]%s", 
+                                                 isBlackTurn ? "⚫" : "⚪", 
+                                                 currentPlayer, 
+                                                 gameManager.getCurrentMode().displayName,
+                                                 aiStatus);
+                    updateStatus(status);
+                    
+                    // 更新棋盘显示
+                    if (boardPanel != null) {
+                        boardPanel.repaint();
+                    }
+                    
+                    // 更新统计信息
+                    updateGameStats();
+                });
+            }
+            
+            @Override
+            public void onAIThinking(String message) {
+                SwingUtilities.invokeLater(() -> {
+                    if (aiLogArea != null) {
+                        aiLogArea.append("🤔 " + message + "\n");
+                        aiLogArea.setCaretPosition(aiLogArea.getDocument().getLength());
+                    }
+                });
+            }
+            
+            @Override
+            public void onAIMove(int row, int col, String analysis) {
+                SwingUtilities.invokeLater(() -> {
+                    if (aiLogArea != null) {
+                        String moveStr = String.format("🎯 AI落子: (%d, %d) - %s\n", row, col, analysis);
+                        aiLogArea.append(moveStr);
+                        aiLogArea.setCaretPosition(aiLogArea.getDocument().getLength());
+                    }
+                    
+                    // 更新棋盘显示
+                    if (boardPanel != null) {
+                        boardPanel.repaint();
+                    }
+                });
+            }
+            
+            @Override
+            public void onGameModeChanged(GameMode newMode) {
+                SwingUtilities.invokeLater(() -> {
+                    // 更新UI显示
+                    updatePlayerInfoLabel();
+                    
+                    if (aiLogArea != null) {
+                        aiLogArea.append("📋 游戏模式切换为: " + newMode.displayName + "\n");
+                        aiLogArea.setCaretPosition(aiLogArea.getDocument().getLength());
+                    }
+                });
+            }
+            
+            @Override
+            public void onError(String error) {
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(GomokuFrame.this, 
+                                                error, 
+                                                "游戏错误", 
+                                                JOptionPane.ERROR_MESSAGE);
+                    
+                    if (aiLogArea != null) {
+                        aiLogArea.append("❌ 错误: " + error + "\n");
+                        aiLogArea.setCaretPosition(aiLogArea.getDocument().getLength());
+                    }
+                });
+            }
+        });
+        
+        System.out.println("🎮 游戏管理器初始化完成");
+    }
+    
+    /**
+     * 更新游戏统计信息
+     */
+    private void updateGameStats() {
+        if (gameManager != null) {
+            String stats = gameManager.getGameStats();
+            
+            // 更新手数
+            int moveCount = 0;
+            if (gameManager.getBoard() != null) {
+                for (int row = 0; row < gameManager.getBoard().getBoardSize(); row++) {
+                    for (int col = 0; col < gameManager.getBoard().getBoardSize(); col++) {
+                        if (gameManager.getBoard().getPiece(row, col) != ' ') {
+                            moveCount++;
+                        }
+                    }
+                }
+            }
+            
+            moveCountLabel.setText("手数：" + moveCount);
+            
+            // 更新游戏状态
+            String gameStatus;
+            if (gameManager.isGameRunning()) {
+                if (gameManager.isGamePaused()) {
+                    gameStatus = "状态：暂停";
+                } else if (gameManager.isAIThinking()) {
+                    gameStatus = "状态：AI思考中";
+                } else {
+                    gameStatus = "状态：进行中";
+                }
+            } else {
+                gameStatus = "状态：未开始";
+            }
+            
+            gameStatsLabel.setText(gameStatus);
+            
+            // 优势分析（简化实现）
+            if (moveCount < 5) {
+                advantageLabel.setText("优势：开局阶段");
+            } else if (gameManager.getBoard() != null && gameManager.getBoard().getGameState() != GameState.PLAYING) {
+                GameState state = gameManager.getBoard().getGameState();
+                if (state == GameState.BLACK_WINS) {
+                    advantageLabel.setText("优势：黑方胜利");
+                } else if (state == GameState.RED_WINS) {
+                    advantageLabel.setText("优势：白方胜利");
+                } else {
+                    advantageLabel.setText("优势：平局");
+                }
+            } else {
+                advantageLabel.setText("优势：均势");
+            }
+        }
+    }
+    
+    /**
+     * 更新玩家信息标签
+     */
+    private void updatePlayerInfoLabel() {
+        if (gameManager != null) {
+            GameMode mode = gameManager.getCurrentMode();
+            PlayerType blackPlayer = gameManager.getBlackPlayer();
+            PlayerType whitePlayer = gameManager.getWhitePlayer();
+            
+            String blackInfo = blackPlayer == PlayerType.HUMAN ? "玩家" : "AI";
+            String whiteInfo = whitePlayer == PlayerType.HUMAN ? "玩家" : "AI";
+            
+            playerInfoLabel.setText(String.format("⚫：%s   ⚪：%s", blackInfo, whiteInfo));
         }
     }
     

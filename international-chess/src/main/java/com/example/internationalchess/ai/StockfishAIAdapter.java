@@ -130,12 +130,6 @@ public class StockfishAIAdapter {
         }
     }
     
-    /**
-     * 析构函数
-     */
-    @Override
-    protected void finalize() throws Throwable {
-        shutdown();
-        super.finalize();
-    }
+    // 注意：不再使用finalize()方法，因为它会导致AI引擎过早关闭
+    // 请手动调用shutdown()方法来清理资源
 }

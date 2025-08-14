@@ -364,4 +364,182 @@ public class StockfishEngine {
     public String debugBoardToFEN(InternationalChessBoard board, PieceColor currentPlayer) {
         return boardToFEN(board, currentPlayer);
     }
+    
+    /**
+     * 分析当前局面并返回具体建议
+     */
+    public void analyzePosition(InternationalChessBoard board, PieceColor currentPlayer) {
+        if (!isInitialized) {
+            log("❌ Stockfish引擎未初始化");
+            return;
+        }
+        
+        try {
+            // 设置棋盘位置
+            String fen = boardToFEN(board, currentPlayer);
+            sendCommand("position fen " + fen);
+            
+            // 分析一定时间（用于获取多个候选移动）
+            sendCommand("go depth 15");
+            
+            log("📈 Stockfish正在分析棋局...");
+            
+            String line;
+            String bestMove = null;
+            int evaluation = 0;
+            String principalVariation = "";
+            
+            while ((line = reader.readLine()) != null) {
+                if (logPanel != null) {
+                    logPanel.addEngineOutput(line);
+                }
+                
+                // 解析info信息
+                if (line.startsWith("info")) {
+                    if (line.contains("depth") && line.contains("score")) {
+                        // 提取评分
+                        if (line.contains("cp")) {
+                            String[] parts = line.split(" ");
+                            for (int i = 0; i < parts.length - 1; i++) {
+                                if ("cp".equals(parts[i])) {
+                                    try {
+                                        evaluation = Integer.parseInt(parts[i + 1]);
+                                    } catch (NumberFormatException e) {
+                                        // 忽略解析错误
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // 提取主要变例
+                        if (line.contains("pv")) {
+                            int pvIndex = line.indexOf("pv");
+                            if (pvIndex != -1 && pvIndex + 3 < line.length()) {
+                                String pvPart = line.substring(pvIndex + 3).trim();
+                                String[] moves = pvPart.split(" ");
+                                // 只取前3-5步
+                                StringBuilder pvBuilder = new StringBuilder();
+                                for (int i = 0; i < Math.min(5, moves.length); i++) {
+                                    if (i > 0) pvBuilder.append(" ");
+                                    pvBuilder.append(formatMoveForDisplay(moves[i]));
+                                }
+                                principalVariation = pvBuilder.toString();
+                            }
+                        }
+                    }
+                }
+                
+                if (line.startsWith("bestmove")) {
+                    String[] parts = line.split(" ");
+                    if (parts.length >= 2) {
+                        bestMove = parts[1];
+                    }
+                    break;
+                }
+            }
+            
+            // 显示分析结果
+            if (bestMove != null) {
+                String currentPlayerName = (currentPlayer == PieceColor.WHITE) ? "白方" : "黑方";
+                log("👤 当前轮到: " + currentPlayerName);
+                
+                String formattedMove = formatMoveForDisplay(bestMove);
+                log("🎯 建议移动: " + formattedMove);
+                
+                // 转换评分为可读格式
+                String evalText = formatEvaluation(evaluation, currentPlayer);
+                log("📊 局面评价: " + evalText);
+                
+                if (!principalVariation.isEmpty()) {
+                    log("🕰 主要变例: " + principalVariation);
+                }
+                
+                log("🏆 分析完成！请根据建议考虑下一步移动。");
+            } else {
+                log("❌ 无法获取分析结果");
+            }
+            
+        } catch (IOException e) {
+            logError("分析失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 格式化移动为显示格式
+     */
+    private String formatMoveForDisplay(String uciMove) {
+        if (uciMove.length() < 4) {
+            return uciMove;
+        }
+        
+        char fromFile = uciMove.charAt(0);
+        char fromRank = uciMove.charAt(1);
+        char toFile = uciMove.charAt(2);
+        char toRank = uciMove.charAt(3);
+        
+        return "" + fromFile + fromRank + "-" + toFile + toRank;
+    }
+    
+    /**
+     * 格式化评分为可读格式
+     */
+    private String formatEvaluation(int centipawns, PieceColor currentPlayer) {
+        if (centipawns == 0) {
+            return "均势";
+        }
+        
+        double pawns = centipawns / 100.0;
+        
+        String advantage;
+        if (pawns > 0) {
+            advantage = String.format("白方领先 %.1f 兵", Math.abs(pawns));
+        } else {
+            advantage = String.format("黑方领先 %.1f 兵", Math.abs(pawns));
+        }
+        
+        return advantage;
+    }
+    
+    /**
+     * 获取分析用的最佳移动（返回UCI格式字符串）
+     */
+    public String getBestMoveForAnalysis(InternationalChessBoard board, PieceColor currentPlayer) {
+        if (!isInitialized) {
+            log("❌ Stockfish引擎未初始化");
+            return null;
+        }
+        
+        try {
+            // 设置棋盘位置
+            String fen = boardToFEN(board, currentPlayer);
+            sendCommand("position fen " + fen);
+            
+            // 快速分析获取最佳移动
+            sendCommand("go depth 12");
+            
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (logPanel != null) {
+                    logPanel.addEngineOutput(line);
+                }
+                
+                if (line.startsWith("bestmove")) {
+                    String[] parts = line.split(" ");
+                    if (parts.length >= 2) {
+                        String bestMove = parts[1];
+                        if (!bestMove.equals("(none)")) {
+                            return bestMove; // 返回UCI格式的移动，例如 "e2e4"
+                        }
+                    }
+                    break;
+                }
+            }
+            
+        } catch (IOException e) {
+            logError("获取分析移动失败: " + e.getMessage());
+        }
+        
+        return null;
+    }
 }

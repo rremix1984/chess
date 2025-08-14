@@ -222,10 +222,11 @@ public class GoBoardPanel extends JPanel {
         thinking = true;
         updateGameState();
         
-        // 添加AI思考日志
+        // 添加AI思考日志（简化版）
         if (aiLogPanel != null) {
             String playerColor = (game.getCurrentPlayer() == GoGame.BLACK) ? "黑棋" : "白棋";
-            aiLogPanel.logAIThinking(playerColor + "开始分析当前局面...");
+            String aiType = (kataGoAI != null && ai == null) ? "KataGo" : "传统AI";
+            aiLogPanel.logGameMove(playerColor, "思考中...", aiType);
         }
         
         // 在后台线程中计算AI移动
@@ -261,6 +262,15 @@ public class GoBoardPanel extends JPanel {
                     }
                     
                     move = kataGoAI.calculateBestMove(game.getBoard(), game.getCurrentPlayer());
+                    
+                    // 在AI思考期间显示推荐位置高亮（如果找到了走法）
+                    final GoPosition finalMove = move;
+                    if (finalMove != null) {
+                        SwingUtilities.invokeLater(() -> {
+                            suggestedMove = finalMove;
+                            repaint();
+                        });
+                    }
                     
                     // 获取移动后的分析信息
                     if (analysis != null) {
@@ -317,6 +327,9 @@ public class GoBoardPanel extends JPanel {
                         lastMove = null;
                         System.out.println("🏳️ AI选择弃权");
                     }
+                    
+                    // 清除推荐移动高亮
+                    suggestedMove = null;
                     
                     updateGameState();
                     repaint();

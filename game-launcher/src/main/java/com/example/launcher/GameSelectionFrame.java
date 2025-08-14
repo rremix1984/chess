@@ -95,6 +95,14 @@ public class GameSelectionFrame extends JFrame {
         panel.setBackground(new Color(245, 245, 220)); // 与主背景相同
         panel.setBorder(BorderFactory.createEmptyBorder(30, 40, 40, 40)); // 增加边距
         
+        // 大富翁选项
+        JPanel monopolyPanel = createGameOptionPanel(
+            "💰 大富翁", 
+            "经典的家庭理财和策略游戏",
+            "/images/monopoly_icon.png",
+            e -> startMonopoly()
+        );
+        
         // 中国象棋选项
         JPanel chineseChessPanel = createGameOptionPanel(
             "🏮 中国象棋", 
@@ -111,10 +119,19 @@ public class GameSelectionFrame extends JFrame {
             e -> startInternationalChess()
         );
         
+        // 军棋选项
+        JPanel armyChessPanel = createGameOptionPanel(
+            "🎖️ 军棋",
+            "策略性军棋游戏，支持玩家对玩家、玩家对AI和AI对AI",
+            "/images/army_chess_icon.png",
+            e -> startArmyChess()
+        );
+        panel.add(armyChessPanel);
+        
         // 五子棋选项
         JPanel gomokuPanel = createGameOptionPanel(
             "⚫⚪ 五子棋", 
-            "经典的五子棋游戏，支持多种对弈模式",
+            "classical五子棋游戏，支持多种对弈模式",
             "/images/gomoku_icon.png",
             e -> startGomoku()
         );
@@ -158,6 +175,7 @@ public class GameSelectionFrame extends JFrame {
         panel.add(aeroplaneChessPanel);
         panel.add(tankBattlePanel);
         panel.add(streetFighterPanel);
+        panel.add(monopolyPanel);
         
         return panel;
     }
@@ -302,6 +320,7 @@ public class GameSelectionFrame extends JFrame {
         if (title.contains("飞行棋")) return "✈";
         if (title.contains("坦克大战")) return "🚗";
         if (title.contains("街头霸王")) return "👊";
+        if (title.contains("大富翁")) return "💰";
         return "🎮";
     }
     
@@ -324,6 +343,28 @@ public class GameSelectionFrame extends JFrame {
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this, "启动中国象棋失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void startArmyChess() {
+        try {
+            dispose(); // 关闭选择界面
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    // 使用反射来动态加载军棋游戏界面
+                    Class<?> gameFrameClass = Class.forName("com.example.junqi.JunQiFrame");
+                    Object frame = gameFrameClass.getDeclaredConstructor().newInstance();
+                    gameFrameClass.getMethod("setVisible", boolean.class).invoke(frame, true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "启动军棋失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+                    // 重新显示选择界面
+                    new GameSelectionFrame().setVisible(true);
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "启动军棋失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
         }
     }
     
@@ -438,6 +479,28 @@ public class GameSelectionFrame extends JFrame {
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this, "启动五子棋失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void startMonopoly() {
+        try {
+            dispose(); // 关闭选择界面
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    // 使用反射来动态加载大富翁游戏界面
+                    Class<?> gameFrameClass = Class.forName("com.example.monopoly.MonopolyFrame");
+                    Object frame = gameFrameClass.getDeclaredConstructor().newInstance();
+                    gameFrameClass.getMethod("setVisible", boolean.class).invoke(frame, true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "启动大富翁失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+                    // 重新显示选择界面
+                    new GameSelectionFrame().setVisible(true);
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "启动大富翁失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
         }
     }
     

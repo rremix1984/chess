@@ -30,6 +30,9 @@
     <module>flight-chess</module>
     <module>tank-battle-game</module>
     <module>game-launcher</module>
+    <module>army-chess</module>
+    <module>junqi</module>
+    <module>monopoly</module>
   </modules>
 
   <dependencyManagement>
@@ -112,6 +115,11 @@
       <dependency>
         <groupId>com.example</groupId>
         <artifactId>tank-battle-game</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.example</groupId>
+        <artifactId>monopoly</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>

@@ -6,6 +6,7 @@ import java.util.List;
 
 /**
  * 飞行棋游戏核心逻辑类
+ * 支持多种对战模式：玩家vs玩家、玩家vsAI、AIvsAI
  */
 public class FlightChessGame {
     // 游戏常量
@@ -17,18 +18,30 @@ public class FlightChessGame {
     
     // 玩家颜色
     public static final java.awt.Color[] PLAYER_COLORS = {
-        java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.YELLOW, java.awt.Color.GREEN
+        new Color(220, 20, 60),   // 深红色
+        new Color(30, 144, 255),  // 道奇蓝
+        new Color(255, 215, 0),   // 金黄色
+        new Color(50, 205, 50)    // 亮绿色
+    };
+    
+    // 玩家名称
+    public static final String[] PLAYER_NAMES = {
+        "红色", "蓝色", "黄色", "绿色"
     };
     
     // 游戏状态
     private int currentPlayer;
     private int playerCount;
     private boolean[] aiPlayers;
+    private int[] aiDifficulty;
     private Plane[][] planes;
     private Random random;
     private boolean gameOver;
     private int winner;
     private List<GameMove> moveHistory;
+    private int consecutiveSixes;
+    private boolean canRollAgain;
+    private GameMode gameMode;
     
     public FlightChessGame() {
         this(4);
@@ -298,6 +311,7 @@ public class FlightChessGame {
         public int toPosition;
         public int diceValue;
         public List<Plane> capturedPlanes;
+        public long timestamp;
         
         public GameMove(int player, int planeIndex, int fromPosition, int toPosition, 
                        int diceValue, List<Plane> capturedPlanes) {
@@ -307,8 +321,149 @@ public class FlightChessGame {
             this.toPosition = toPosition;
             this.diceValue = diceValue;
             this.capturedPlanes = capturedPlanes;
+            this.timestamp = System.currentTimeMillis();
         }
     }
     
-
+    /**
+     * 游戏模式枚举
+     */
+    public enum GameMode {
+        PLAYER_VS_PLAYER,    // 玩家对玩家
+        PLAYER_VS_AI,        // 玩家对AI
+        AI_VS_AI            // AI对AI
+    }
+    
+    /**
+     * 设置游戏模式
+     */
+    public void setGameMode(GameMode mode) {
+        this.gameMode = mode;
+    }
+    
+    /**
+     * 获取游戏模式
+     */
+    public GameMode getGameMode() {
+        return gameMode;
+    }
+    
+    /**
+     * 设置AI玩家和难度
+     */
+    public void setAIPlayer(int player, boolean isAI, int difficulty) {
+        if (player >= 0 && player < 4) {
+            aiPlayers[player] = isAI;
+            if (isAI) {
+                if (aiDifficulty == null) {
+                    aiDifficulty = new int[4];
+                }
+                aiDifficulty[player] = difficulty;
+            }
+        }
+    }
+    
+    /**
+     * 获取AI难度
+     */
+    public int getAIDifficulty(int player) {
+        return aiDifficulty != null ? aiDifficulty[player] : 1;
+    }
+    
+    /**
+     * 检查是否可以再次投掷骰子
+     */
+    public boolean canRollAgain() {
+        return canRollAgain;
+    }
+    
+    /**
+     * 设置是否可以再次投掷
+     */
+    public void setCanRollAgain(boolean canRoll) {
+        this.canRollAgain = canRoll;
+    }
+    
+    /**
+     * 获取连续投掷6的次数
+     */
+    public int getConsecutiveSixes() {
+        return consecutiveSixes;
+    }
+    
+    /**
+     * 增强的投掷骰子方法
+     */
+    public int rollDiceEnhanced() {
+        int value = rollDice();
+        
+        if (value == 6) {
+            consecutiveSixes++;
+            canRollAgain = true;
+            
+            // 如果连续投掷3次6，则跳过此回合
+            if (consecutiveSixes >= 3) {
+                consecutiveSixes = 0;
+                canRollAgain = false;
+                nextPlayer();
+            }
+        } else {
+            consecutiveSixes = 0;
+            canRollAgain = false;
+        }
+        
+        return value;
+    }
+    
+    /**
+     * 获取玩家在跑道上的飞机数量
+     */
+    public int getPlanesOnTrack(int player) {
+        int count = 0;
+        for (Plane plane : planes[player]) {
+            if (plane.position >= 0 && plane.position < MAIN_TRACK_SIZE) {
+                count++;
+            }
+        }
+        return count;
+    }
+    
+    /**
+     * 获取玩家在家园的飞机数量
+     */
+    public int getPlanesAtHome(int player) {
+        int count = 0;
+        for (Plane plane : planes[player]) {
+            if (plane.position == -1) {
+                count++;
+            }
+        }
+        return count;
+    }
+    
+    /**
+     * 获取玩家到达终点的飞机数量
+     */
+    public int getPlanesFinished(int player) {
+        int count = 0;
+        for (Plane plane : planes[player]) {
+            if (plane.position >= MAIN_TRACK_SIZE) {
+                count++;
+            }
+        }
+        return count;
+    }
+    
+    /**
+     * 获取游戏统计信息
+     */
+    public String getGameStats(int player) {
+        return String.format(
+            "玩家 %s - 家园: %d, 跑道: %d, 终点: %d",
+            PLAYER_NAMES[player],
+            getPlanesAtHome(player),
+            getPlanesOnTrack(player),
+            getPlanesFinished(player)
+        );
+    }
 }

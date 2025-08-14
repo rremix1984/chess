@@ -129,6 +129,9 @@ public class PikafishEngine {
             // 如果配置的路径不存在，尝试其他位置
             if (nnueFile == null || !nnueFile.exists()) {
                 String[] possiblePaths = {
+                    // 优先检查用户主目录
+                    System.getProperty("user.home") + "/.pikafish/pikafish.nnue",
+                    // 为了向后兼容，保留旧路径
                     "chinese-chess/pikafish.nnue",
                     "pikafish.nnue", 
                     "../chinese-chess/pikafish.nnue",
@@ -343,16 +346,11 @@ public class PikafishEngine {
             // 设置多PV模式
             sendCommand("setoption name MultiPV value " + numPV);
 
-            // 根据思考时间计算搜索深度，增加AI智能
-            int searchDepth = calculateSearchDepth(thinkTime);
-            log("开始计算，思考时间: " + thinkTime + "ms, 搜索深度: " + searchDepth);
+            // 优先使用时间限制，确保在给定时间内返回结果
+            log("开始计算，思考时间: " + thinkTime + "ms");
             
-            // 使用深度搜索而不是时间限制，提高AI决策质量
-            if (searchDepth > 0) {
-                sendCommand("go depth " + searchDepth);
-            } else {
-                sendCommand("go movetime " + thinkTime);
-            }
+            // 使用时间限制而不是深度限制，确保及时响应
+            sendCommand("go movetime " + thinkTime);
             
             // 读取响应，寻找bestmove
             long startTime = System.currentTimeMillis();
@@ -393,14 +391,17 @@ public class PikafishEngine {
                     
                     if (currentDepth > lastDepth) {
                         lastDepth = currentDepth;
-                        String logMessage = "🔍 深度 " + currentDepth;
-                        if (!score.isEmpty()) {
-                            logMessage += ", 分数: " + score;
+                        // 只显示重要的深度里程碑，减少日志噪声
+                        if (currentDepth == 15 || currentDepth == 20 || currentDepth == 25 || currentDepth >= 30) {
+                            String logMessage = "🔍 深度 " + currentDepth;
+                            if (!score.isEmpty()) {
+                                logMessage += ", 分数: " + score;
+                            }
+                            if (!pv.isEmpty()) {
+                                logMessage += ", 主变: " + pv;
+                            }
+                            log(logMessage);
                         }
-                        if (!pv.isEmpty()) {
-                            logMessage += ", 主变: " + pv;
-                        }
-                        log(logMessage);
                     }
                 }
                 

@@ -46,12 +46,12 @@ public class GomokuZeroAI {
      */
     private int getSimulationsForDifficulty(int difficulty) {
         switch (difficulty) {
-            case 1: case 2: return 200;   // 简单
-            case 3: case 4: return 400;   // 普通
-            case 5: case 6: return 800;   // 困难
-            case 7: case 8: return 1200;  // 专家
-            case 9: case 10: return 1600; // 大师
-            default: return 800;
+            case 1: case 2: return 800;   // 简单 - 提升至800
+            case 3: case 4: return 1600;  // 普通 - 提升至1600
+            case 5: case 6: return 3200;  // 困难 - 提升至3200
+            case 7: case 8: return 4800;  // 专家 - 提升至4800
+            case 9: case 10: return 6400; // 大师 - 提升至6400
+            default: return 1600;
         }
     }
     
@@ -60,14 +60,20 @@ public class GomokuZeroAI {
      */
     public int[] getBestMove(GomokuBoard board) {
         if (board == null || board.getGameState() != GameState.PLAYING) {
+            System.out.println("🚫 GomokuZeroAI.getBestMove() 退出: 棋盘状态无效");
             return null;
         }
+        
+        System.out.println("🧠🧠🧠 ===========================================\n" + 
+                         "🧠🧠🧠 GomokuZero AI 开始分析 (难度级别: " + difficulty + ")\n" +
+                         "🧠🧠🧠 ===========================================");
         
         long startTime = System.currentTimeMillis();
         thinkingProcess = "🧠 GomokuZero AI 开始思考...\n";
         
         // 获取当前玩家
         boolean isBlackTurn = board.isBlackTurn();
+        System.out.println("🧠 当前玩家: " + (isBlackTurn ? "黑棋 (●)" : "白棋 (○)"));
         thinkingProcess += "当前玩家: " + (isBlackTurn ? "黑棋" : "白棋") + "\n";
         
         try {
