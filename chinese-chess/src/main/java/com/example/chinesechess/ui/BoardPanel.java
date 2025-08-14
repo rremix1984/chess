@@ -134,6 +134,15 @@ public class BoardPanel extends JPanel {
         this.board = board;
         initializePieceSelectionMenu();
         initializeErrorInfoPanel();
+        
+        // 设置棋盘面板的首选大小和最小大小
+        Dimension boardSize = calculateBoardSize();
+        setPreferredSize(boardSize);
+        setMinimumSize(boardSize);
+        setSize(boardSize);
+        
+        // 设置背景色
+        setBackground(new Color(245, 222, 179)); // 棋盘背景色
 
         addMouseListener(new MouseAdapter() {
             @Override
@@ -4049,5 +4058,40 @@ public class BoardPanel extends JPanel {
         repaint();
         
         showErrorInfo("玩家对玩家残局游戏开始！\n红方玩家 vs 黑方玩家");
+    }
+    
+    /**
+     * 计算棋盘面板的合理大小
+     * 确保棋盘有足够的空间显示完整的棋盘和坐标
+     */
+    private Dimension calculateBoardSize() {
+        // 计算棋盘本身的大小：8列 × 9行 的格子
+        int boardWidth = 8 * CELL_SIZE;
+        int boardHeight = 9 * CELL_SIZE;
+        
+        // 加上边距：左右各MARGIN，上下各MARGIN
+        // 还要加上坐标显示的额外空间
+        int totalWidth = boardWidth + 2 * MARGIN + 40; // 额外40像素用于坐标显示
+        int totalHeight = boardHeight + 2 * MARGIN + 80; // 额外80像素用于坐标显示
+        
+        // 确保最小尺寸
+        int minWidth = Math.max(totalWidth, 600);
+        int minHeight = Math.max(totalHeight, 700);
+        
+        System.out.println("📐 计算棋盘尺寸: 格子大小=" + CELL_SIZE + ", 边距=" + MARGIN + ", 总尺寸=" + minWidth + "x" + minHeight);
+        
+        return new Dimension(minWidth, minHeight);
+    }
+    
+    @Override
+    public Dimension getPreferredSize() {
+        // 重写getPreferredSize方法，确保布局管理器能正确计算大小
+        return calculateBoardSize();
+    }
+    
+    @Override
+    public Dimension getMinimumSize() {
+        // 重写getMinimumSize方法
+        return calculateBoardSize();
     }
 }

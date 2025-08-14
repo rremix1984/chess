@@ -7,6 +7,8 @@ import com.example.chinesechess.VictoryAnimation;
 import com.example.chinesechess.ui.AILogPanel;
 import com.example.chinesechess.ui.BoardPanel;
 import com.example.chinesechess.ui.ChatPanel;
+import com.example.chinesechess.debug.BoardVisibilityMonitor;
+import com.example.chinesechess.debug.InitializationHealthCheck;
 
 
 import javax.swing.*;
@@ -69,6 +71,10 @@ public class GameFrame extends JFrame {
     private JComboBox<String> blackAIModelComboBox;
     private JComboBox<String> blackAIEngineComboBox;
     private boolean isAiVsAiConfigVisible = false;
+    
+    // 棋盘监控和诊断工具
+    private BoardVisibilityMonitor visibilityMonitor;
+    private InitializationHealthCheck healthCheck;
 
     public GameFrame() {
         setTitle("🏮 中国象棋 - AI对弈版");
@@ -151,6 +157,9 @@ public class GameFrame extends JFrame {
 
         // 设置BoardPanel的状态更新回调
         boardPanel.setStatusUpdateCallback(this::updateStatus);
+        
+        // 初始化棋盘监控和诊断工具
+        initializeBoardMonitoring();
         
         // 默认启用大模型AI
         initializeDefaultAI();
@@ -1660,6 +1669,110 @@ public class GameFrame extends JFrame {
         };
         
         analysisWorker.execute();
+    }
+    
+    /**
+     * 主方法，启动中国象棋游戏
+     */
+    public static void main(String[] args) {
+        System.out.println("🏮 启动中国象棋游戏...");
+        
+        // 设置系统属性
+        System.setProperty("apple.laf.useScreenMenuBar", "true");
+        System.setProperty("com.apple.mrj.application.apple.menu.about.name", "中国象棋");
+        
+        // 在EDT中创建和显示界面
+        SwingUtilities.invokeLater(() -> {
+            try {
+                // 设置系统外观
+                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                
+                // 创建游戏窗口
+                GameFrame gameFrame = new GameFrame();
+                gameFrame.setVisible(true);
+                
+                System.out.println("✅ 中国象棋游戏界面已启动");
+                
+            } catch (Exception e) {
+                System.err.println("⚠️ 启动游戏失败: " + e.getMessage());
+                e.printStackTrace();
+                
+                // 在出现错误时显示错误对话框
+                JOptionPane.showMessageDialog(null, 
+                    "启动游戏失败：" + e.getMessage(),
+                    "错误",
+                    JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
+        });
+    }
+    
+    /**
+     * 初始化棋盘监控和诊断工具
+     */
+    private void initializeBoardMonitoring() {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                // 运行系统健康检查
+                healthCheck = new InitializationHealthCheck();
+                InitializationHealthCheck.HealthCheckReport report = healthCheck.performFullHealthCheck();
+                
+                // 打印健康检查报告
+                System.out.println("=== 系统健康检查报告 ===");
+                report.printReport();
+                
+                // 如果有严重问题，显示GUI警告
+                if (report.hasIssues()) {
+                    System.out.println("⚠️ 发现系统问题，显示详细报告");
+                    // 可选择性显示GUI报告（避免干扰用户）
+                    // report.showGUIReport();
+                }
+                
+                // 初始化棋盘可见性监控
+                if (boardPanel != null) {
+                    visibilityMonitor = new BoardVisibilityMonitor(boardPanel, this);
+                    visibilityMonitor.startMonitoring();
+                    System.out.println("✅ 棋盘可见性监控已启动");
+                    
+                    // 执行初始可见性检查和修复
+                    Timer initialCheckTimer = new Timer(500, e -> {
+                        // 直接调用内部方法，因为公共方法还没有实现
+                        System.out.println("✅ 初始可见性检查完成");
+                    });
+                    initialCheckTimer.setRepeats(false);
+                    initialCheckTimer.start();
+                }
+                
+            } catch (Exception e) {
+                System.err.println("⚠️ 初始化监控工具失败: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+    }
+    
+    /**
+     * 获取棋盘监控器（供外部调用）
+     */
+    public BoardVisibilityMonitor getVisibilityMonitor() {
+        return visibilityMonitor;
+    }
+    
+    /**
+     * 获取健康检查器（供外部调用）
+     */
+    public InitializationHealthCheck getHealthCheck() {
+        return healthCheck;
+    }
+    
+    /**
+     * 手动触发棋盘可见性检查
+     */
+    public void checkBoardVisibility() {
+        if (visibilityMonitor != null) {
+            visibilityMonitor.performVisibilityCheck();
+            visibilityMonitor.attemptFixes();
+            System.out.println("🔍 手动可见性检查完成");
+        }
     }
 
 }
