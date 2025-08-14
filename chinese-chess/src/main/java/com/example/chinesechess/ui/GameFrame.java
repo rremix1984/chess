@@ -1213,12 +1213,16 @@ public class GameFrame extends JFrame {
                 break;
         }
         
-        // 启用聊天面板和AI日志面板（在使用大模型AI、混合AI或DeepSeek+Pikafish时）
+        // 始终启用聊天面板（用于Pikafish和Fairy-Stockfish评估功能）
+        chatPanel.setEnabled(true);
+        chatPanel.setModelName(modelName);
+        
+        // 只有在使用大模型AI、混合AI或DeepSeek+Pikafish时才启用AI日志面板
         boolean enableLogPanel = (aiTypeIndex == 2) || (aiTypeIndex == 3) || (aiTypeIndex == 4);
         if (enableLogPanel) {
-            chatPanel.setEnabled(true);
-            chatPanel.setModelName(modelName);
             aiLogPanel.setEnabled(true);
+        } else {
+            aiLogPanel.setEnabled(false);
         }
         
         updateStatus("🔴 玩家对AI模式已启用");

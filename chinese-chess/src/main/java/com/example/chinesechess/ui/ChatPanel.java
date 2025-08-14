@@ -33,6 +33,7 @@ public class ChatPanel extends JPanel {
     private Object board;
     // 移除了五子棋棋盘引用
     private JComboBox<String> pikafishDifficultyComboBox; // Pikafish难度选择
+    private JComboBox<String> fairyStockfishDifficultyComboBox; // Fairy-Stockfish难度选择
     // 棋盘面板引用已移除，简化实现
     private Object boardPanel; // 棋盘面板引用，用于显示推荐走法标记
     private String modelName;
@@ -83,63 +84,62 @@ public class ChatPanel extends JPanel {
         inputField.setFont(new Font("SansSerif", Font.PLAIN, 12));
         inputField.addActionListener(e -> sendMessage());
         
-        // 按钮面板
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        // AI分析面板 - 纵向布局
+        JPanel analysisPanel = new JPanel(new GridLayout(2, 1, 0, 3));
+        analysisPanel.setBorder(BorderFactory.createTitledBorder("AI引擎分析"));
         
-        // Pikafish评估面板（包含按钮和难度选择）
-        JPanel pikafishPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
+        // Pikafish分析面板
+        JPanel pikafishPanel = createEngineAnalysisPanel(
+            "🐟 Pikafish", new Color(30, 144, 255), 
+            "让Pikafish引擎评估当前棋局并给出建议",
+            e -> requestPikafishEvaluation()
+        );
         
-        // Pikafish评估按钮 - 使用更明显的颜色
-        JButton evaluateButton = new JButton("🐟 Pikafish评估");
-        evaluateButton.setFont(new Font("微软雅黑", Font.BOLD, 12));
-        evaluateButton.setBackground(new Color(30, 144, 255)); // 更明显的蓝色
-        evaluateButton.setForeground(Color.BLACK); // 修改为黑色字体
-        evaluateButton.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createRaisedBevelBorder(),
-            BorderFactory.createEmptyBorder(8, 15, 8, 15)
-        ));
-        evaluateButton.setFocusPainted(false);
-        evaluateButton.setToolTipText("让Pikafish引擎评估当前棋局并给出建议");
-        evaluateButton.addActionListener(e -> requestPikafishEvaluation());
-        
-        // Pikafish难度选择
-        JLabel difficultyLabel = new JLabel("难度:");
-        difficultyLabel.setFont(new Font("微软雅黑", Font.PLAIN, 11));
-        
+        // 创建Pikafish难度选择
         pikafishDifficultyComboBox = new JComboBox<>(new String[]{
             "1-简单", "2-普通", "3-困难", "4-专家", "5-大师",
             "6-特级", "7-超级", "8-顶级", "9-传奇", "10-神级"
         });
         pikafishDifficultyComboBox.setSelectedIndex(2); // 默认选择困难
         pikafishDifficultyComboBox.setFont(new Font("微软雅黑", Font.PLAIN, 10));
-        pikafishDifficultyComboBox.setPreferredSize(new Dimension(80, 25));
-        pikafishDifficultyComboBox.setToolTipText("选择Pikafish引擎的思考深度");
-        
-        pikafishPanel.add(evaluateButton);
-        pikafishPanel.add(difficultyLabel);
+        pikafishDifficultyComboBox.setPreferredSize(new Dimension(75, 22));
+        pikafishDifficultyComboBox.setToolTipText("选择Pikafish引擎的思考深度，难度越高计算越深入");
         pikafishPanel.add(pikafishDifficultyComboBox);
         
-        // Fairy-Stockfish评估按钮 - 使用绿色
-        JButton fairyEvaluateButton = new JButton("🧚 Fairy分析");
-        fairyEvaluateButton.setFont(new Font("微软雅黑", Font.BOLD, 12));
-        fairyEvaluateButton.setBackground(new Color(34, 139, 34)); // 森林绿色
-        fairyEvaluateButton.setForeground(Color.BLACK); // 黑色字体
-        fairyEvaluateButton.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createRaisedBevelBorder(),
-            BorderFactory.createEmptyBorder(8, 15, 8, 15)
-        ));
-        fairyEvaluateButton.setFocusPainted(false);
-        fairyEvaluateButton.setToolTipText("让Fairy-Stockfish引擎评估当前棋局并给出建议");
-        fairyEvaluateButton.addActionListener(e -> requestFairyStockfishEvaluation());
+        // Fairy-Stockfish分析面板
+        JPanel fairyPanel = createEngineAnalysisPanel(
+            "🧚 Fairy", new Color(34, 139, 34), 
+            "让Fairy-Stockfish引擎评估当前棋局并给出建议",
+            e -> requestFairyStockfishEvaluation()
+        );
         
+        // 创建Fairy-Stockfish难度选择
+        fairyStockfishDifficultyComboBox = new JComboBox<>(new String[]{
+            "1-简单", "2-普通", "3-困难", "4-专家", "5-大师",
+            "6-特级", "7-超级", "8-顶级", "9-传奇", "10-神级"
+        });
+        fairyStockfishDifficultyComboBox.setSelectedIndex(2); // 默认选择困难
+        fairyStockfishDifficultyComboBox.setFont(new Font("微软雅黑", Font.PLAIN, 10));
+        fairyStockfishDifficultyComboBox.setPreferredSize(new Dimension(75, 22));
+        fairyStockfishDifficultyComboBox.setToolTipText("选择Fairy-Stockfish引擎的思考深度，难度越高搜索越深");
+        fairyPanel.add(fairyStockfishDifficultyComboBox);
+        
+        // 添加两个分析面板
+        analysisPanel.add(pikafishPanel);
+        analysisPanel.add(fairyPanel);
+        
+        // 聊天发送面板
+        JPanel chatPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
         sendButton = new JButton("发送");
         sendButton.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        sendButton.setPreferredSize(new Dimension(80, 30));
+        sendButton.setPreferredSize(new Dimension(60, 25));
         sendButton.addActionListener(e -> sendMessage());
+        chatPanel.add(sendButton);
         
-        buttonPanel.add(pikafishPanel);
-        buttonPanel.add(fairyEvaluateButton);
-        buttonPanel.add(sendButton);
+        // 按钮总面板
+        JPanel buttonPanel = new JPanel(new BorderLayout());
+        buttonPanel.add(analysisPanel, BorderLayout.NORTH);
+        buttonPanel.add(chatPanel, BorderLayout.SOUTH);
         
         inputPanel.add(inputField, BorderLayout.CENTER);
         inputPanel.add(buttonPanel, BorderLayout.EAST);
@@ -179,6 +179,30 @@ public class ChatPanel extends JPanel {
         
         revalidate();
         repaint();
+    }
+    
+    /**
+     * 创建引擎分析面板
+     */
+    private JPanel createEngineAnalysisPanel(String engineName, Color bgColor, String tooltip, ActionListener actionListener) {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
+        
+        // 创建按钮
+        JButton button = new JButton(engineName);
+        button.setFont(new Font("微软雅黑", Font.BOLD, 11));
+        button.setBackground(bgColor);
+        button.setForeground(Color.BLACK);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createRaisedBevelBorder(),
+            BorderFactory.createEmptyBorder(4, 8, 4, 8)
+        ));
+        button.setFocusPainted(false);
+        button.setToolTipText(tooltip);
+        button.setPreferredSize(new Dimension(85, 25));
+        button.addActionListener(actionListener);
+        
+        panel.add(button);
+        return panel;
     }
     
     /**
@@ -801,9 +825,26 @@ public class ChatPanel extends JPanel {
                     
                     SwingUtilities.invokeLater(() -> {
                         removeThinkingMessage();
-                        if (result != null && result.getAdviceText() != null && !result.getAdviceText().trim().isEmpty()) {
-                            // 显示评估结果
-                            appendAIMessage("🐟 Pikafish引擎分析：\n\n" + result.getAdviceText() + "\n\n💡 提示：以上分析由专业的Pikafish引擎提供，包含精确的局面评估和最佳走法推荐。");
+                        if (result != null && result.getRecommendedMoves() != null && !result.getRecommendedMoves().isEmpty()) {
+                            // 获取最佳推荐走法
+                            var bestMove = result.getRecommendedMoves().get(0);
+                            String moveDescription = bestMove.getDescription();
+                            
+                            // 简化的分析结果，只显示核心建议
+                            String simplifiedAnalysis = "🐟 **Pikafish引擎推荐**\n\n" +
+                                                       "📍 **建议走法**: " + moveDescription;
+                            
+                            // 如果有多个候选走法，显示前3个
+                            if (result.getRecommendedMoves().size() > 1) {
+                                simplifiedAnalysis += "\n\n🎯 **其他选择**:";
+                                int showCount = Math.min(3, result.getRecommendedMoves().size());
+                                for (int i = 1; i < showCount; i++) {
+                                    var alternativeMove = result.getRecommendedMoves().get(i);
+                                    simplifiedAnalysis += "\n• " + alternativeMove.getDescription();
+                                }
+                            }
+                            
+                            appendAIMessage(simplifiedAnalysis);
                             
                             // 显示推荐走法的视觉标记
                             showRecommendedMoveHighlights(result);
@@ -933,24 +974,28 @@ public class ChatPanel extends JPanel {
             return;
         }
         
-        System.out.println("用户请求Fairy-Stockfish评估");
+        // 获取用户选择的难度
+        int selectedDifficulty = fairyStockfishDifficultyComboBox.getSelectedIndex() + 1; // 1-10级难度
+        String difficultyName = (String) fairyStockfishDifficultyComboBox.getSelectedItem();
+        
+        System.out.println("用户请求Fairy-Stockfish评估，难度: " + difficultyName);
         
         // 显示评估开始消息
-        appendUserMessage("👤 你：请Fairy-Stockfish引擎分析当前棋局");
+        appendUserMessage("👤 你：请Fairy-Stockfish引擎分析当前棋局（难度: " + difficultyName + "）");
         
         // 禁用输入，显示分析状态
         setInputEnabled(false);
-        appendThinkingMessage("🧚 Fairy-Stockfish引擎：正在分析象棋棋局...");
+        appendThinkingMessage("🧚 Fairy-Stockfish引擎：正在进行" + difficultyName + "深度分析象棋棋局...");
         
         // 在后台线程中处理Fairy-Stockfish评估
         new Thread(() -> {
             try {
                 // 实际调用FairyStockfishAI进行分析
                 if (board instanceof com.example.chinesechess.core.Board) {
-                    // 创建FairyStockfishAI实例
+                    // 创建FairyStockfishAI实例，使用用户选择的难度
                     com.example.chinesechess.ai.FairyStockfishAI analyzer = new com.example.chinesechess.ai.FairyStockfishAI(
                         com.example.chinesechess.core.PieceColor.RED, // 默认颜色
-                        5 // 中等难度
+                        selectedDifficulty // 用户选择的难度
                     );
                     
                     // 获取当前玩家颜色，如果无法确定则使用红方
@@ -964,13 +1009,9 @@ public class ChatPanel extends JPanel {
                     SwingUtilities.invokeLater(() -> {
                         removeThinkingMessage();
                         if (bestMove != null) {
-                            String moveDescription = formatMoveDescription(bestMove);
+                            String moveDescription = formatMoveToChineseNotation(bestMove);
                             String analysis = "🧚 **Fairy-Stockfish引擎分析**\n\n" +
-                                           "📍 **推荐走法**: " + moveDescription + "\n\n" +
-                                           "🎯 **分析说明**: Fairy-Stockfish是专门支持中国象棋的多变体引擎，" +
-                                           "能够提供准确的局面评估和走法建议。\n\n" +
-                                           "💡 **提示**: 以上分析由专业的Fairy-Stockfish引擎提供，" +
-                                           "专门针对中国象棋进行了优化。";
+                                           "📍 **推荐走法**: " + moveDescription;
                             
                             appendAIMessage(analysis);
                             
@@ -1010,6 +1051,23 @@ public class ChatPanel extends JPanel {
     /**
      * 格式化走法描述
      */
+    private String formatMoveToChineseNotation(com.example.chinesechess.core.Move move) {
+        if (move == null || move.getStart() == null || move.getEnd() == null || board == null) {
+            return "未知走法";
+        }
+
+        try {
+            if (board instanceof com.example.chinesechess.core.Board) {
+                return ((com.example.chinesechess.core.Board) board).toChineseNotation(move);
+            } else {
+                return formatMoveDescription(move);
+            }
+        } catch (Exception e) {
+            System.err.println("格式化为中国象棋记谱法时出错: " + e.getMessage());
+            return formatMoveDescription(move); // 降级为简单描述
+        }
+    }
+
     private String formatMoveDescription(com.example.chinesechess.core.Move move) {
         if (move == null || move.getStart() == null || move.getEnd() == null) {
             return "未知走法";
@@ -1051,9 +1109,8 @@ public class ChatPanel extends JPanel {
             String moveDesc = formatMoveDescription(move);
             System.out.println("💡 显示Fairy-Stockfish推荐走法标记: " + moveDesc);
             
-            // 在聊天面板中也添加一条提示消息
-            appendAIMessage("💡 **走法提示**: 棋盘上已用蓝色和绿色标记显示推荐走法：" + moveDesc + 
-                          "\n🔹 蓝色圆圈标记需要移动的棋子\n🔸 绿色圆圈标记目标位置\n标记将在30秒后自动消失。");
+            // 简化后的提示信息
+            // 不再显示额外的提示消息，只在棋盘上显示标记
             
         } catch (Exception e) {
             System.err.println("❌ 无法显示Fairy-Stockfish推荐走法标记: " + e.getMessage());

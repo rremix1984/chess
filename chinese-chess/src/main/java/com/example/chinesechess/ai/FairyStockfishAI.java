@@ -108,11 +108,9 @@ public class FairyStockfishAI {
             }
             addToAILog("AI难度: " + difficulty + "/10 (" + getDifficultyName() + ")");
             
-            // 根据难度动态调整思考时间，高难度级别获得更多思考时间
-            int baseThinkTime = thinkTimes[difficulty - 1];
-            // 为高难度级别额外增加50%的思考时间，确保更强的棋力
-            int thinkTime = difficulty >= 7 ? (int)(baseThinkTime * 1.5) : baseThinkTime;
-            addToAILog("基础思考时间: " + baseThinkTime + "ms, 实际思考时间: " + thinkTime + "ms");
+            // 按照新的难度算法计算思考时间，大幅提高高难度级别的分析质量
+            int thinkTime = calculateEnhancedThinkTime(difficulty);
+            addToAILog("优化后的思考时间: " + thinkTime + "ms （难度级别: " + difficulty + "）");
             
             // 优先尝试Fairy-Stockfish引擎
             if (fairyStockfishEngine != null && fairyStockfishEngine.isAvailable()) {
@@ -220,6 +218,29 @@ public class FairyStockfishAI {
         } catch (Exception e) {
             System.err.println("❌ UCI走法转换异常: " + e.getMessage());
             return null;
+        }
+    }
+    
+    /**
+     * 计算专业竞赛级思考时间，充分利用新的引擎优化配置
+     * 基于引擎的极致优化，提供前所未有的AI棋力体验
+     * @param difficulty 难度级别 (1-10)
+     * @return 思考时间（毫秒）
+     */
+    private int calculateEnhancedThinkTime(int difficulty) {
+        // 新的专业级思考时间映射，配合1GB Hash、多线程、30层深度搜索
+        switch (difficulty) {
+            case 1:  return 5000;     // 简单: 5秒 (基础提升)
+            case 2:  return 10000;    // 普通: 10秒 (明显增强)
+            case 3:  return 18000;    // 困难: 18秒 (深度搜索)
+            case 4:  return 30000;    // 专家: 30秒 (竞赛水平)
+            case 5:  return 45000;    // 大师: 45秒 (职业级别)
+            case 6:  return 75000;    // 特级: 75秒 (顶尖水平)
+            case 7:  return 120000;   // 超级: 2分钟 (大师级深度)
+            case 8:  return 180000;   // 顶级: 3分钟 (超级深度分析)
+            case 9:  return 300000;   // 传奇: 5分钟 (极致分析)
+            case 10: return 600000;   // 神级: 10分钟 (终极棋力，无人能敌)
+            default: return 18000;    // 默认提升到困难级别
         }
     }
     

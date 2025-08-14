@@ -18,6 +18,7 @@ public class FairyStockfishEngine {
     private String enginePath;
     private Consumer<String> logCallback;
     private String engineInfo = "";
+    private String neuralNetworkPath; // 神经网络文件路径
     
     public FairyStockfishEngine(String enginePath) {
         this.enginePath = enginePath != null ? enginePath : "fairy-stockfish";
@@ -94,24 +95,38 @@ public class FairyStockfishEngine {
             // 设置中国象棋变体
             sendCommand("setoption name UCI_Variant value xiangqi");
             
-            // 配置引擎强度 - 增强游戏水平
-            // 设置Hash表大小为256MB，提升搜索效率
-            sendCommand("setoption name Hash value 256");
+            // === 根据专业建议进行极致优化 ===
+            log("正在应用专业级引擎优化配置...");
             
-            // 设置线程数为4，提升多核CPU性能
-            sendCommand("setoption name Threads value 4");
+            // 1. 最大棋力设置 - 关闭所有限制
+            sendCommand("setoption name Skill Level value 20");           // 最高技能等级
+            sendCommand("setoption name UCI_LimitStrength value false");   // 禁用棋力限制
+            sendCommand("setoption name Contempt value 0");               // 无偏见评估
+            sendCommand("setoption name Nodestime value 0");              // 禁用节点限制
             
-            // 启用Ponder（思考对手时间），增强分析深度
-            sendCommand("setoption name Ponder value true");
+            // 2. 大内存配置 - 最大化置换表大小
+            sendCommand("setoption name Hash value 1024");               // 1GB Hash表（专业级）
+            sendCommand("setoption name Clear Hash value true");          // 清除旧Hash数据
             
-            // 设置技能等级为最高（20级），确保最强棋力
-            sendCommand("setoption name Skill Level value 20");
+            // 3. 多线程优化 - 充分利用CPU核心
+            int cpuCores = Runtime.getRuntime().availableProcessors();
+            int threads = Math.max(4, Math.min(cpuCores, 16)); // 4-16线程范围
+            sendCommand("setoption name Threads value " + threads);
+            log("设置线程数: " + threads + " (CPU核心数: " + cpuCores + ")");
             
-            // 禁用随机性，确保最佳走法
-            sendCommand("setoption name UCI_LimitStrength value false");
+            // 4. 搜索优化 - 提升搜索质量
+            sendCommand("setoption name Ponder value true");              // 启用后台思考
+            sendCommand("setoption name UCI_AnalyseMode value true");     // 分析模式
+            sendCommand("setoption name MultiPV value 1");                // 主要变例数
+            sendCommand("setoption name Move Overhead value 50");         // 减少移动开销
             
-            // 设置更深的搜索策略
-            sendCommand("setoption name Contempt value 0");
+            // 5. 评估优化 - 启用最强神经网络
+            sendCommand("setoption name UCI_ShowWDL value true");         // 显示胜负平概率
+            sendCommand("setoption name SyzygyPath value clear");         // 清除残局库路径
+            
+            // 6. 时间管理优化
+            sendCommand("setoption name Minimum Thinking Time value 1000"); // 最少思考时间
+            sendCommand("setoption name Slow Mover value 100");            // 减缓速度设置
             
             // 等待引擎准备就绪
             sendCommand("isready");
@@ -286,22 +301,24 @@ public class FairyStockfishEngine {
     }
     
     /**
-     * 根据思考时间计算最优搜索深度
+     * 根据思考时间计算最优搜索深度（优化版）
      * @param thinkTimeMs 思考时间（毫秒）
      * @return 搜索深度
      */
     private int calculateSearchDepth(int thinkTimeMs) {
-        // 基于思考时间动态计算深度，确保强棋力
-        if (thinkTimeMs <= 2000) {
-            return 12;  // 短时间：中等深度
-        } else if (thinkTimeMs <= 5000) {
-            return 15;  // 中等时间：更深搜索
-        } else if (thinkTimeMs <= 10000) {
-            return 18;  // 较长时间：深度搜索
-        } else if (thinkTimeMs <= 20000) {
-            return 22;  // 长时间：非常深度的搜索
+        // 新的增强算法，为高难度级别提供更深的搜索
+        if (thinkTimeMs <= 3000) {
+            return 12;   // 3秒及以下: 中等深度
+        } else if (thinkTimeMs <= 8000) {
+            return 15;   // 8秒及以下: 较深搜索
+        } else if (thinkTimeMs <= 15000) {
+            return 18;   // 15秒及以下: 深度搜索
+        } else if (thinkTimeMs <= 30000) {
+            return 22;   // 30秒及以下: 高深度搜索
+        } else if (thinkTimeMs <= 60000) {
+            return 26;   // 1分钟及以下: 非常深度搜索
         } else {
-            return 25;  // 最长时间：最深搜索，确保最强棋力
+            return 30;   // 超过1分钟: 最深搜索，极致棋力
         }
     }
     

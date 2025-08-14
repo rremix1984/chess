@@ -396,4 +396,133 @@ public class Board {
             }
         }
     }
+    
+    /**
+     * 将棋步转换为中国象棋记谱法
+     * @param move 棋步
+     * @return 中国象棋记谱法字符串
+     */
+    public String toChineseNotation(Move move) {
+        if (move == null || move.getStart() == null || move.getEnd() == null) {
+            return "未知走法";
+        }
+        
+        try {
+            Position start = move.getStart();
+            Position end = move.getEnd();
+            Piece piece = getPiece(start.getX(), start.getY());
+            
+            if (piece == null) {
+                return "无效走法";
+            }
+            
+            String pieceName = getPieceChineseName(piece);
+            String position = getChinesePosition(start, piece.getColor());
+            String direction = getChineseDirection(start, end, piece);
+            String target = getChineseTarget(start, end, piece);
+            
+            return pieceName + position + direction + target;
+        } catch (Exception e) {
+            return "走法解析出错";
+        }
+    }
+    
+    /**
+     * 获取棋子的中文名称
+     */
+    private String getPieceChineseName(Piece piece) {
+        if (piece instanceof General) {
+            return piece.getColor() == PieceColor.RED ? "帅" : "将";
+        } else if (piece instanceof Advisor) {
+            return piece.getColor() == PieceColor.RED ? "仕" : "士";
+        } else if (piece instanceof Elephant) {
+            return piece.getColor() == PieceColor.RED ? "相" : "象";
+        } else if (piece instanceof Horse) {
+            return "马";
+        } else if (piece instanceof Chariot) {
+            return "车";
+        } else if (piece instanceof Cannon) {
+            return "炮";
+        } else if (piece instanceof Soldier) {
+            return piece.getColor() == PieceColor.RED ? "兵" : "卒";
+        }
+        return "未知";
+    }
+    
+    /**
+     * 获取中文位置表示
+     */
+    private String getChinesePosition(Position pos, PieceColor color) {
+        int col = pos.getY();
+        if (color == PieceColor.RED) {
+            // 红方使用中文数字（从右到左）
+            String[] redNumbers = {"九", "八", "七", "六", "五", "四", "三", "二", "一"};
+            return redNumbers[col];
+        } else {
+            // 黑方使用阿拉伯数字（从左到右）
+            return String.valueOf(col + 1);
+        }
+    }
+    
+    /**
+     * 获取移动方向
+     */
+    private String getChineseDirection(Position start, Position end, Piece piece) {
+        int startRow = start.getX();
+        int endRow = end.getX();
+        int startCol = start.getY();
+        int endCol = end.getY();
+        
+        if (piece instanceof Horse || piece instanceof Elephant || piece instanceof Advisor) {
+            // 斜线棋子直接返回目标位置
+            return "";
+        }
+        
+        if (startRow == endRow) {
+            return "平";
+        } else if (endRow < startRow) {
+            return "进";
+        } else {
+            return "退";
+        }
+    }
+    
+    /**
+     * 获取目标位置或步数
+     */
+    private String getChineseTarget(Position start, Position end, Piece piece) {
+        int startRow = start.getX();
+        int endRow = end.getX();
+        int startCol = start.getY();
+        int endCol = end.getY();
+        
+        if (piece instanceof Horse || piece instanceof Elephant || piece instanceof Advisor) {
+            // 斜线棋子返回目标纵线位置
+            if (piece.getColor() == PieceColor.RED) {
+                String[] redNumbers = {"九", "八", "七", "六", "五", "四", "三", "二", "一"};
+                return redNumbers[endCol];
+            } else {
+                return String.valueOf(endCol + 1);
+            }
+        }
+        
+        if (startRow == endRow) {
+            // 平移：返回目标纵线
+            if (piece.getColor() == PieceColor.RED) {
+                String[] redNumbers = {"九", "八", "七", "六", "五", "四", "三", "二", "一"};
+                return redNumbers[endCol];
+            } else {
+                return String.valueOf(endCol + 1);
+            }
+        } else {
+            // 进退：返回步数
+            int steps = Math.abs(endRow - startRow);
+            if (piece.getColor() == PieceColor.RED) {
+                String[] redNumbers = {"一", "二", "三", "四", "五", "六", "七", "八", "九"};
+                return steps <= 9 ? redNumbers[steps - 1] : String.valueOf(steps);
+            } else {
+                return String.valueOf(steps);
+            }
+        }
+    }
 }
