@@ -106,8 +106,8 @@ public class BoardPanel extends JPanel {
     private boolean isSettingUpEndgame = false;
     private PieceColor endgameAIColor = PieceColor.BLACK; // 残局中AI执子颜色
     private boolean isAIvsAIMode = false; // AI对AI模式
-    private DeepSeekPikafishAI redAI; // 红方AI
-    private DeepSeekPikafishAI blackAI; // 黑方AI
+    private Object redAI; // 红方AI (支持多种引擎类型)
+    private Object blackAI; // 黑方AI (支持多种引擎类型)
     
     // 残局棋子选择菜单相关
     private JPopupMenu pieceSelectionMenu;
@@ -2517,11 +2517,23 @@ public class BoardPanel extends JPanel {
             
             // 清理AI实例
             if (redAI != null) {
-                redAI.shutdown();
+                if (redAI instanceof DeepSeekPikafishAI) {
+                    ((DeepSeekPikafishAI) redAI).shutdown();
+                } else if (redAI instanceof PikafishAI) {
+                    ((PikafishAI) redAI).cleanup();
+                } else if (redAI instanceof FairyStockfishAI) {
+                    ((FairyStockfishAI) redAI).cleanup();
+                }
                 redAI = null;
             }
             if (blackAI != null) {
-                blackAI.shutdown();
+                if (blackAI instanceof DeepSeekPikafishAI) {
+                    ((DeepSeekPikafishAI) blackAI).shutdown();
+                } else if (blackAI instanceof PikafishAI) {
+                    ((PikafishAI) blackAI).cleanup();
+                } else if (blackAI instanceof FairyStockfishAI) {
+                    ((FairyStockfishAI) blackAI).cleanup();
+                }
                 blackAI = null;
             }
             
@@ -2700,13 +2712,21 @@ public class BoardPanel extends JPanel {
         SwingWorker<Move, Void> worker = new SwingWorker<Move, Void>() {
             @Override
             protected Move doInBackground() throws Exception {
-                DeepSeekPikafishAI currentAI = (currentPlayer == PieceColor.RED) ? redAI : blackAI;
+                Object currentAI = (currentPlayer == PieceColor.RED) ? redAI : blackAI;
                 String aiName = (currentPlayer == PieceColor.RED) ? "红方AI" : "黑方AI";
                 
                 addAILog("思考", aiName + "正在思考...");
                 
-                // 让AI分析并返回最佳走法
-                return currentAI.getBestMove(board);
+                // 根据AI类型调用相应的getBestMove方法
+                if (currentAI instanceof DeepSeekPikafishAI) {
+                    return ((DeepSeekPikafishAI) currentAI).getBestMove(board);
+                } else if (currentAI instanceof PikafishAI) {
+                    return ((PikafishAI) currentAI).getBestMove(board);
+                } else if (currentAI instanceof FairyStockfishAI) {
+                    return ((FairyStockfishAI) currentAI).getBestMove(board);
+                } else {
+                    throw new IllegalStateException("不支持的AI类型: " + currentAI.getClass().getSimpleName());
+                }
             }
             
             @Override
@@ -3585,8 +3605,21 @@ public class BoardPanel extends JPanel {
             
             // 设置AI日志面板
             if (aiLogPanel != null) {
-                redAI.setAILogPanel(aiLogPanel);
-                blackAI.setAILogPanel(aiLogPanel);
+                if (redAI instanceof DeepSeekPikafishAI) {
+                    ((DeepSeekPikafishAI) redAI).setAILogPanel(aiLogPanel);
+                } else if (redAI instanceof PikafishAI) {
+                    ((PikafishAI) redAI).setAILogPanel(aiLogPanel);
+                } else if (redAI instanceof FairyStockfishAI) {
+                    ((FairyStockfishAI) redAI).setAILogPanel(aiLogPanel);
+                }
+                
+                if (blackAI instanceof DeepSeekPikafishAI) {
+                    ((DeepSeekPikafishAI) blackAI).setAILogPanel(aiLogPanel);
+                } else if (blackAI instanceof PikafishAI) {
+                    ((PikafishAI) blackAI).setAILogPanel(aiLogPanel);
+                } else if (blackAI instanceof FairyStockfishAI) {
+                    ((FairyStockfishAI) blackAI).setAILogPanel(aiLogPanel);
+                }
             }
             
             addAILog("system", "AI vs AI对弈模式已启用 - 红方AI vs 黑方AI (Pikafish引擎)");
@@ -3624,8 +3657,21 @@ public class BoardPanel extends JPanel {
             
             // 设置AI日志面板
             if (aiLogPanel != null) {
-                redAI.setAILogPanel(aiLogPanel);
-                blackAI.setAILogPanel(aiLogPanel);
+                if (redAI instanceof DeepSeekPikafishAI) {
+                    ((DeepSeekPikafishAI) redAI).setAILogPanel(aiLogPanel);
+                } else if (redAI instanceof PikafishAI) {
+                    ((PikafishAI) redAI).setAILogPanel(aiLogPanel);
+                } else if (redAI instanceof FairyStockfishAI) {
+                    ((FairyStockfishAI) redAI).setAILogPanel(aiLogPanel);
+                }
+                
+                if (blackAI instanceof DeepSeekPikafishAI) {
+                    ((DeepSeekPikafishAI) blackAI).setAILogPanel(aiLogPanel);
+                } else if (blackAI instanceof PikafishAI) {
+                    ((PikafishAI) blackAI).setAILogPanel(aiLogPanel);
+                } else if (blackAI instanceof FairyStockfishAI) {
+                    ((FairyStockfishAI) blackAI).setAILogPanel(aiLogPanel);
+                }
             }
             
             String redDifficultyName = getDifficultyName(redDifficulty);
@@ -3659,6 +3705,71 @@ public class BoardPanel extends JPanel {
     }
     
     /**
+     * 启用AI vs AI对弈模式（支持引擎选择）
+     */
+    public void enableAIvsAIWithEngines(int redDifficulty, String redModelName, String redEngine,
+                                        int blackDifficulty, String blackModelName, String blackEngine) {
+        // 禁用原有的AI
+        disableAI();
+        
+        // 设置AI vs AI模式
+        isAIvsAIMode = true;
+        isAIEnabled = false; // 禁用原有的单AI模式
+        
+        try {
+            // 根据选择的引擎创建红方AI
+            if ("Pikafish".equals(redEngine)) {
+                redAI = new PikafishAI(PieceColor.RED, redDifficulty);
+            } else { // FairyStockfish
+                redAI = new FairyStockfishAI(PieceColor.RED, redDifficulty);
+            }
+            
+            // 根据选择的引擎创建黑方AI
+            if ("Pikafish".equals(blackEngine)) {
+                blackAI = new PikafishAI(PieceColor.BLACK, blackDifficulty);
+            } else { // FairyStockfish
+                blackAI = new FairyStockfishAI(PieceColor.BLACK, blackDifficulty);
+            }
+            
+            // 设置AI日志面板
+            if (aiLogPanel != null) {
+                if (redAI instanceof DeepSeekPikafishAI) {
+                    ((DeepSeekPikafishAI) redAI).setAILogPanel(aiLogPanel);
+                } else if (redAI instanceof PikafishAI) {
+                    ((PikafishAI) redAI).setAILogPanel(aiLogPanel);
+                } else if (redAI instanceof FairyStockfishAI) {
+                    ((FairyStockfishAI) redAI).setAILogPanel(aiLogPanel);
+                }
+                
+                if (blackAI instanceof DeepSeekPikafishAI) {
+                    ((DeepSeekPikafishAI) blackAI).setAILogPanel(aiLogPanel);
+                } else if (blackAI instanceof PikafishAI) {
+                    ((PikafishAI) blackAI).setAILogPanel(aiLogPanel);
+                } else if (blackAI instanceof FairyStockfishAI) {
+                    ((FairyStockfishAI) blackAI).setAILogPanel(aiLogPanel);
+                }
+            }
+            
+            String redDifficultyName = getDifficultyName(redDifficulty);
+            String blackDifficultyName = getDifficultyName(blackDifficulty);
+            addAILog("system", "AI vs AI对弈模式已启用 - 🔴红方AI(" + redEngine + ", " + redDifficultyName + ") vs ⚫黑方AI(" + blackEngine + ", " + blackDifficultyName + ")");
+            System.out.println("🤖 AI vs AI对弈模式已启用 - 红方AI(" + redEngine + ", " + redDifficultyName + ") vs 黑方AI(" + blackEngine + ", " + blackDifficultyName + ")");
+            
+            // 如果当前是红方回合，让红方AI先走
+            if (currentPlayer == PieceColor.RED) {
+                SwingUtilities.invokeLater(this::performAIvsAIMove);
+            }
+            
+        } catch (Exception e) {
+            showErrorInfo("AI初始化失败：" + e.getMessage());
+            isAIvsAIMode = false;
+            ExceptionHandler.logError("AI vs AI模式初始化失败: " + e.getMessage(), "BoardPanel");
+        }
+        
+        updateStatus();
+    }
+    
+    /**
      * 禁用AI vs AI对弈模式
      */
     public void disableAIvsAI() {
@@ -3666,11 +3777,23 @@ public class BoardPanel extends JPanel {
         
         // 清理AI实例
         if (redAI != null) {
-            redAI.shutdown();
+            if (redAI instanceof DeepSeekPikafishAI) {
+                ((DeepSeekPikafishAI) redAI).shutdown();
+            } else if (redAI instanceof PikafishAI) {
+                ((PikafishAI) redAI).cleanup();
+            } else if (redAI instanceof FairyStockfishAI) {
+                ((FairyStockfishAI) redAI).cleanup();
+            }
             redAI = null;
         }
         if (blackAI != null) {
-            blackAI.shutdown();
+            if (blackAI instanceof DeepSeekPikafishAI) {
+                ((DeepSeekPikafishAI) blackAI).shutdown();
+            } else if (blackAI instanceof PikafishAI) {
+                ((PikafishAI) blackAI).cleanup();
+            } else if (blackAI instanceof FairyStockfishAI) {
+                ((FairyStockfishAI) blackAI).cleanup();
+            }
             blackAI = null;
         }
         

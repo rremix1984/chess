@@ -64,8 +64,10 @@ public class GameFrame extends JFrame {
     private JPanel aiVsAiConfigPanel;
     private JComboBox<String> redAIDifficultyComboBox;
     private JComboBox<String> redAIModelComboBox;
+    private JComboBox<String> redAIEngineComboBox;
     private JComboBox<String> blackAIDifficultyComboBox;
     private JComboBox<String> blackAIModelComboBox;
+    private JComboBox<String> blackAIEngineComboBox;
     private boolean isAiVsAiConfigVisible = false;
 
     public GameFrame() {
@@ -402,11 +404,18 @@ public class GameFrame extends JFrame {
         // 创建AI对AI配置面板
         aiVsAiConfigPanel = new JPanel();
         aiVsAiConfigPanel.setBorder(BorderFactory.createTitledBorder("🤖 AI对AI配置"));
-        aiVsAiConfigPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 5));
-        aiVsAiConfigPanel.setPreferredSize(new Dimension(1300, 50));
+        aiVsAiConfigPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 5));
+        aiVsAiConfigPanel.setPreferredSize(new Dimension(1300, 60));
         
         // 红方AI配置
         aiVsAiConfigPanel.add(new JLabel("🔴红方:"));
+        
+        aiVsAiConfigPanel.add(new JLabel("引擎:"));
+        String[] engineOptions = {"FairyStockfish", "Pikafish"};
+        redAIEngineComboBox = new JComboBox<>(engineOptions);
+        redAIEngineComboBox.setSelectedIndex(0); // 默认FairyStockfish
+        redAIEngineComboBox.setPreferredSize(new Dimension(100, 25));
+        aiVsAiConfigPanel.add(redAIEngineComboBox);
         
         aiVsAiConfigPanel.add(new JLabel("难度:"));
         String[] difficultyOptions = {"简单", "普通", "困难", "专家", "大师", "特级", "超级", "顶级", "传奇", "神级"};
@@ -419,14 +428,20 @@ public class GameFrame extends JFrame {
         List<String> availableModels = OllamaModelManager.getAvailableModels();
         redAIModelComboBox = new JComboBox<>(availableModels.toArray(new String[0]));
         redAIModelComboBox.setSelectedIndex(0); // 默认第一个模型
-        redAIModelComboBox.setPreferredSize(new Dimension(150, 25));
+        redAIModelComboBox.setPreferredSize(new Dimension(120, 25));
         aiVsAiConfigPanel.add(redAIModelComboBox);
         
         // 分隔符
-        aiVsAiConfigPanel.add(new JLabel("   |   "));
+        aiVsAiConfigPanel.add(new JLabel("  |  "));
         
         // 黑方AI配置
         aiVsAiConfigPanel.add(new JLabel("⚫黑方:"));
+        
+        aiVsAiConfigPanel.add(new JLabel("引擎:"));
+        blackAIEngineComboBox = new JComboBox<>(engineOptions);
+        blackAIEngineComboBox.setSelectedIndex(1); // 默认Pikafish (与红方不同)
+        blackAIEngineComboBox.setPreferredSize(new Dimension(100, 25));
+        aiVsAiConfigPanel.add(blackAIEngineComboBox);
         
         aiVsAiConfigPanel.add(new JLabel("难度:"));
         blackAIDifficultyComboBox = new JComboBox<>(difficultyOptions);
@@ -437,7 +452,7 @@ public class GameFrame extends JFrame {
         aiVsAiConfigPanel.add(new JLabel("模型:"));
         blackAIModelComboBox = new JComboBox<>(availableModels.toArray(new String[0]));
         blackAIModelComboBox.setSelectedIndex(0); // 默认第一个模型
-        blackAIModelComboBox.setPreferredSize(new Dimension(150, 25));
+        blackAIModelComboBox.setPreferredSize(new Dimension(120, 25));
         aiVsAiConfigPanel.add(blackAIModelComboBox);
         
         // 初始隐藏面板
@@ -1229,11 +1244,13 @@ public class GameFrame extends JFrame {
         // 使用配置面板的设置启动AI vs AI模式
         int redDifficulty = redAIDifficultyComboBox.getSelectedIndex() + 1;
         String redModelName = (String) redAIModelComboBox.getSelectedItem();
+        String redEngine = (String) redAIEngineComboBox.getSelectedItem();
         int blackDifficulty = blackAIDifficultyComboBox.getSelectedIndex() + 1;
         String blackModelName = (String) blackAIModelComboBox.getSelectedItem();
+        String blackEngine = (String) blackAIEngineComboBox.getSelectedItem();
         
         // 启动AI vs AI模式（传入红方和黑方的配置）
-        boardPanel.enableAIvsAI(redDifficulty, redModelName, blackDifficulty, blackModelName);
+        boardPanel.enableAIvsAIWithEngines(redDifficulty, redModelName, redEngine, blackDifficulty, blackModelName, blackEngine);
         
         // 禁用相关控件（AI对AI模式下不需要用户选择）
         aiTypeComboBox.setEnabled(false);
@@ -1247,7 +1264,7 @@ public class GameFrame extends JFrame {
         
         String redDifficultyName = getDifficultyName(redDifficulty);
         String blackDifficultyName = getDifficultyName(blackDifficulty);
-        updateStatus("🤖 AI对AI模式 - 🔴红方AI(" + redDifficultyName + ", " + redModelName + ") vs ⚫黑方AI(" + blackDifficultyName + ", " + blackModelName + ")");
+        updateStatus("🤖 AI对AI模式 - 🔴红方AI(" + redEngine + ", " + redDifficultyName + ") vs ⚫黑方AI(" + blackEngine + ", " + blackDifficultyName + ")");
     }
     
     /**
