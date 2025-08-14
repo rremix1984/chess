@@ -18,6 +18,7 @@ public class PikafishEngine {
     private BufferedReader reader;
     private boolean isInitialized = false;
     private String enginePath;
+    private String neuralNetworkPath; // 神经网络文件路径
     private static final int DEFAULT_TIMEOUT = 10000; // 10秒超时
     
     // 日志回调接口
@@ -41,6 +42,15 @@ public class PikafishEngine {
      */
     public void setLogCallback(LogCallback callback) {
         this.logCallback = callback;
+    }
+    
+    /**
+     * 设置神经网络文件路径
+     * @param neuralNetworkPath 神经网络文件路径
+     */
+    public void setNeuralNetworkPath(String neuralNetworkPath) {
+        this.neuralNetworkPath = neuralNetworkPath;
+        log("设置神经网络文件: " + neuralNetworkPath);
     }
     
     /**
@@ -112,20 +122,26 @@ public class PikafishEngine {
             sendCommand("setoption name MultiPV value 1");     // 保证专注于最优走法
             
             // 尝试设置神经网络文件路径
-            // 首先尝试从配置管理器获取NNUE文件路径
-            String nnueFilePath = null;
-            try {
-                com.example.common.config.ConfigurationManager config = 
-                    com.example.common.config.ConfigurationManager.getInstance();
-                nnueFilePath = config.getPikafishConfig().neuralNetworkPath;
-                System.out.println("从配置文件获取NNUE路径: " + nnueFilePath);
-            } catch (Exception e) {
-                System.out.println("无法获取配置管理器，使用默认路径");
+            // 优先使用手动设置的neuralNetworkPath字段
+            String nnueFilePath = this.neuralNetworkPath;
+            
+            // 如果没有手动设置，尝试从配置管理器获取NNUE文件路径
+            if (nnueFilePath == null || nnueFilePath.isEmpty()) {
+                try {
+                    com.example.common.config.ConfigurationManager config = 
+                        com.example.common.config.ConfigurationManager.getInstance();
+                    nnueFilePath = config.getPikafishConfig().neuralNetworkPath;
+                    System.out.println("从配置文件获取NNUE路径: " + nnueFilePath);
+                } catch (Exception e) {
+                    System.out.println("无法获取配置管理器，使用默认路径");
+                }
+            } else {
+                System.out.println("使用手动设置的NNUE路径: " + nnueFilePath);
             }
             
             // 如果配置路径不存在，尝试多个可能的位置
             File nnueFile = null;
-            if (nnueFilePath != null) {
+            if (nnueFilePath != null && !nnueFilePath.isEmpty()) {
                 nnueFile = new File(nnueFilePath);
             }
             

@@ -71,6 +71,17 @@ public class GameFrame extends JFrame {
     private JComboBox<String> blackAIEngineComboBox;
     private boolean isAiVsAiConfigVisible = false;
     
+    // 神经网络文件选择器相关组件
+    private JLabel neuralNetworkLabel;
+    private JTextField neuralNetworkPathField;
+    private JButton neuralNetworkBrowseButton;
+    private JLabel redNeuralNetworkLabel;
+    private JTextField redNeuralNetworkPathField;
+    private JButton redNeuralNetworkBrowseButton;
+    private JLabel blackNeuralNetworkLabel;
+    private JTextField blackNeuralNetworkPathField;
+    private JButton blackNeuralNetworkBrowseButton;
+    
     // 已移除棋盘监控功能
 
     public GameFrame() {
@@ -98,6 +109,9 @@ public class GameFrame extends JFrame {
         
         // 设置ChatPanel的BoardPanel引用，以便访问AI实例
         chatPanel.setBoardPanel(boardPanel);
+        
+        // 设置ChatPanel的GameFrame引用，以便获取神经网络文件路径
+        chatPanel.setGameFrame(this);
         
         // 创建右侧面板（聊天+AI日志）
         JTabbedPane rightTabbedPane = new JTabbedPane();
@@ -220,7 +234,10 @@ public class GameFrame extends JFrame {
         aiTypeComboBox = new JComboBox<>(new String[]{"传统AI", "增强AI", "大模型AI", "混合AI", "DeepSeek+Pikafish", "Fairy-Stockfish", "Pikafish"});
         aiTypeComboBox.setSelectedIndex(3); // 默认选择混合AI
         aiTypeComboBox.setPreferredSize(new Dimension(80, 25));
-        aiTypeComboBox.addActionListener(e -> updateModelComboBox());
+        aiTypeComboBox.addActionListener(e -> {
+            updateModelComboBox();
+            updateNeuralNetworkVisibility();
+        });
         leftPanel.add(aiTypeComboBox);
 
         // AI难度选择
@@ -238,6 +255,27 @@ public class GameFrame extends JFrame {
         modelComboBox.setSelectedIndex(0); // 默认选择第一个模型
         modelComboBox.setPreferredSize(new Dimension(150, 25));
         leftPanel.add(modelComboBox);
+        
+        // 神经网络文件选择器（仅FairyStockfish需要）
+        neuralNetworkLabel = new JLabel("神经网络:");
+        neuralNetworkLabel.setVisible(false);
+        leftPanel.add(neuralNetworkLabel);
+        
+        neuralNetworkPathField = new JTextField();
+        neuralNetworkPathField.setPreferredSize(new Dimension(120, 25));
+        neuralNetworkPathField.setEditable(false);
+        neuralNetworkPathField.setToolTipText("选择FairyStockfish神经网络文件（可选）");
+        neuralNetworkPathField.setVisible(false);
+        leftPanel.add(neuralNetworkPathField);
+        
+        neuralNetworkBrowseButton = new JButton("浏览...");
+        neuralNetworkBrowseButton.setPreferredSize(new Dimension(60, 25));
+        neuralNetworkBrowseButton.setFont(new Font("微软雅黑", Font.PLAIN, 10));
+        neuralNetworkBrowseButton.setToolTipText("浏览选择神经网络文件");
+        neuralNetworkBrowseButton.addActionListener(e -> browseNeuralNetworkFile());
+        neuralNetworkBrowseButton.setVisible(false);
+        styleButton(neuralNetworkBrowseButton);
+        leftPanel.add(neuralNetworkBrowseButton);
         
         panel.add(leftPanel, BorderLayout.CENTER);
 
@@ -399,6 +437,7 @@ public class GameFrame extends JFrame {
         redAIEngineComboBox = new JComboBox<>(engineOptions);
         redAIEngineComboBox.setSelectedIndex(0); // 默认FairyStockfish
         redAIEngineComboBox.setPreferredSize(new Dimension(100, 25));
+        redAIEngineComboBox.addActionListener(e -> updateAIvsAINeuralNetworkVisibility());
         aiVsAiConfigPanel.add(redAIEngineComboBox);
         
         aiVsAiConfigPanel.add(new JLabel("难度:"));
@@ -425,6 +464,7 @@ public class GameFrame extends JFrame {
         blackAIEngineComboBox = new JComboBox<>(engineOptions);
         blackAIEngineComboBox.setSelectedIndex(1); // 默认Pikafish (与红方不同)
         blackAIEngineComboBox.setPreferredSize(new Dimension(100, 25));
+        blackAIEngineComboBox.addActionListener(e -> updateAIvsAINeuralNetworkVisibility());
         aiVsAiConfigPanel.add(blackAIEngineComboBox);
         
         aiVsAiConfigPanel.add(new JLabel("难度:"));
@@ -438,6 +478,48 @@ public class GameFrame extends JFrame {
         blackAIModelComboBox.setSelectedIndex(0); // 默认第一个模型
         blackAIModelComboBox.setPreferredSize(new Dimension(120, 25));
         aiVsAiConfigPanel.add(blackAIModelComboBox);
+        
+        // 黑方神经网络文件选择器（仅FairyStockfish需要）
+        blackNeuralNetworkLabel = new JLabel("神经网络:");
+        blackNeuralNetworkLabel.setVisible(false); // 默认隐藏，因为默认选择Pikafish
+        aiVsAiConfigPanel.add(blackNeuralNetworkLabel);
+        
+        blackNeuralNetworkPathField = new JTextField();
+        blackNeuralNetworkPathField.setPreferredSize(new Dimension(80, 25));
+        blackNeuralNetworkPathField.setEditable(false);
+        blackNeuralNetworkPathField.setToolTipText("选择黑方FairyStockfish神经网络文件（可选）");
+        blackNeuralNetworkPathField.setVisible(false);
+        aiVsAiConfigPanel.add(blackNeuralNetworkPathField);
+        
+        blackNeuralNetworkBrowseButton = new JButton("浏览...");
+        blackNeuralNetworkBrowseButton.setPreferredSize(new Dimension(50, 25));
+        blackNeuralNetworkBrowseButton.setFont(new Font("微软雅黑", Font.PLAIN, 9));
+        blackNeuralNetworkBrowseButton.setToolTipText("浏览选择黑方神经网络文件");
+        blackNeuralNetworkBrowseButton.addActionListener(e -> browseBlackNeuralNetworkFile());
+        blackNeuralNetworkBrowseButton.setVisible(false);
+        styleButton(blackNeuralNetworkBrowseButton);
+        aiVsAiConfigPanel.add(blackNeuralNetworkBrowseButton);
+        
+        // 红方神经网络文件选择器（仅FairyStockfish需要）
+        redNeuralNetworkLabel = new JLabel("神经网络:");
+        redNeuralNetworkLabel.setVisible(true); // 默认显示，因为默认选择FairyStockfish
+        aiVsAiConfigPanel.add(redNeuralNetworkLabel);
+        
+        redNeuralNetworkPathField = new JTextField();
+        redNeuralNetworkPathField.setPreferredSize(new Dimension(80, 25));
+        redNeuralNetworkPathField.setEditable(false);
+        redNeuralNetworkPathField.setToolTipText("选择红方FairyStockfish神经网络文件（可选）");
+        redNeuralNetworkPathField.setVisible(true);
+        aiVsAiConfigPanel.add(redNeuralNetworkPathField);
+        
+        redNeuralNetworkBrowseButton = new JButton("浏览...");
+        redNeuralNetworkBrowseButton.setPreferredSize(new Dimension(50, 25));
+        redNeuralNetworkBrowseButton.setFont(new Font("微软雅黑", Font.PLAIN, 9));
+        redNeuralNetworkBrowseButton.setToolTipText("浏览选择红方神经网络文件");
+        redNeuralNetworkBrowseButton.addActionListener(e -> browseRedNeuralNetworkFile());
+        redNeuralNetworkBrowseButton.setVisible(true);
+        styleButton(redNeuralNetworkBrowseButton);
+        aiVsAiConfigPanel.add(redNeuralNetworkBrowseButton);
         
         // 初始隐藏面板
         aiVsAiConfigPanel.setVisible(false);
@@ -1651,6 +1733,144 @@ public class GameFrame extends JFrame {
         };
         
         analysisWorker.execute();
+    }
+    
+    /**
+     * 浏览选择神经网络文件（玩家对AI模式）
+     */
+    private void browseNeuralNetworkFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("选择FairyStockfish神经网络文件");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(java.io.File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".nnue") || f.getName().toLowerCase().endsWith(".bin");
+            }
+            
+            @Override
+            public String getDescription() {
+                return "神经网络文件 (*.nnue, *.bin)";
+            }
+        });
+        
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            java.io.File selectedFile = fileChooser.getSelectedFile();
+            neuralNetworkPathField.setText(selectedFile.getAbsolutePath());
+        }
+    }
+    
+    /**
+     * 浏览选择红方神经网络文件（AI对AI模式）
+     */
+    private void browseRedNeuralNetworkFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("选择红方FairyStockfish神经网络文件");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(java.io.File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".nnue") || f.getName().toLowerCase().endsWith(".bin");
+            }
+            
+            @Override
+            public String getDescription() {
+                return "神经网络文件 (*.nnue, *.bin)";
+            }
+        });
+        
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            java.io.File selectedFile = fileChooser.getSelectedFile();
+            redNeuralNetworkPathField.setText(selectedFile.getAbsolutePath());
+        }
+    }
+    
+    /**
+     * 浏览选择黑方神经网络文件（AI对AI模式）
+     */
+    private void browseBlackNeuralNetworkFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("选择黑方FairyStockfish神经网络文件");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(java.io.File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".nnue") || f.getName().toLowerCase().endsWith(".bin");
+            }
+            
+            @Override
+            public String getDescription() {
+                return "神经网络文件 (*.nnue, *.bin)";
+            }
+        });
+        
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            java.io.File selectedFile = fileChooser.getSelectedFile();
+            blackNeuralNetworkPathField.setText(selectedFile.getAbsolutePath());
+        }
+    }
+    
+    /**
+     * 更新神经网络文件选择器的可见性（玩家对AI模式）
+     */
+    private void updateNeuralNetworkVisibility() {
+        int aiTypeIndex = aiTypeComboBox.getSelectedIndex();
+        boolean isFairyStockfish = (aiTypeIndex == 5); // Fairy-Stockfish
+        
+        neuralNetworkLabel.setVisible(isFairyStockfish);
+        neuralNetworkPathField.setVisible(isFairyStockfish);
+        neuralNetworkBrowseButton.setVisible(isFairyStockfish);
+        
+        // 刷新界面
+        revalidate();
+        repaint();
+    }
+    
+    /**
+     * 更新AI对AI模式中神经网络文件选择器的可见性
+     */
+    private void updateAIvsAINeuralNetworkVisibility() {
+        // 更新红方神经网络选择器可见性
+        String redEngine = (String) redAIEngineComboBox.getSelectedItem();
+        boolean redIsFairyStockfish = "FairyStockfish".equals(redEngine);
+        redNeuralNetworkLabel.setVisible(redIsFairyStockfish);
+        redNeuralNetworkPathField.setVisible(redIsFairyStockfish);
+        redNeuralNetworkBrowseButton.setVisible(redIsFairyStockfish);
+        
+        // 更新黑方神经网络选择器可见性
+        String blackEngine = (String) blackAIEngineComboBox.getSelectedItem();
+        boolean blackIsFairyStockfish = "FairyStockfish".equals(blackEngine);
+        blackNeuralNetworkLabel.setVisible(blackIsFairyStockfish);
+        blackNeuralNetworkPathField.setVisible(blackIsFairyStockfish);
+        blackNeuralNetworkBrowseButton.setVisible(blackIsFairyStockfish);
+        
+        // 刷新界面
+        revalidate();
+        repaint();
+    }
+    
+    /**
+     * 获取选择的神经网络文件路径（玩家对AI模式）
+     */
+    public String getSelectedNeuralNetworkPath() {
+        String path = neuralNetworkPathField.getText();
+        return (path != null && !path.trim().isEmpty()) ? path.trim() : null;
+    }
+    
+    /**
+     * 获取红方选择的神经网络文件路径（AI对AI模式）
+     */
+    public String getRedNeuralNetworkPath() {
+        String path = redNeuralNetworkPathField.getText();
+        return (path != null && !path.trim().isEmpty()) ? path.trim() : null;
+    }
+    
+    /**
+     * 获取黑方选择的神经网络文件路径（AI对AI模式）
+     */
+    public String getBlackNeuralNetworkPath() {
+        String path = blackNeuralNetworkPathField.getText();
+        return (path != null && !path.trim().isEmpty()) ? path.trim() : null;
     }
     
     /**

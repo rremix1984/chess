@@ -36,6 +36,7 @@ public class ChatPanel extends JPanel {
     private JComboBox<String> fairyStockfishDifficultyComboBox; // Fairy-Stockfish难度选择
     // 棋盘面板引用已移除，简化实现
     private Object boardPanel; // 棋盘面板引用，用于显示推荐走法标记
+    private Object gameFrame; // GameFrame引用，用于获取神经网络文件路径
     private String modelName;
     private boolean isEnabled;
     
@@ -808,12 +809,47 @@ public class ChatPanel extends JPanel {
             try {
                 // 实际调用DeepSeekPikafishAI进行分析
                 if (board instanceof com.example.chinesechess.core.Board) {
+                    // 获取神经网络文件路径
+                    String neuralNetworkPath = null;
+                    if (gameFrame != null) {
+                        try {
+                            java.lang.reflect.Method getSelectedNeuralNetworkPathMethod = 
+                                gameFrame.getClass().getMethod("getSelectedNeuralNetworkPath");
+                            neuralNetworkPath = (String) getSelectedNeuralNetworkPathMethod.invoke(gameFrame);
+                            
+                            if (neuralNetworkPath != null && !neuralNetworkPath.isEmpty()) {
+                                System.out.println("🤖 Pikafish评估使用神经网络: " + neuralNetworkPath);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("无法获取神经网络文件路径: " + e.getMessage());
+                        }
+                    }
+                    
                     // 创建DeepSeekPikafishAI实例，使用用户选择的难度
                     com.example.chinesechess.ai.DeepSeekPikafishAI analyzer = new com.example.chinesechess.ai.DeepSeekPikafishAI(
                         com.example.chinesechess.core.PieceColor.RED, // 默认颜色
                         selectedDifficulty, // 用户选择的难度
                         "deepseek-r1:7b" // 默认模型
                     );
+                    
+                    // 如果有神经网络文件，设置到Pikafish引擎
+                    if (neuralNetworkPath != null && !neuralNetworkPath.isEmpty()) {
+                        try {
+                            // 获取DeepSeekPikafishAI的Pikafish引擎实例
+                            java.lang.reflect.Field pikafishEngineField = analyzer.getClass().getDeclaredField("pikafishEngine");
+                            pikafishEngineField.setAccessible(true);
+                            Object pikafishEngine = pikafishEngineField.get(analyzer);
+                            
+                            if (pikafishEngine != null) {
+                                java.lang.reflect.Method setNeuralNetworkPathMethod = 
+                                    pikafishEngine.getClass().getMethod("setNeuralNetworkPath", String.class);
+                                setNeuralNetworkPathMethod.invoke(pikafishEngine, neuralNetworkPath);
+                                System.out.println("✅ 已设置Pikafish神经网络文件: " + neuralNetworkPath);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("设置Pikafish神经网络文件失败: " + e.getMessage());
+                        }
+                    }
                     
                     // 获取当前玩家颜色，如果无法确定则使用红方
                     com.example.chinesechess.core.PieceColor currentPlayer = com.example.chinesechess.core.PieceColor.RED;
@@ -947,6 +983,14 @@ public class ChatPanel extends JPanel {
     }
     
     /**
+     * 设置GameFrame引用
+     */
+    public void setGameFrame(Object gameFrame) {
+        this.gameFrame = gameFrame;
+        System.out.println("🎯 设置GameFrame引用: " + (gameFrame != null ? gameFrame.getClass().getSimpleName() : "null"));
+    }
+    
+    /**
      * 添加思考中消息（带自定义文本）
      */
     private void appendThinkingMessage(String message) {
@@ -992,11 +1036,32 @@ public class ChatPanel extends JPanel {
             try {
                 // 实际调用FairyStockfishAI进行分析
                 if (board instanceof com.example.chinesechess.core.Board) {
-                    // 创建FairyStockfishAI实例，使用用户选择的难度
+                    // 获取神经网络文件路径
+                    String neuralNetworkPath = null;
+                    if (gameFrame != null) {
+                        try {
+                            java.lang.reflect.Method getSelectedNeuralNetworkPathMethod = 
+                                gameFrame.getClass().getMethod("getSelectedNeuralNetworkPath");
+                            neuralNetworkPath = (String) getSelectedNeuralNetworkPathMethod.invoke(gameFrame);
+                            
+                            if (neuralNetworkPath != null && !neuralNetworkPath.isEmpty()) {
+                                System.out.println("🧚 Fairy-Stockfish评估使用神经网络: " + neuralNetworkPath);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("无法获取神经网络文件路径: " + e.getMessage());
+                        }
+                    }
+                    
+                    // 创建FairyStockfishAI实例，使用用户选择的难度和神经网络文件
                     com.example.chinesechess.ai.FairyStockfishAI analyzer = new com.example.chinesechess.ai.FairyStockfishAI(
                         com.example.chinesechess.core.PieceColor.RED, // 默认颜色
-                        selectedDifficulty // 用户选择的难度
+                        selectedDifficulty, // 用户选择的难度
+                        neuralNetworkPath // 神经网络文件路径
                     );
+                    
+                    if (neuralNetworkPath != null && !neuralNetworkPath.isEmpty()) {
+                        System.out.println("✅ Fairy-Stockfish使用神经网络文件: " + neuralNetworkPath);
+                    }
                     
                     // 获取当前玩家颜色，如果无法确定则使用红方
                     com.example.chinesechess.core.PieceColor currentPlayer = com.example.chinesechess.core.PieceColor.RED;

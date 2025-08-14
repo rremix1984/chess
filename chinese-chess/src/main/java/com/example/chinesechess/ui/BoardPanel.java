@@ -278,6 +278,16 @@ public class BoardPanel extends JPanel {
      * @param difficulty AI难度 (1-10)
      */
     public void enableFairyStockfishAI(PieceColor humanColor, int difficulty) {
+        enableFairyStockfishAI(humanColor, difficulty, null);
+    }
+    
+    /**
+     * 启用Fairy-Stockfish AI对弈（支持神经网络选择）
+     * @param humanColor 人类玩家颜色
+     * @param difficulty AI难度 (1-10)
+     * @param neuralNetworkPath 神经网络文件路径（可为null）
+     */
+    public void enableFairyStockfishAI(PieceColor humanColor, int difficulty, String neuralNetworkPath) {
         this.humanPlayer = humanColor;
         this.useFairyStockfish = true;
         this.useLLM = false;
@@ -286,7 +296,7 @@ public class BoardPanel extends JPanel {
         this.useDeepSeekPikafish = false;
 
         PieceColor aiColor = (humanColor == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
-        this.fairyStockfishAI = new FairyStockfishAI(aiColor, difficulty);
+        this.fairyStockfishAI = new FairyStockfishAI(aiColor, difficulty, neuralNetworkPath);
         
         // 设置AI日志面板
         if (this.aiLogPanel != null) {
@@ -299,7 +309,12 @@ public class BoardPanel extends JPanel {
         String humanColorName = (humanColor == PieceColor.RED) ? "红方" : "黑方";
         String aiColorName = (aiColor == PieceColor.RED) ? "红方" : "黑方";
         System.out.println("🧚 Fairy-Stockfish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
-        addAILog("system", "Fairy-Stockfish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+        if (neuralNetworkPath != null && !neuralNetworkPath.isEmpty()) {
+            System.out.println("   - 神经网络: " + neuralNetworkPath);
+            addAILog("system", "Fairy-Stockfish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName + ", NN=" + neuralNetworkPath);
+        } else {
+            addAILog("system", "Fairy-Stockfish AI对弈设置: 玩家=" + humanColorName + ", AI=" + aiColorName);
+        }
 
         // 如果当前轮到AI，立即开始AI回合
         if (aiColor == currentPlayer) {
@@ -3767,6 +3782,15 @@ public class BoardPanel extends JPanel {
      */
     public void enableAIvsAIWithEngines(int redDifficulty, String redModelName, String redEngine,
                                         int blackDifficulty, String blackModelName, String blackEngine) {
+        enableAIvsAIWithEnginesAndNN(redDifficulty, redModelName, redEngine, null,
+                                     blackDifficulty, blackModelName, blackEngine, null);
+    }
+    
+    /**
+     * 启用AI vs AI对弈模式（支持引擎和神经网络选择）
+     */
+    public void enableAIvsAIWithEnginesAndNN(int redDifficulty, String redModelName, String redEngine, String redNeuralNetwork,
+                                             int blackDifficulty, String blackModelName, String blackEngine, String blackNeuralNetwork) {
         // 禁用原有的AI
         disableAI();
         
@@ -3779,14 +3803,14 @@ public class BoardPanel extends JPanel {
             if ("Pikafish".equals(redEngine)) {
                 redAI = new PikafishAI(PieceColor.RED, redDifficulty);
             } else { // FairyStockfish
-                redAI = new FairyStockfishAI(PieceColor.RED, redDifficulty);
+                redAI = new FairyStockfishAI(PieceColor.RED, redDifficulty, redNeuralNetwork);
             }
             
             // 根据选择的引擎创建黑方AI
             if ("Pikafish".equals(blackEngine)) {
                 blackAI = new PikafishAI(PieceColor.BLACK, blackDifficulty);
             } else { // FairyStockfish
-                blackAI = new FairyStockfishAI(PieceColor.BLACK, blackDifficulty);
+                blackAI = new FairyStockfishAI(PieceColor.BLACK, blackDifficulty, blackNeuralNetwork);
             }
             
             // 设置AI日志面板
@@ -3810,8 +3834,18 @@ public class BoardPanel extends JPanel {
             
             String redDifficultyName = getDifficultyName(redDifficulty);
             String blackDifficultyName = getDifficultyName(blackDifficulty);
-            addAILog("system", "AI vs AI对弈模式已启用 - 🔴红方AI(" + redEngine + ", " + redDifficultyName + ") vs ⚫黑方AI(" + blackEngine + ", " + blackDifficultyName + ")");
-            System.out.println("🤖 AI vs AI对弈模式已启用 - 红方AI(" + redEngine + ", " + redDifficultyName + ") vs 黑方AI(" + blackEngine + ", " + blackDifficultyName + ")");
+            
+            String redEngineDisplay = "Pikafish".equals(redEngine) ? redEngine : 
+                (redNeuralNetwork != null && !redNeuralNetwork.isEmpty() ? 
+                    redEngine + "(" + java.nio.file.Paths.get(redNeuralNetwork).getFileName().toString() + ")" : 
+                    redEngine);
+            String blackEngineDisplay = "Pikafish".equals(blackEngine) ? blackEngine : 
+                (blackNeuralNetwork != null && !blackNeuralNetwork.isEmpty() ? 
+                    blackEngine + "(" + java.nio.file.Paths.get(blackNeuralNetwork).getFileName().toString() + ")" : 
+                    blackEngine);
+                    
+            addAILog("system", "AI vs AI对弈模式已启用 - 🔴红方AI(" + redEngineDisplay + ", " + redDifficultyName + ") vs ⚫黑方AI(" + blackEngineDisplay + ", " + blackDifficultyName + ")");
+            System.out.println("🤖 AI vs AI对弈模式已启用 - 红方AI(" + redEngineDisplay + ", " + redDifficultyName + ") vs 黑方AI(" + blackEngineDisplay + ", " + blackDifficultyName + ")");
             
             // 如果当前是红方回合，让红方AI先走
             if (currentPlayer == PieceColor.RED) {
