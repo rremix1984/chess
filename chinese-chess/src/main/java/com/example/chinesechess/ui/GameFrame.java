@@ -1036,23 +1036,34 @@ public class GameFrame extends JFrame {
      * 设置AI对AI模式
      */
     private void setupAIvsAIMode() {
-        int difficulty = difficultyComboBox.getSelectedIndex() + 1;
-        String modelName = (String) modelComboBox.getSelectedItem();
+        // 显示AI对AI配置对话框
+        AIvsAIConfigDialog dialog = showAIvsAIConfigDialog();
         
-        // 启动AI vs AI模式
-        boardPanel.enableAIvsAI(difficulty, modelName);
-        
-        // 禁用相关控件（AI对AI模式下不需要用户选择）
-        aiTypeComboBox.setEnabled(false);
-        difficultyComboBox.setEnabled(false);
-        modelComboBox.setEnabled(false);
-        playerColorComboBox.setEnabled(false);
-        
-        // 启用聊天面板和AI日志面板
-        chatPanel.setEnabled(true);
-        aiLogPanel.setEnabled(true);
-        
-        updateStatus("🤖 AI对AI模式 - 红方AI vs 黑方AI");
+        if (dialog != null && dialog.isConfirmed()) {
+            int difficulty = dialog.getDifficulty();
+            String modelName = dialog.getModelName();
+            
+            // 启动AI vs AI模式
+            boardPanel.enableAIvsAI(difficulty, modelName);
+            
+            // 禁用相关控件（AI对AI模式下不需要用户选择）
+            aiTypeComboBox.setEnabled(false);
+            difficultyComboBox.setEnabled(false);
+            modelComboBox.setEnabled(false);
+            playerColorComboBox.setEnabled(false);
+            
+            // 启用聊天面板和AI日志面板
+            chatPanel.setEnabled(true);
+            aiLogPanel.setEnabled(true);
+            
+            String difficultyName = getDifficultyName(difficulty);
+            updateStatus("🤖 AI对AI模式 - 红方AI vs 黑方AI (" + difficultyName + ", " + modelName + ")");
+        } else {
+            // 用户取消了配置，恢复到玩家对AI模式
+            currentGameMode = GameMode.PLAYER_VS_AI;
+            playerVsAIRadio.setSelected(true);
+            updateStatus("已取消AI对AI模式");
+        }
     }
     
     /**
@@ -1128,6 +1139,211 @@ public class GameFrame extends JFrame {
             case PLAYER_VS_PLAYER:
                 playerVsPlayerRadio.setSelected(true);
                 break;
+        }
+    }
+    
+    /**
+     * 显示AI对AI配置对话框
+     */
+    private AIvsAIConfigDialog showAIvsAIConfigDialog() {
+        AIvsAIConfigDialog dialog = new AIvsAIConfigDialog(this);
+        
+        // 设置默认值（从当前界面获取）
+        int currentDifficulty = difficultyComboBox.getSelectedIndex() + 1;
+        String currentModel = (String) modelComboBox.getSelectedItem();
+        
+        dialog.setDefaultDifficulty(currentDifficulty);
+        dialog.setDefaultModel(currentModel);
+        
+        // 显示对话框
+        dialog.setVisible(true);
+        
+        return dialog;
+    }
+    
+    /**
+     * 获取难度名称
+     */
+    private String getDifficultyName(int difficulty) {
+        String[] difficultyNames = {"简单", "普通", "困难", "专家", "大师", "特级", "超级", "顶级", "传奇", "神级"};
+        if (difficulty >= 1 && difficulty <= difficultyNames.length) {
+            return difficultyNames[difficulty - 1];
+        }
+        return "未知";
+    }
+    
+    /**
+     * AI对AI配置对话框内部类
+     */
+    private static class AIvsAIConfigDialog extends JDialog {
+        private JComboBox<String> difficultyComboBox;
+        private JComboBox<String> modelComboBox;
+        private boolean confirmed = false;
+        
+        public AIvsAIConfigDialog(JFrame parent) {
+            super(parent, "🤖 AI对AI对弈配置", true);
+            initComponents();
+            setupLayout();
+            setupEventHandlers();
+            
+            setSize(400, 200);
+            setLocationRelativeTo(parent);
+            setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        }
+        
+        private void initComponents() {
+            // 创建难度选择下拉框
+            String[] difficultyOptions = {"简单", "普通", "困难", "专家", "大师", "特级", "超级", "顶级", "传奇", "神级"};
+            difficultyComboBox = new JComboBox<>(difficultyOptions);
+            difficultyComboBox.setSelectedIndex(2); // 默认困难
+            
+            // 创建模型选择下拉框
+            List<String> availableModels = OllamaModelManager.getAvailableModels();
+            modelComboBox = new JComboBox<>(availableModels.toArray(new String[0]));
+            if (!availableModels.isEmpty()) {
+                modelComboBox.setSelectedIndex(0); // 默认第一个模型
+            }
+        }
+        
+        private void setupLayout() {
+            setLayout(new BorderLayout(10, 10));
+            
+            // 顶部标题
+            JLabel titleLabel = new JLabel("配置AI对AI对弈参数", JLabel.CENTER);
+            titleLabel.setFont(new Font("微软雅黑", Font.BOLD, 16));
+            titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
+            add(titleLabel, BorderLayout.NORTH);
+            
+            // 中央配置面板
+            JPanel configPanel = new JPanel(new GridBagLayout());
+            configPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+            GridBagConstraints gbc = new GridBagConstraints();
+            
+            // AI难度配置
+            gbc.gridx = 0; gbc.gridy = 0; gbc.anchor = GridBagConstraints.WEST;
+            gbc.insets = new Insets(5, 0, 5, 10);
+            configPanel.add(new JLabel("AI难度:"), gbc);
+            
+            gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.weightx = 1.0;
+            configPanel.add(difficultyComboBox, gbc);
+            
+            // AI模型配置
+            gbc.gridx = 0; gbc.gridy = 1; gbc.weightx = 0;
+            gbc.fill = GridBagConstraints.NONE;
+            configPanel.add(new JLabel("AI模型:"), gbc);
+            
+            gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.weightx = 1.0;
+            configPanel.add(modelComboBox, gbc);
+            
+            // 添加说明文字
+            gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.insets = new Insets(10, 0, 0, 0);
+            JLabel noteLabel = new JLabel("<html><div style='text-align: center; color: #666;'><small>※ 红黑双方AI将使用相同的难度和模型</small></div></html>");
+            noteLabel.setHorizontalAlignment(JLabel.CENTER);
+            configPanel.add(noteLabel, gbc);
+            
+            add(configPanel, BorderLayout.CENTER);
+            
+            // 底部按钮面板
+            JPanel buttonPanel = new JPanel(new FlowLayout());
+            buttonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
+            
+            JButton confirmButton = new JButton("开始对弈");
+            confirmButton.setPreferredSize(new Dimension(100, 30));
+            confirmButton.addActionListener(e -> {
+                confirmed = true;
+                dispose();
+            });
+            
+            JButton cancelButton = new JButton("取消");
+            cancelButton.setPreferredSize(new Dimension(100, 30));
+            cancelButton.addActionListener(e -> {
+                confirmed = false;
+                dispose();
+            });
+            
+            // 设置按钮样式
+            styleDialogButton(confirmButton);
+            styleDialogButton(cancelButton);
+            
+            buttonPanel.add(confirmButton);
+            buttonPanel.add(cancelButton);
+            add(buttonPanel, BorderLayout.SOUTH);
+        }
+        
+        private void setupEventHandlers() {
+            // ESC键取消
+            KeyStroke escapeKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, false);
+            getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(escapeKeyStroke, "ESCAPE");
+            getRootPane().getActionMap().put("ESCAPE", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    confirmed = false;
+                    dispose();
+                }
+            });
+            
+            // Enter键确认
+            KeyStroke enterKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0, false);
+            getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(enterKeyStroke, "ENTER");
+            getRootPane().getActionMap().put("ENTER", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    confirmed = true;
+                    dispose();
+                }
+            });
+        }
+        
+        private void styleDialogButton(JButton button) {
+            button.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+            button.setFocusPainted(false);
+            button.setBorder(BorderFactory.createRaisedBevelBorder());
+            button.setBackground(new Color(245, 245, 245));
+            button.setForeground(Color.BLACK);
+            
+            // 添加鼠标悬停效果
+            button.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseEntered(java.awt.event.MouseEvent evt) {
+                    button.setBackground(new Color(230, 230, 230));
+                }
+                
+                @Override
+                public void mouseExited(java.awt.event.MouseEvent evt) {
+                    button.setBackground(new Color(245, 245, 245));
+                }
+            });
+        }
+        
+        // Getter方法
+        public boolean isConfirmed() {
+            return confirmed;
+        }
+        
+        public int getDifficulty() {
+            return difficultyComboBox.getSelectedIndex() + 1;
+        }
+        
+        public String getModelName() {
+            Object selectedModel = modelComboBox.getSelectedItem();
+            return selectedModel != null ? selectedModel.toString() : "deepseek-coder";
+        }
+        
+        // Setter方法（用于设置默认值）
+        public void setDefaultDifficulty(int difficulty) {
+            if (difficulty >= 1 && difficulty <= difficultyComboBox.getItemCount()) {
+                difficultyComboBox.setSelectedIndex(difficulty - 1);
+            }
+        }
+        
+        public void setDefaultModel(String modelName) {
+            if (modelName != null) {
+                modelComboBox.setSelectedItem(modelName);
+            }
         }
     }
 
