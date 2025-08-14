@@ -1,5 +1,6 @@
 package com.example.chinesechess.ai;
 
+import com.example.chinesechess.ai.FenConverter;
 import com.example.chinesechess.core.*;
 import com.example.chinesechess.ui.AILogPanel;
 import java.util.List;
@@ -32,7 +33,7 @@ public class PikafishAI {
     public PikafishAI(PieceColor aiColor, int difficulty) {
         this.aiColor = aiColor;
         this.difficulty = Math.max(1, Math.min(10, difficulty)); // 限制在1-10范围内
-        this.fenConverter = new FenConverter();
+        this.fenConverter = null; // FenConverter is static
         
         initializeEngine();
     }
@@ -51,7 +52,7 @@ public class PikafishAI {
             // 设置日志回调
             engine.setLogCallback(message -> {
                 if (aiLogPanel != null) {
-                    aiLogPanel.addThinkingLog("Pikafish", message);
+                    aiLogPanel.addAIThinking("[Pikafish] " + message);
                 } else {
                     System.out.println("[Pikafish] " + message);
                 }
@@ -105,7 +106,7 @@ public class PikafishAI {
 
         try {
             // 转换棋盘为 FEN 格式
-            String fen = fenConverter.boardToFen(board);
+            String fen = FenConverter.boardToFen(board, aiColor);
             logInfo("分析局面 FEN: " + fen);
 
             // 根据难度获取思考时间
@@ -242,7 +243,7 @@ public class PikafishAI {
     private void logInfo(String message) {
         String logMessage = "🐟 " + message;
         if (aiLogPanel != null) {
-            aiLogPanel.addAnalysis(logMessage);
+            aiLogPanel.addSystemLog(logMessage);
         }
         System.out.println("[PikafishAI] " + logMessage);
     }
@@ -250,7 +251,7 @@ public class PikafishAI {
     private void logWarning(String message) {
         String logMessage = "⚠️ " + message;
         if (aiLogPanel != null) {
-            aiLogPanel.addAnalysis(logMessage);
+            aiLogPanel.addError(logMessage);
         }
         System.out.println("[PikafishAI] " + logMessage);
     }
@@ -258,7 +259,7 @@ public class PikafishAI {
     private void logError(String message) {
         String logMessage = "❌ " + message;
         if (aiLogPanel != null) {
-            aiLogPanel.addAnalysis(logMessage);
+            aiLogPanel.addError(logMessage);
         }
         System.err.println("[PikafishAI] " + logMessage);
     }

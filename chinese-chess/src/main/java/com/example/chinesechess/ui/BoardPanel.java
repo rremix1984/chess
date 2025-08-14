@@ -3750,8 +3750,8 @@ public class BoardPanel extends JPanel {
                 if (aiLogPanel != null) {
                     tempAI.setAILogPanel(aiLogPanel);
                 }
-                Move bestMove = tempAI.findBestMove(board);
-                tempAI.shutdown(); // 清理临时实例
+                Move bestMove = tempAI.getBestMove(board);
+                tempAI.cleanup(); // 清理临时实例
                 if (bestMove != null) {
                     return formatMoveForDisplay(bestMove);
                 }
@@ -3795,15 +3795,22 @@ public class BoardPanel extends JPanel {
         
         String colorPrefix = (piece.getColor() == PieceColor.RED) ? "红" : "黑";
         
-        switch (piece.getType()) {
-            case KING: return colorPrefix + (piece.getColor() == PieceColor.RED ? "帅" : "将");
-            case ADVISOR: return colorPrefix + (piece.getColor() == PieceColor.RED ? "仕" : "士");
-            case ELEPHANT: return colorPrefix + (piece.getColor() == PieceColor.RED ? "相" : "象");
-            case HORSE: return colorPrefix + "马";
-            case ROOK: return colorPrefix + "车";
-            case CANNON: return colorPrefix + "炮";
-            case PAWN: return colorPrefix + (piece.getColor() == PieceColor.RED ? "兵" : "卒");
-            default: return colorPrefix + "？";
+        if (piece instanceof General) {
+            return colorPrefix + (piece.getColor() == PieceColor.RED ? "帅" : "将");
+        } else if (piece instanceof Advisor) {
+            return colorPrefix + (piece.getColor() == PieceColor.RED ? "仕" : "士");
+        } else if (piece instanceof Elephant) {
+            return colorPrefix + (piece.getColor() == PieceColor.RED ? "相" : "象");
+        } else if (piece instanceof Horse) {
+            return colorPrefix + "马";
+        } else if (piece instanceof Chariot) {
+            return colorPrefix + "车";
+        } else if (piece instanceof Cannon) {
+            return colorPrefix + "炮";
+        } else if (piece instanceof Soldier) {
+            return colorPrefix + (piece.getColor() == PieceColor.RED ? "兵" : "卒");
+        } else {
+            return colorPrefix + "？";
         }
     }
     

@@ -1568,7 +1568,7 @@ public class GameFrame extends JFrame {
                     
                     // 在AI日志面板中显示分析结果
                     if (aiLogPanel != null) {
-                        aiLogPanel.addAnalysis(result);
+                        aiLogPanel.addAIDecision(result);
                     }
                     
                     // 更新状态
@@ -1579,7 +1579,7 @@ public class GameFrame extends JFrame {
                     e.printStackTrace();
                     updateStatus("🐟 Pikafish 分析失败: " + e.getMessage());
                     if (aiLogPanel != null) {
-                        aiLogPanel.addAnalysis("🐟 Pikafish 分析失败: " + e.getMessage());
+                        aiLogPanel.addError("🐟 Pikafish 分析失败: " + e.getMessage());
                     }
                 }
             }
@@ -1625,7 +1625,7 @@ public class GameFrame extends JFrame {
                     
                     // 在AI日志面板中显示分析结果
                     if (aiLogPanel != null) {
-                        aiLogPanel.addAnalysis(result);
+                        aiLogPanel.addAIDecision(result);
                     }
                     
                     // 更新状态
@@ -1636,7 +1636,7 @@ public class GameFrame extends JFrame {
                     e.printStackTrace();
                     updateStatus("🧚 Fairy-Stockfish 分析失败: " + e.getMessage());
                     if (aiLogPanel != null) {
-                        aiLogPanel.addAnalysis("🧚 Fairy-Stockfish 分析失败: " + e.getMessage());
+                        aiLogPanel.addError("🧚 Fairy-Stockfish 分析失败: " + e.getMessage());
                     }
                 }
             }
