@@ -21,7 +21,53 @@ public class FairyStockfishEngine {
     private String neuralNetworkPath; // 神经网络文件路径
     
     public FairyStockfishEngine(String enginePath) {
-        this.enginePath = enginePath != null ? enginePath : "fairy-stockfish";
+        // 尝试多个可能的Fairy-Stockfish路径
+        if (enginePath != null && !enginePath.isEmpty()) {
+            this.enginePath = enginePath;
+        } else {
+            // 按优先级尝试不同的路径
+            String[] possiblePaths = {
+                "fairy-stockfish",
+                "/usr/local/bin/fairy-stockfish",
+                "/opt/homebrew/bin/fairy-stockfish",
+                "./fairy-stockfish",
+                "./engines/fairy-stockfish",
+                "fairy-stockfish.exe",  // Windows
+                ".\\engines\\fairy-stockfish.exe"  // Windows路径
+            };
+            
+            this.enginePath = "fairy-stockfish"; // 默认值
+            
+            // 检查哪个路径可用
+            for (String path : possiblePaths) {
+                if (isEngineAvailable(path)) {
+                    this.enginePath = path;
+                    break;
+                }
+            }
+        }
+        log("使用引擎路径: " + this.enginePath);
+    }
+    
+    /**
+     * 检查引擎是否可用
+     * @param path 引擎路径
+     * @return 是否可用
+     */
+    private boolean isEngineAvailable(String path) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(path, "--help");
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            boolean finished = process.waitFor(3, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                return false;
+            }
+            return process.exitValue() == 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
     
     /**
@@ -185,9 +231,10 @@ public class FairyStockfishEngine {
         if (engineInput != null) {
             engineInput.write(command + "\n");
             engineInput.flush();
-            // 只记录重要命令，避免日志过多
-            if (command.equals("uci") || command.equals("isready") || command.startsWith("go ")) {
-                log("发送命令: " + command);
+            // 🔧 临时：记录所有关键命令以调试UCI通信
+            if (command.equals("uci") || command.equals("isready") || command.startsWith("go ") || 
+                command.startsWith("position") || command.equals("ucinewgame")) {
+                log("📤 发送命令: " + command);
             }
         }
     }
@@ -205,8 +252,50 @@ public class FairyStockfishEngine {
         }
         
         try {
-            // 设置位置
-            sendCommand("position fen " + fen);
+            // 🔧 确保引擎状态完全重置
+            log("重置引擎状态并设置新局面");
+            sendCommand("ucinewgame");  // 重置引擎内部状态
+            
+            // 等待引擎准备就绪
+            sendCommand("isready");
+            String line;
+            long startTime = System.currentTimeMillis();
+            while ((line = engineOutput.readLine()) != null) {
+                if (line.equals("readyok")) {
+                    break;
+                }
+                // 超时保护
+                if (System.currentTimeMillis() - startTime > 3000) {
+                    log("引擎重置超时");
+                    break;
+                }
+            }
+            
+            // 🔧 实用解决方案：由于Fairy-Stockfish在FEN处理上有问题
+            // 只在标准开局位置使用该引擎，其他位置返回null使用备用AI
+            log("设置棋盘位置: " + fen);
+            
+            if (isInitialPosition(fen)) {
+                log("检测到标准开局位置，使用Fairy-Stockfish");
+                sendCommand("position startpos");
+            } else {
+                log("检测到非标准位置，由于Fairy-Stockfish的FEN处理限制，返回null使用备用AI");
+                return null; // 返回null让上层使用备用AI
+            }
+            
+            // 再次确认引擎就绪
+            sendCommand("isready");
+            startTime = System.currentTimeMillis();
+            while ((line = engineOutput.readLine()) != null) {
+                if (line.equals("readyok")) {
+                    break;
+                }
+                // 超时保护
+                if (System.currentTimeMillis() - startTime > 3000) {
+                    log("引擎位置设置超时");
+                    break;
+                }
+            }
             
             // 使用混合搜索策略：时间限制 + 深度限制
             // 根据思考时间计算搜索深度
@@ -216,9 +305,8 @@ public class FairyStockfishEngine {
             sendCommand(searchCommand);
             
             // 读取引擎响应
-            String line;
             String bestMove = null;
-            long startTime = System.currentTimeMillis();
+            long searchStartTime = System.currentTimeMillis();
             
             while ((line = engineOutput.readLine()) != null) {
                 // 只记录关键信息，避免日志过于啰嗦
@@ -252,7 +340,7 @@ public class FairyStockfishEngine {
                 }
                 
                 // 超时保护
-                if (System.currentTimeMillis() - startTime > thinkTimeMs + 5000) {
+                if (System.currentTimeMillis() - searchStartTime > thinkTimeMs + 5000) {
                     log("搜索超时");
                     break;
                 }
@@ -317,6 +405,14 @@ public class FairyStockfishEngine {
             log("评估局面时发生错误: " + e.getMessage());
             return 0;
         }
+    }
+    
+    /**
+     * 检查是否为标准开局位置
+     */
+    private boolean isInitialPosition(String fen) {
+        String standardInitialFen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1";
+        return fen != null && fen.equals(standardInitialFen);
     }
     
     /**

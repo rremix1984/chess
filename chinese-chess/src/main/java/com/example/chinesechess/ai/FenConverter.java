@@ -15,21 +15,30 @@ public class FenConverter {
      * @return FEN字符串
      */
     public static String boardToFen(Board board, PieceColor currentPlayer) {
+        System.out.println("🔍 [FEN生成] 开始转换棋盘为FEN字符串");
+        System.out.println("🔍 [FEN生成] 当前行棋方: " + (currentPlayer == PieceColor.RED ? "红方(w)" : "黑方(b)"));
+        
         StringBuilder fen = new StringBuilder();
         
         // 1. 棋盘布局（从第0行到第9行）
+        System.out.println("🔍 [FEN生成] 扫描棋盘布局:");
         for (int row = 0; row < 10; row++) {
             int emptyCount = 0;
+            StringBuilder rowDebug = new StringBuilder("  第" + row + "行: ");
+            
             for (int col = 0; col < 9; col++) {
                 Piece piece = board.getPiece(row, col);
                 if (piece == null) {
                     emptyCount++;
+                    rowDebug.append("[空]");
                 } else {
                     if (emptyCount > 0) {
                         fen.append(emptyCount);
                         emptyCount = 0;
                     }
-                    fen.append(pieceToFenChar(piece));
+                    char fenChar = pieceToFenChar(piece);
+                    fen.append(fenChar);
+                    rowDebug.append("[").append(fenChar).append("]");
                 }
             }
             if (emptyCount > 0) {
@@ -38,6 +47,7 @@ public class FenConverter {
             if (row < 9) {
                 fen.append('/');
             }
+            System.out.println(rowDebug.toString());
         }
         
         // 2. 当前行棋方（红方用w，黑方用b）
@@ -47,7 +57,33 @@ public class FenConverter {
         // 3. 其他信息（中国象棋不需要易位和吃过路兵）
         fen.append(" - - 0 1");
         
-        return fen.toString();
+        String result = fen.toString();
+        System.out.println("🔍 [FEN生成] 最终FEN字符串: " + result);
+        
+        // 验证生成的FEN
+        if (isValidFen(result)) {
+            System.out.println("✅ [FEN生成] FEN字符串格式有效");
+        } else {
+            System.out.println("❌ [FEN生成] FEN字符串格式无效!");
+        }
+        
+        // 额外验证：检查棋盘上是否有两个将
+        int redGeneralCount = 0, blackGeneralCount = 0;
+        for (int row = 0; row < 10; row++) {
+            for (int col = 0; col < 9; col++) {
+                Piece piece = board.getPiece(row, col);
+                if (piece instanceof General) {
+                    if (piece.getColor() == PieceColor.RED) {
+                        redGeneralCount++;
+                    } else {
+                        blackGeneralCount++;
+                    }
+                }
+            }
+        }
+        System.out.println("🔍 [FEN生成] 将军统计: 红将=" + redGeneralCount + ", 黑将=" + blackGeneralCount);
+        
+        return result;
     }
     
     /**
@@ -220,6 +256,7 @@ public class FenConverter {
      */
     public static Position uciToPosition(String uci) {
         if (uci == null || uci.length() != 2) {
+            System.err.println("[UCI转换] 无效UCI格式: " + uci + " (长度必须为2)");
             return null;
         }
         
@@ -227,28 +264,32 @@ public class FenConverter {
             char fileChar = uci.charAt(0);
             char rankChar = uci.charAt(1);
             
+            System.out.println("[UCI转换] 解析UCI: " + uci + " (文件列: " + fileChar + ", 排行: " + rankChar + ")");
+            
             // 检查字符范围
             if (fileChar < 'a' || fileChar > 'i') {
-                System.err.println("UCI列字符超出范围: " + fileChar);
+                System.err.println("[UCI转换] UCI列字符超出范围: " + fileChar + " (必须在a-i之间)");
                 return null;
             }
             if (rankChar < '0' || rankChar > '9') {
-                System.err.println("UCI行字符超出范围: " + rankChar);
+                System.err.println("[UCI转换] UCI行字符超出范围: " + rankChar + " (必须在0-9之间)");
                 return null;
             }
             
             int col = fileChar - 'a';  // 0-8
             int row = 9 - (rankChar - '0');  // 9-0 -> 0-9
             
+            System.out.println("[UCI转换] 转换结果: " + uci + " -> 棋盘坐标(" + row + "," + col + ")");
+            
             // 检查坐标范围
             if (row < 0 || row > 9 || col < 0 || col > 8) {
-                System.err.println("UCI坐标超出棋盘范围: row=" + row + ", col=" + col);
+                System.err.println("[UCI转换] 棋盘坐标超出范围: row=" + row + ", col=" + col + " (行:0-9, 列:0-8)");
                 return null;
             }
             
             return new Position(row, col);
         } catch (Exception e) {
-            System.err.println("解析UCI位置失败: " + uci + ", " + e.getMessage());
+            System.err.println("[UCI转换] 解析UCI位置失败: " + uci + ", 异常: " + e.getMessage());
             return null;
         }
     }

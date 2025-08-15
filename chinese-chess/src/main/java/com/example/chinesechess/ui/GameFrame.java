@@ -7,6 +7,9 @@ import com.example.chinesechess.VictoryAnimation;
 import com.example.chinesechess.ui.AILogPanel;
 import com.example.chinesechess.ui.BoardPanel;
 import com.example.chinesechess.ui.ChatPanel;
+import com.example.chinesechess.network.NetworkClient;
+// import com.example.chinesechess.network.NetworkMessageHandler;
+// import com.example.chinesechess.network.protocol.*;
 // 移除了棋盘监控相关的导入
 
 
@@ -73,16 +76,27 @@ public class GameFrame extends JFrame {
     
     // 神经网络文件选择器相关组件
     private JLabel neuralNetworkLabel;
-    private JTextField neuralNetworkPathField;
-    private JButton neuralNetworkBrowseButton;
+    private JComboBox<String> neuralNetworkComboBox;  // 替换原有的文本框和浏览按钮
+    private JTextField neuralNetworkPathField;  // 保留用于自定义文件路径
+    private JButton neuralNetworkBrowseButton;  // 保留用于浏览自定义文件
     private JLabel redNeuralNetworkLabel;
+    private JComboBox<String> redNeuralNetworkComboBox;
     private JTextField redNeuralNetworkPathField;
     private JButton redNeuralNetworkBrowseButton;
     private JLabel blackNeuralNetworkLabel;
+    private JComboBox<String> blackNeuralNetworkComboBox;
     private JTextField blackNeuralNetworkPathField;
     private JButton blackNeuralNetworkBrowseButton;
     
     // 已移除棋盘监控功能
+    
+    // 网络模式相关字段
+    private boolean isNetworkMode = false;
+    private NetworkClient networkClient;
+    private String roomId = "";
+    private String roomName = "";
+    private String localPlayerName = "";
+    private JLabel networkStatusLabel;
 
     public GameFrame() {
         setTitle("🌎 中国象棋 - AI对弈版");
@@ -256,26 +270,24 @@ public class GameFrame extends JFrame {
         modelComboBox.setPreferredSize(new Dimension(150, 25));
         leftPanel.add(modelComboBox);
         
-        // 神经网络文件选择器（仅FairyStockfish需要）
+        // 神经网络文件选择器（仅FairyStockfish需要） - 改为下拉菜单
         neuralNetworkLabel = new JLabel("神经网络:");
         neuralNetworkLabel.setVisible(false);
         leftPanel.add(neuralNetworkLabel);
         
-        neuralNetworkPathField = new JTextField();
-        neuralNetworkPathField.setPreferredSize(new Dimension(120, 25));
-        neuralNetworkPathField.setEditable(false);
-        neuralNetworkPathField.setToolTipText("选择FairyStockfish神经网络文件（可选）");
-        neuralNetworkPathField.setVisible(false);
-        leftPanel.add(neuralNetworkPathField);
-        
-        neuralNetworkBrowseButton = new JButton("浏览...");
-        neuralNetworkBrowseButton.setPreferredSize(new Dimension(60, 25));
-        neuralNetworkBrowseButton.setFont(new Font("微软雅黑", Font.PLAIN, 10));
-        neuralNetworkBrowseButton.setToolTipText("浏览选择神经网络文件");
-        neuralNetworkBrowseButton.addActionListener(e -> browseNeuralNetworkFile());
-        neuralNetworkBrowseButton.setVisible(false);
-        styleButton(neuralNetworkBrowseButton);
-        leftPanel.add(neuralNetworkBrowseButton);
+        // 使用下拉菜单替代文本框和浏览按钮
+        String[] nnueOptions = {
+            "默认（不使用NNUE）",
+            "fairy-nnue/network1.nnue",
+            "fairy-nnue/network2.nnue",
+            "自定义文件..."
+        };
+        neuralNetworkComboBox = new JComboBox<>(nnueOptions);
+        neuralNetworkComboBox.setPreferredSize(new Dimension(150, 25));
+        neuralNetworkComboBox.setToolTipText("选择FairyStockfish神经网络文件");
+        neuralNetworkComboBox.setVisible(false);
+        neuralNetworkComboBox.addActionListener(e -> handleNeuralNetworkSelection());
+        leftPanel.add(neuralNetworkComboBox);
         
         panel.add(leftPanel, BorderLayout.CENTER);
 
@@ -403,6 +415,14 @@ public class GameFrame extends JFrame {
         styleButton(aiVsAiEndgameButton);
         rightPanel.add(aiVsAiEndgameButton);
         
+        // 网络对战按钮
+        JButton networkGameButton = new JButton("🌐 网络对战");
+        networkGameButton.setToolTipText("启动网络对弈模式");
+        networkGameButton.setPreferredSize(new Dimension(100, 30));
+        networkGameButton.addActionListener(e -> startNetworkGame());
+        styleButton(networkGameButton);
+        rightPanel.add(networkGameButton);
+        
         // 返回主菜单按钮
         JButton returnButton = new JButton("⬅️");
         returnButton.setToolTipText("返回主菜单");
@@ -479,11 +499,26 @@ public class GameFrame extends JFrame {
         blackAIModelComboBox.setPreferredSize(new Dimension(120, 25));
         aiVsAiConfigPanel.add(blackAIModelComboBox);
         
-        // 黑方神经网络文件选择器（仅FairyStockfish需要）
+        // 黑方神经网络文件选择器（仅FairyStockfish需要）- 改为下拉菜单
         blackNeuralNetworkLabel = new JLabel("神经网络:");
         blackNeuralNetworkLabel.setVisible(false); // 默认隐藏，因为默认选择Pikafish
         aiVsAiConfigPanel.add(blackNeuralNetworkLabel);
         
+        // 使用下拉菜单替代文本框和浏览按钮
+        String[] blackNnueOptions = {
+            "默认（不使用NNUE）",
+            "fairy-nnue/network1.nnue",
+            "fairy-nnue/network2.nnue",
+            "自定义文件..."
+        };
+        blackNeuralNetworkComboBox = new JComboBox<>(blackNnueOptions);
+        blackNeuralNetworkComboBox.setPreferredSize(new Dimension(120, 25));
+        blackNeuralNetworkComboBox.setToolTipText("选择黑方FairyStockfish神经网络文件");
+        blackNeuralNetworkComboBox.setVisible(false);
+        blackNeuralNetworkComboBox.addActionListener(e -> handleBlackNeuralNetworkSelection());
+        aiVsAiConfigPanel.add(blackNeuralNetworkComboBox);
+        
+        // 保留文本框和浏览按钮用于备用（隐藏）
         blackNeuralNetworkPathField = new JTextField();
         blackNeuralNetworkPathField.setPreferredSize(new Dimension(80, 25));
         blackNeuralNetworkPathField.setEditable(false);
@@ -500,16 +535,31 @@ public class GameFrame extends JFrame {
         styleButton(blackNeuralNetworkBrowseButton);
         aiVsAiConfigPanel.add(blackNeuralNetworkBrowseButton);
         
-        // 红方神经网络文件选择器（仅FairyStockfish需要）
+        // 红方神经网络文件选择器（仅FairyStockfish需要）- 改为下拉菜单
         redNeuralNetworkLabel = new JLabel("神经网络:");
         redNeuralNetworkLabel.setVisible(true); // 默认显示，因为默认选择FairyStockfish
         aiVsAiConfigPanel.add(redNeuralNetworkLabel);
         
+        // 使用下拉菜单替代文本框和浏览按钮
+        String[] redNnueOptions = {
+            "默认（不使用NNUE）",
+            "fairy-nnue/network1.nnue",
+            "fairy-nnue/network2.nnue",
+            "自定义文件..."
+        };
+        redNeuralNetworkComboBox = new JComboBox<>(redNnueOptions);
+        redNeuralNetworkComboBox.setPreferredSize(new Dimension(120, 25));
+        redNeuralNetworkComboBox.setToolTipText("选择红方FairyStockfish神经网络文件");
+        redNeuralNetworkComboBox.setVisible(true);
+        redNeuralNetworkComboBox.addActionListener(e -> handleRedNeuralNetworkSelection());
+        aiVsAiConfigPanel.add(redNeuralNetworkComboBox);
+        
+        // 保留文本框和浏览按钮用于备用（隐藏）
         redNeuralNetworkPathField = new JTextField();
         redNeuralNetworkPathField.setPreferredSize(new Dimension(80, 25));
         redNeuralNetworkPathField.setEditable(false);
         redNeuralNetworkPathField.setToolTipText("选择红方FairyStockfish神经网络文件（可选）");
-        redNeuralNetworkPathField.setVisible(true);
+        redNeuralNetworkPathField.setVisible(false); // 隐藏文本框，改用下拉菜单
         aiVsAiConfigPanel.add(redNeuralNetworkPathField);
         
         redNeuralNetworkBrowseButton = new JButton("浏览...");
@@ -517,7 +567,7 @@ public class GameFrame extends JFrame {
         redNeuralNetworkBrowseButton.setFont(new Font("微软雅黑", Font.PLAIN, 9));
         redNeuralNetworkBrowseButton.setToolTipText("浏览选择红方神经网络文件");
         redNeuralNetworkBrowseButton.addActionListener(e -> browseRedNeuralNetworkFile());
-        redNeuralNetworkBrowseButton.setVisible(true);
+        redNeuralNetworkBrowseButton.setVisible(false); // 隐藏浏览按钮，改用下拉菜单
         styleButton(redNeuralNetworkBrowseButton);
         aiVsAiConfigPanel.add(redNeuralNetworkBrowseButton);
         
@@ -1811,6 +1861,135 @@ public class GameFrame extends JFrame {
     }
     
     /**
+     * 处理神经网络选择事件
+     */
+    private void handleNeuralNetworkSelection() {
+        if (neuralNetworkComboBox == null) return;
+        
+        String selection = (String) neuralNetworkComboBox.getSelectedItem();
+        if ("自定义文件...".equals(selection)) {
+            // 打开文件选择器
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("选择FairyStockfish神经网络文件");
+            fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+                @Override
+                public boolean accept(java.io.File f) {
+                    return f.isDirectory() || f.getName().toLowerCase().endsWith(".nnue") || f.getName().toLowerCase().endsWith(".bin");
+                }
+                
+                @Override
+                public String getDescription() {
+                    return "神经网络文件 (*.nnue, *.bin)";
+                }
+            });
+            
+            int result = fileChooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                java.io.File selectedFile = fileChooser.getSelectedFile();
+                // 动态添加到下拉列表
+                String customPath = selectedFile.getAbsolutePath();
+                neuralNetworkComboBox.addItem(customPath);
+                neuralNetworkComboBox.setSelectedItem(customPath);
+            } else {
+                // 取消选择，恢复为默认
+                neuralNetworkComboBox.setSelectedIndex(0);
+            }
+        }
+        
+        System.out.println("📶 神经网络选择: " + selection);
+    }
+    
+    /**
+     * 处理红方神经网络选择事件（AI对AI模式）
+     */
+    private void handleRedNeuralNetworkSelection() {
+        if (redNeuralNetworkComboBox == null) return;
+        
+        String selection = (String) redNeuralNetworkComboBox.getSelectedItem();
+        if ("自定义文件...".equals(selection)) {
+            // 打开文件选择器
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("选择红方FairyStockfish神经网络文件");
+            fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+                @Override
+                public boolean accept(java.io.File f) {
+                    return f.isDirectory() || f.getName().toLowerCase().endsWith(".nnue") || f.getName().toLowerCase().endsWith(".bin");
+                }
+                
+                @Override
+                public String getDescription() {
+                    return "神经网络文件 (*.nnue, *.bin)";
+                }
+            });
+            
+            int result = fileChooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                java.io.File selectedFile = fileChooser.getSelectedFile();
+                // 动态添加到下拉列表
+                String customPath = selectedFile.getAbsolutePath();
+                redNeuralNetworkComboBox.addItem(customPath);
+                redNeuralNetworkComboBox.setSelectedItem(customPath);
+                // 同时更新备用的文本框
+                redNeuralNetworkPathField.setText(customPath);
+            } else {
+                // 取消选择，恢复为默认
+                redNeuralNetworkComboBox.setSelectedIndex(0);
+            }
+        } else {
+            // 将选择的路径同步到文本框，保持兼容性
+            String path = "默认（不使用NNUE）".equals(selection) ? "" : selection;
+            redNeuralNetworkPathField.setText(path);
+        }
+        
+        System.out.println("📶 红方神经网络选择: " + selection);
+    }
+    
+    /**
+     * 处理黑方神经网络选择事件（AI对AI模式）
+     */
+    private void handleBlackNeuralNetworkSelection() {
+        if (blackNeuralNetworkComboBox == null) return;
+        
+        String selection = (String) blackNeuralNetworkComboBox.getSelectedItem();
+        if ("自定义文件...".equals(selection)) {
+            // 打开文件选择器
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("选择黑方FairyStockfish神经网络文件");
+            fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+                @Override
+                public boolean accept(java.io.File f) {
+                    return f.isDirectory() || f.getName().toLowerCase().endsWith(".nnue") || f.getName().toLowerCase().endsWith(".bin");
+                }
+                
+                @Override
+                public String getDescription() {
+                    return "神经网络文件 (*.nnue, *.bin)";
+                }
+            });
+            
+            int result = fileChooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                java.io.File selectedFile = fileChooser.getSelectedFile();
+                // 动态添加到下拉列表
+                String customPath = selectedFile.getAbsolutePath();
+                blackNeuralNetworkComboBox.addItem(customPath);
+                blackNeuralNetworkComboBox.setSelectedItem(customPath);
+                // 同时更新备用的文本框
+                blackNeuralNetworkPathField.setText(customPath);
+            } else {
+                // 取消选择，恢复为默认
+                blackNeuralNetworkComboBox.setSelectedIndex(0);
+            }
+        } else {
+            // 将选择的路径同步到文本框，保持兼容性
+            String path = "默认（不使用NNUE）".equals(selection) ? "" : selection;
+            blackNeuralNetworkPathField.setText(path);
+        }
+        
+        System.out.println("📶 黑方神经网络选择: " + selection);
+    }
+    
+    /**
      * 更新神经网络文件选择器的可见性（玩家对AI模式）
      */
     private void updateNeuralNetworkVisibility() {
@@ -1818,8 +1997,7 @@ public class GameFrame extends JFrame {
         boolean isFairyStockfish = (aiTypeIndex == 5); // Fairy-Stockfish
         
         neuralNetworkLabel.setVisible(isFairyStockfish);
-        neuralNetworkPathField.setVisible(isFairyStockfish);
-        neuralNetworkBrowseButton.setVisible(isFairyStockfish);
+        neuralNetworkComboBox.setVisible(isFairyStockfish);
         
         // 刷新界面
         revalidate();
@@ -1834,15 +2012,19 @@ public class GameFrame extends JFrame {
         String redEngine = (String) redAIEngineComboBox.getSelectedItem();
         boolean redIsFairyStockfish = "FairyStockfish".equals(redEngine);
         redNeuralNetworkLabel.setVisible(redIsFairyStockfish);
-        redNeuralNetworkPathField.setVisible(redIsFairyStockfish);
-        redNeuralNetworkBrowseButton.setVisible(redIsFairyStockfish);
+        redNeuralNetworkComboBox.setVisible(redIsFairyStockfish);
+        // 保持文本框和浏览按钮隐藏，现在使用下拉菜单
+        redNeuralNetworkPathField.setVisible(false);
+        redNeuralNetworkBrowseButton.setVisible(false);
         
         // 更新黑方神经网络选择器可见性
         String blackEngine = (String) blackAIEngineComboBox.getSelectedItem();
         boolean blackIsFairyStockfish = "FairyStockfish".equals(blackEngine);
         blackNeuralNetworkLabel.setVisible(blackIsFairyStockfish);
-        blackNeuralNetworkPathField.setVisible(blackIsFairyStockfish);
-        blackNeuralNetworkBrowseButton.setVisible(blackIsFairyStockfish);
+        blackNeuralNetworkComboBox.setVisible(blackIsFairyStockfish);
+        // 保持文本框和浏览按钮隐藏，现在使用下拉菜单
+        blackNeuralNetworkPathField.setVisible(false);
+        blackNeuralNetworkBrowseButton.setVisible(false);
         
         // 刷新界面
         revalidate();
@@ -1853,14 +2035,34 @@ public class GameFrame extends JFrame {
      * 获取选择的神经网络文件路径（玩家对AI模式）
      */
     public String getSelectedNeuralNetworkPath() {
-        String path = neuralNetworkPathField.getText();
-        return (path != null && !path.trim().isEmpty()) ? path.trim() : null;
+        if (neuralNetworkComboBox != null && neuralNetworkComboBox.getSelectedItem() != null) {
+            String selection = (String) neuralNetworkComboBox.getSelectedItem();
+            if ("默认（不使用NNUE）".equals(selection) || "自定义文件...".equals(selection)) {
+                return null; // 不使用神经网络或未选择
+            }
+            return selection; // 返回选中的文件路径
+        }
+        // 备用方案：从文本框获取
+        if (neuralNetworkPathField != null) {
+            String path = neuralNetworkPathField.getText();
+            return (path != null && !path.trim().isEmpty()) ? path.trim() : null;
+        }
+        return null;
     }
     
     /**
      * 获取红方选择的神经网络文件路径（AI对AI模式）
      */
     public String getRedNeuralNetworkPath() {
+        // 优先从下拉菜单获取
+        if (redNeuralNetworkComboBox != null && redNeuralNetworkComboBox.getSelectedItem() != null) {
+            String selection = (String) redNeuralNetworkComboBox.getSelectedItem();
+            if ("默认（不使用NNUE）".equals(selection) || "自定义文件...".equals(selection)) {
+                return null; // 不使用神经网络或未选择
+            }
+            return selection; // 返回选中的文件路径
+        }
+        // 备用方案：从文本框获取
         String path = redNeuralNetworkPathField.getText();
         return (path != null && !path.trim().isEmpty()) ? path.trim() : null;
     }
@@ -1869,6 +2071,15 @@ public class GameFrame extends JFrame {
      * 获取黑方选择的神经网络文件路径（AI对AI模式）
      */
     public String getBlackNeuralNetworkPath() {
+        // 优先从下拉菜单获取
+        if (blackNeuralNetworkComboBox != null && blackNeuralNetworkComboBox.getSelectedItem() != null) {
+            String selection = (String) blackNeuralNetworkComboBox.getSelectedItem();
+            if ("默认（不使用NNUE）".equals(selection) || "自定义文件...".equals(selection)) {
+                return null; // 不使用神经网络或未选择
+            }
+            return selection; // 返回选中的文件路径
+        }
+        // 备用方案：从文本框获取
         String path = blackNeuralNetworkPathField.getText();
         return (path != null && !path.trim().isEmpty()) ? path.trim() : null;
     }
@@ -1907,6 +2118,226 @@ public class GameFrame extends JFrame {
                 System.exit(1);
             }
         });
+    }
+    
+    // ======================== 网络模式相关方法 ========================
+    
+    /**
+     * 设置网络模式
+     */
+    public void setNetworkMode(boolean networkMode) {
+        this.isNetworkMode = networkMode;
+        
+        if (networkMode) {
+            // 更新窗口标题
+            setTitle("🌐 中国象棋 - 网络对弈");
+            
+            // 禁用AI相关功能（网络模式下不使用AI）
+            aiTypeComboBox.setEnabled(false);
+            difficultyComboBox.setEnabled(false);
+            modelComboBox.setEnabled(false);
+            
+            // 设置为玩家对玩家模式
+            playerVsPlayerRadio.setSelected(true);
+            currentGameMode = GameMode.PLAYER_VS_PLAYER;
+            
+            // 添加网络状态标签
+            if (networkStatusLabel == null) {
+                networkStatusLabel = new JLabel("🔴 未连接");
+                networkStatusLabel.setFont(new Font("微软雅黑", Font.PLAIN, 11));
+            }
+            
+            // 如果已经有控制面板，添加网络状态标签
+            Component[] components = getContentPane().getComponents();
+            for (Component comp : components) {
+                if (comp instanceof JPanel && ((JPanel) comp).getBorder() != null) {
+                    String title = ((JPanel) comp).getBorder().toString();
+                    if (title.contains("AI对弈控制")) {
+                        ((JPanel) comp).setBorder(BorderFactory.createTitledBorder("🌐 网络对弈控制"));
+                        
+                        // 添加网络状态到左侧面板
+                        Component[] subComponents = ((JPanel) comp).getComponents();
+                        for (Component subComp : subComponents) {
+                            if (subComp instanceof JPanel) {
+                                JPanel leftPanel = (JPanel) subComp;
+                                if (leftPanel.getLayout() instanceof FlowLayout) {
+                                    leftPanel.add(new JLabel("网络:"));
+                                    leftPanel.add(networkStatusLabel);
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // 设置棋盘面板的网络模式
+        if (boardPanel != null) {
+            boardPanel.setNetworkMode(networkMode);
+        }
+    }
+    
+    /**
+     * 设置网络客户端
+     */
+    public void setNetworkClient(NetworkClient networkClient) {
+        this.networkClient = networkClient;
+        
+        if (boardPanel != null) {
+            boardPanel.setNetworkClient(networkClient);
+        }
+    }
+    
+    /**
+     * 设置房间信息
+     */
+    public void setRoomInfo(String roomId, String roomName) {
+        this.roomId = roomId;
+        this.roomName = roomName;
+        
+        // 更新状态
+        if (networkStatusLabel != null) {
+            networkStatusLabel.setText("🟢 房间: " + roomName);
+        }
+        
+        // 更新窗口标题
+        setTitle("🌐 中国象棋 - " + roomName + " (ID: " + roomId + ")");
+        
+        // 更新状态栏
+        updateStatus("已加入房间: " + roomName + " - 等待对手加入...");
+    }
+    
+    /**
+     * 设置本地玩家名称
+     */
+    public void setLocalPlayerName(String playerName) {
+        this.localPlayerName = playerName;
+    }
+    
+    /**
+     * 获取网络模式状态
+     */
+    public boolean isNetworkMode() {
+        return isNetworkMode;
+    }
+    
+    /**
+     * 获取网络客户端
+     */
+    public NetworkClient getNetworkClient() {
+        return networkClient;
+    }
+    
+    /**
+     * 获取房间ID
+     */
+    public String getRoomId() {
+        return roomId;
+    }
+    
+    /**
+     * 获取房间名称
+     */
+    public String getRoomName() {
+        return roomName;
+    }
+    
+    /**
+     * 获取本地玩家名称
+     */
+    public String getLocalPlayerName() {
+        return localPlayerName;
+    }
+    
+    /**
+     * 更新网络连接状态
+     */
+    public void updateNetworkStatus(String status) {
+        if (networkStatusLabel != null) {
+            networkStatusLabel.setText(status);
+        }
+    }
+    
+    /**
+     * 处理网络游戏开始
+     */
+    public void onNetworkGameStart(String opponentName, PieceColor playerColor) {
+        SwingUtilities.invokeLater(() -> {
+            // 设置玩家颜色
+            String colorText = (playerColor == PieceColor.RED) ? "红方" : "黑方";
+            playerColorComboBox.setSelectedItem(colorText);
+            
+            // 更新状态
+            String colorEmoji = (playerColor == PieceColor.RED) ? "🔴" : "⚫";
+            updateStatus(colorEmoji + " 你执" + colorText + " vs " + opponentName + " - 游戏开始！");
+            
+            // 更新窗口标题
+            setTitle("🌐 中国象棋 - " + roomName + " (你:" + colorText + " vs " + opponentName + ")");
+            
+            // 重要：设置棋盘面板的本地玩家颜色
+            if (boardPanel != null) {
+                String colorString = (playerColor == PieceColor.RED) ? "RED" : "BLACK";
+                boardPanel.setLocalPlayerColor(colorString);
+                boardPanel.setOpponentName(opponentName);
+                
+                System.out.println("🌐 设置网络游戏参数: 本地玩家=" + colorString + ", 对手=" + opponentName);
+            }
+        });
+    }
+    
+    /**
+     * 处理对手断开连接
+     */
+    public void onOpponentDisconnected() {
+        SwingUtilities.invokeLater(() -> {
+            updateStatus("⚠️ 对手已断开连接 - 游戏暂停");
+            
+            int option = JOptionPane.showConfirmDialog(
+                this,
+                "对手已断开连接，是否返回房间列表？",
+                "对手断开",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            );
+            
+            if (option == JOptionPane.YES_OPTION) {
+                // 返回房间列表
+                setVisible(false);
+                dispose();
+            }
+        });
+    }
+    
+    /**
+     * 启动网络对战
+     */
+    private void startNetworkGame() {
+        System.out.println("🌐 启动网络对战模式...");
+        
+        try {
+            // 隐藏当前游戏界面
+            setVisible(false);
+            
+            // 创建网络房间界面
+            NetworkRoomFrame networkFrame = new NetworkRoomFrame();
+            networkFrame.setVisible(true);
+            
+            // 关闭当前游戏界面
+            dispose();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(
+                this,
+                "启动网络对战失败：" + e.getMessage(),
+                "错误",
+                JOptionPane.ERROR_MESSAGE
+            );
+            // 如果失败，重新显示当前界面
+            setVisible(true);
+        }
     }
 
 }

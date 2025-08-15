@@ -33,6 +33,10 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import javax.swing.Timer;
 import com.example.common.sound.SoundPlayer;
+import com.example.chinesechess.network.NetworkClient;
+import com.example.chinesechess.network.*;
+import com.example.chinesechess.network.NetworkMessage.MessageType;
+import com.example.chinesechess.network.GameStateSyncRequestMessage;
 
 public class BoardPanel extends JPanel {
 
@@ -129,6 +133,24 @@ public class BoardPanel extends JPanel {
     private JTextArea moveAnalysisTextArea;
     private JScrollPane moveAnalysisScrollPane;
     private JButton analyzeButton;
+    
+    // 网络对战相关字段
+    private NetworkClient networkClient;
+    private boolean isNetworkMode = false;
+    private boolean isHost = false;
+    private String localPlayerColor; // "RED" 或 "BLACK"
+    private String opponentName;
+    private String roomId;
+    private boolean waitingForOpponentMove = false;
+    
+    // 使用NetworkClient中已定义的ClientEventListener接口
+    private NetworkClient.ClientEventListener networkEventListener;
+    
+    // GameStart消息检测和恢复相关字段
+    private Timer gameStartDetectionTimer;
+    private boolean gameStartReceived = false;
+    private long roomJoinTimestamp = 0;
+    private static final int GAMESTART_DETECTION_DELAY_MS = 5000; // 5秒后检测
 
     public BoardPanel(Board board) {
         this.board = board;
@@ -411,6 +433,10 @@ public class BoardPanel extends JPanel {
      * 检查当前是否是AI回合
      */
     private boolean isAITurn() {
+        // 在网络模式下，永远不是AI回合（网络对战是人对人）
+        if (isNetworkMode) {
+            return false;
+        }
         // 在AI对AI模式下，总是AI回合
         if (isAIvsAIMode) {
             return true;
@@ -428,7 +454,28 @@ public class BoardPanel extends JPanel {
             String playerName = (currentPlayer == PieceColor.RED) ? "红方" : "黑方";
             String status = "当前玩家: " + playerName;
             
-            if (isAIvsAIMode) {
+            if (isNetworkMode) {
+                // 网络对战模式
+                if (localPlayerColor == null) {
+                    // 如果本地玩家颜色未设置，显示等待初始化状态
+                    status = "🌐 网络对战 - 正在初始化..."; 
+                } else {
+                    String myColor = "RED".equals(localPlayerColor) ? "红方" : "黑方";
+                    String opponentColor = "RED".equals(localPlayerColor) ? "黑方" : "红方";
+                    status = "🌐 网络对战 - 我(" + myColor + ") vs " + (opponentName != null ? opponentName : "对手") + "(" + opponentColor + ")";
+                    
+                    if (waitingForOpponentMove) {
+                        status += " - 等待对手移动...";
+                    } else {
+                        PieceColor myPieceColor = "RED".equals(localPlayerColor) ? PieceColor.RED : PieceColor.BLACK;
+                        if (currentPlayer == myPieceColor) {
+                            status += " - 轮到您了";
+                        } else {
+                            status += " - 对手回合";
+                        }
+                    }
+                }
+            } else if (isAIvsAIMode) {
                 // AI vs AI模式
                 status += isAIThinking ? " (AI思考中...)" : " (AI)";
                 status = "🤖 AI vs AI对弈 - " + status;
@@ -473,14 +520,65 @@ public class BoardPanel extends JPanel {
 
     
     private void handleMouseClick(int mouseX, int mouseY) {
+        // 添加详细的点击调试信息
+        System.out.println("🖱️ 鼠标点击事件: (" + mouseX + "," + mouseY + ")");
+        System.out.println("🔍 当前游戏状态:");
+        System.out.println("   - isNetworkMode: " + isNetworkMode);
+        System.out.println("   - isSettingUpEndgame: " + isSettingUpEndgame);
+        System.out.println("   - isAIvsAIMode: " + isAIvsAIMode);
+        System.out.println("   - waitingForOpponentMove: " + waitingForOpponentMove);
+        System.out.println("   - localPlayerColor: " + localPlayerColor);
+        System.out.println("   - currentPlayer: " + currentPlayer);
+        System.out.println("   - gameState: " + gameState);
+        System.out.println("   - isAIThinking: " + isAIThinking);
+        
         // 如果在残局设置模式下，忽略正常的鼠标点击
         if (isSettingUpEndgame) {
+            System.out.println("🐛 点击被阻止：残局设置模式");
             return;
         }
         
         // 如果在AI对AI模式下，禁用用户点击
         if (isAIvsAIMode) {
+            System.out.println("🐛 点击被阻止：AI对AI模式");
             return;
+        }
+        
+        // 如果在网络模式下且等待对手移动，忽略点击
+        if (isNetworkMode && waitingForOpponentMove) {
+            System.out.println("🐛 点击被阻止：网络模式下等待对手移动");
+            System.out.println("   - isNetworkMode: " + isNetworkMode);
+            System.out.println("   - waitingForOpponentMove: " + waitingForOpponentMove);
+            System.out.println("   - localPlayerColor: " + localPlayerColor);
+            System.out.println("   - currentPlayer: " + currentPlayer);
+            showErrorInfo("请等待对手移动！");
+            return;
+        }
+        
+        // 如果在网络模式下，检查是否轮到本地玩家
+        if (isNetworkMode) {
+            // 检查本地玩家颜色是否已设置
+            if (localPlayerColor == null) {
+                System.out.println("⚠️ 网络模式错误：本地玩家颜色未设置！");
+                showErrorInfo("网络游戏未正确初始化，请重新连接！");
+                return;
+            }
+            
+            PieceColor myColor = "RED".equals(localPlayerColor) ? PieceColor.RED : PieceColor.BLACK;
+            System.out.println("🎯 网络模式玩家颜色检查:");
+            System.out.println("   - localPlayerColor string: " + localPlayerColor);
+            System.out.println("   - myColor enum: " + myColor);
+            System.out.println("   - currentPlayer enum: " + currentPlayer);
+            System.out.println("   - 是否轮到我: " + (currentPlayer == myColor));
+            
+            if (currentPlayer != myColor) {
+                System.out.println("🐛 点击被阻止：网络模式下不是本地玩家回合");
+                System.out.println("   - localPlayerColor: " + localPlayerColor + ", currentPlayer: " + currentPlayer);
+                showErrorInfo("还没轮到您！");
+                return;
+            } else {
+                System.out.println("✅ 网络模式检查通过：轮到本地玩家");
+            }
         }
         
         // 如果游戏已结束、是AI回合或AI正在思考，忽略鼠标点击
@@ -493,8 +591,14 @@ public class BoardPanel extends JPanel {
         int displayCol = (mouseX - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
         int displayRow = (mouseY - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
         
+        System.out.println("🔍 坐标转换详情:");
+        System.out.println("   - 鼠标坐标: (" + mouseX + "," + mouseY + ")");
+        System.out.println("   - 显示坐标: (" + displayRow + "," + displayCol + ")");
+        System.out.println("   - MARGIN: " + MARGIN + ", CELL_SIZE: " + CELL_SIZE);
+        
         // 检查显示坐标是否在棋盘范围内
         if (displayRow < 0 || displayRow >= 10 || displayCol < 0 || displayCol >= 9) {
+            System.out.println("🐛 点击被阻止：显示坐标超出棋盘范围 (" + displayRow + "," + displayCol + ")");
             return;
         }
         
@@ -502,16 +606,36 @@ public class BoardPanel extends JPanel {
         int row = getLogicalRow(displayRow);
         int col = getLogicalCol(displayCol);
         
+        System.out.println("   - 逻辑坐标: (" + row + "," + col + ")");
+        System.out.println("   - 棋盘翻转状态: " + isBoardFlipped);
+        
         Piece clickedPiece = board.getPiece(row, col);
+        System.out.println("   - 点击位置的棋子: " + (clickedPiece != null ? clickedPiece.getChineseName() + "(" + clickedPiece.getColor() + ")" : "无棋子"));
+        
+        System.out.println("📍 棋子选择逻辑判断:");
+        System.out.println("   - selectedPiece: " + (selectedPiece != null ? selectedPiece.getChineseName() : "null"));
+        System.out.println("   - clickedPiece: " + (clickedPiece != null ? clickedPiece.getChineseName() : "null"));
+        System.out.println("   - clickedPiece颜色: " + (clickedPiece != null ? clickedPiece.getColor() : "null"));
+        System.out.println("   - currentPlayer: " + currentPlayer);
+        System.out.println("   - 颜色匹配: " + (clickedPiece != null ? (clickedPiece.getColor() == currentPlayer) : "棋子为空"));
         
         if (selectedPiece == null) {
+            System.out.println("🎯 没有选中棋子，尝试选择棋子...");
             // 没有选中棋子，尝试选择棋子
             if (clickedPiece != null && clickedPiece.getColor() == currentPlayer) {
+                System.out.println("✅ 成功选择棋子: " + clickedPiece.getChineseName() + " 在位置 (" + row + "," + col + ")");
                 selectedPiece = clickedPiece;
                 selectedRow = row;
                 selectedCol = col;
                 calculateValidMoves();
+                System.out.println("   - 计算出" + validMoves.size() + "个有效移动");
                 repaint();
+            } else {
+                if (clickedPiece == null) {
+                    System.out.println("❌ 点击位置没有棋子");
+                } else {
+                    System.out.println("❌ 点击的是对方棋子: " + clickedPiece.getChineseName() + "(" + clickedPiece.getColor() + "), 当前应该是 " + currentPlayer + " 的回合");
+                }
             }
         } else {
             // 已经选中棋子，尝试移动
@@ -532,10 +656,55 @@ public class BoardPanel extends JPanel {
                  if (selectedPiece.isValidMove(board, start, end)) {
                      // 检查移动是否安全（不会导致己方将军被将军）
                      if (board.isMoveSafe(start, end, currentPlayer)) {
+                         // 在网络模式下先发送移动给服务器，但不等待确认就立即执行本地移动
+                         if (isNetworkMode && networkClient != null && networkClient.isConnected()) {
+                             try {
+                                 // 发送给服务器的坐标需要转换为标准坐标（不考虑本地棋盘翻转）
+                                 // 如果本地玩家是黑方且棋盘已翻转，需要将本地坐标转换回标准坐标
+                                 int serverFromRow, serverFromCol, serverToRow, serverToCol;
+                                 
+                                 if ("BLACK".equals(localPlayerColor) && isBoardFlipped) {
+                                     // 黑方棋盘翻转时，需要将本地坐标转换回标准坐标
+                                     serverFromRow = 9 - selectedRow;
+                                     serverFromCol = 8 - selectedCol;
+                                     serverToRow = 9 - row;
+                                     serverToCol = 8 - col;
+                                 } else {
+                                     // 红方或未翻转棋盘时，直接使用本地坐标作为标准坐标
+                                     serverFromRow = selectedRow;
+                                     serverFromCol = selectedCol;
+                                     serverToRow = row;
+                                     serverToCol = col;
+                                 }
+                                 
+                                 System.out.println("📤 准备发送移动坐标:");
+                                 System.out.println("   - 本地逻辑坐标: (" + selectedRow + "," + selectedCol + ") -> (" + row + "," + col + ")");
+                                 System.out.println("   - 服务器坐标: (" + serverFromRow + "," + serverFromCol + ") -> (" + serverToRow + "," + serverToCol + ")");
+                                 System.out.println("   - 本地玩家颜色: " + localPlayerColor);
+                                 System.out.println("   - 棋盘翻转状态: " + isBoardFlipped);
+                                 
+                                 // 验证发送前棋子是否存在
+                                 Piece sendingPiece = board.getPiece(selectedRow, selectedCol);
+                                 System.out.println("   - 发送的棋子: " + (sendingPiece != null ? sendingPiece.getChineseName() + "(" + sendingPiece.getColor() + ")" : "null"));
+                                 
+                                 networkClient.sendMove(serverFromRow, serverFromCol, serverToRow, serverToCol);
+                                 addAILog("network", "发送移动: " + selectedPiece.getChineseName() + 
+                                         " 从 (" + selectedRow + "," + selectedCol + ") 到 (" + row + "," + col + ") [本地坐标]");
+                                 addAILog("network", "服务器坐标: (" + serverFromRow + "," + serverFromCol + ") -> (" + serverToRow + "," + serverToCol + ")");
+                                 
+                                 System.out.println("✅ 移动消息已发送到服务器");
+                             } catch (Exception e) {
+                                 showErrorInfo("发送移动失败: " + e.getMessage());
+                                 System.err.println("❌ 发送移动失败: " + e.getMessage());
+                                 e.printStackTrace();
+                                 return;
+                             }
+                         }
+                         
                          // 记录移动历史（用于悔棋）
                          Piece capturedPiece = board.getPiece(end.getX(), end.getY());
-                             // 保存当前棋盘状态
-    saveBoardState();
+                         // 保存当前棋盘状态
+                         saveBoardState();
                          
                          // 记录移动标记
                          lastMoveStart = new Position(start.getX(), start.getY());
@@ -548,13 +717,30 @@ public class BoardPanel extends JPanel {
                          SoundPlayer.getInstance().playSound("piece_drop");
                          
                          // 显示移动信息
-                         String playerType = (selectedPiece.getColor() == humanPlayer) ? "玩家" : "AI";
+                         String playerType;
+                         if (isNetworkMode) {
+                             playerType = "本地玩家";
+                         } else {
+                             playerType = (selectedPiece.getColor() == humanPlayer) ? "玩家" : "AI";
+                         }
                          String colorName = (selectedPiece.getColor() == PieceColor.RED) ? "红方" : "黑方";
                          System.out.println("🎯 " + playerType + "(" + colorName + ")移动: " + selectedPiece.getChineseName() + 
                                           " 从 (" + selectedRow + "," + selectedCol + ") 到 (" + row + "," + col + ")");
                          
+                         if (isNetworkMode) {
+                             addAILog("network", "本地移动: " + selectedPiece.getChineseName() + 
+                                     " 从 (" + selectedRow + "," + selectedCol + ") 到 (" + row + "," + col + ")");
+                         }
+                         
                          // 切换玩家
                          currentPlayer = (currentPlayer == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
+                         
+                         // 在网络模式下，移动完成后设置等待对手移动状态
+                         if (isNetworkMode) {
+                             waitingForOpponentMove = true;
+                             addAILog("network", "移动完成，等待对手回合...");
+                         }
+                         
                          clearSelection();
                          
                          // 用户操作完成后，清除AI建议标记
@@ -581,16 +767,19 @@ public class BoardPanel extends JPanel {
                          } else if (gameState == GameState.DRAW) {
                              showGameEndDialog("和棋！");
                          } else if (gameState == GameState.PLAYING || gameState == GameState.IN_CHECK) {
-                             // 如果游戏未结束且启用了AI且现在是AI回合，触发AI移动
-                             if (isAIvsAIMode) {
-                                 // AI vs AI模式下，延迟执行下一步AI移动
-                                 SwingUtilities.invokeLater(() -> {
-                                     Timer timer = new Timer(1000, e -> performAIvsAIMove());
-                                     timer.setRepeats(false);
-                                     timer.start();
-                                 });
-                             } else if (isAITurn()) {
-                                 SwingUtilities.invokeLater(this::performAIMove);
+                             // 在网络模式下不需要触发AI移动
+                             if (!isNetworkMode) {
+                                 // 如果游戏未结束且启用了AI且现在是AI回合，触发AI移动
+                                 if (isAIvsAIMode) {
+                                     // AI vs AI模式下，延迟执行下一步AI移动
+                                     SwingUtilities.invokeLater(() -> {
+                                         Timer timer = new Timer(1000, e -> performAIvsAIMove());
+                                         timer.setRepeats(false);
+                                         timer.start();
+                                     });
+                                 } else if (isAITurn()) {
+                                     SwingUtilities.invokeLater(this::performAIMove);
+                                 }
                              }
                          }
                      } else {
@@ -1288,6 +1477,13 @@ public class BoardPanel extends JPanel {
         // 绘制移动标记
         drawMoveMarkers(g);
         
+        int piecesDrawn = 0;
+        int redPiecesDrawn = 0;
+        int blackPiecesDrawn = 0;
+        StringBuilder pieceDetails = new StringBuilder();
+        StringBuilder redPieceDetails = new StringBuilder();
+        StringBuilder blackPieceDetails = new StringBuilder();
+        
         for (int i = 0; i < 10; i++) {
             for (int j = 0; j < 9; j++) {
                 Piece piece = board.getPiece(i, j);
@@ -1296,8 +1492,41 @@ public class BoardPanel extends JPanel {
                     int displayRow = getDisplayRow(i);
                     int displayCol = getDisplayCol(j);
                     drawPiece(g, piece, displayRow, displayCol);
+                    
+                    piecesDrawn++;
+                    
+                    // 分别统计红黑方棋子
+                    if (piece.getColor() == PieceColor.RED) {
+                        redPiecesDrawn++;
+                        if (redPiecesDrawn <= 3) { // 显示前3个红方棋子
+                            redPieceDetails.append(String.format("%s红@(%d,%d)->显示(%d,%d) ", 
+                                piece.getChineseName(), i, j, displayRow, displayCol));
+                        }
+                    } else {
+                        blackPiecesDrawn++;
+                        if (blackPiecesDrawn <= 3) { // 显示前3个黑方棋子
+                            blackPieceDetails.append(String.format("%s黑@(%d,%d)->显示(%d,%d) ", 
+                                piece.getChineseName(), i, j, displayRow, displayCol));
+                        }
+                    }
+                    
+                    // 保持原有的前5个棋子统计（用于兼容）
+                    if (piecesDrawn <= 5) {
+                        pieceDetails.append(String.format("%s%s@(%d,%d)->显示(%d,%d) ", 
+                            piece.getChineseName(), 
+                            piece.getColor() == PieceColor.RED ? "红" : "黑",
+                            i, j, displayRow, displayCol));
+                    }
                 }
             }
+        }
+        
+        // 只有在网络模式下才输出详细的绘制日志，避免AI对战时日志过多
+        if (isNetworkMode && piecesDrawn > 0) {
+            System.out.println("🎨 [RENDER DEBUG] 绘制了" + piecesDrawn + "个棋子 (红方:" + redPiecesDrawn + ", 黑方:" + blackPiecesDrawn + ")");
+            System.out.println("🎨 [RENDER DEBUG] 红方示例: " + (redPieceDetails.length() > 0 ? redPieceDetails.toString() : "无红方棋子"));
+            System.out.println("🎨 [RENDER DEBUG] 黑方示例: " + (blackPieceDetails.length() > 0 ? blackPieceDetails.toString() : "无黑方棋子"));
+            System.out.println("🎨 [RENDER DEBUG] 棋盘翻转状态: " + isBoardFlipped);
         }
     }
     
@@ -4144,15 +4373,82 @@ public class BoardPanel extends JPanel {
     }
     
     /**
+     * 打印当前棋盘状态用于调试
+     */
+    private void printBoardForDebug() {
+        System.out.println("📋 当前棋盘状态（调试信息）:");
+        System.out.println("   红方在下，黑方在上（标准视角）");
+        System.out.println("   行索引: 0-9（从上到下），列索引: 0-8（从左到右）");
+        System.out.println();
+        
+        for (int row = 0; row < 10; row++) {
+            System.out.printf("   %d: ", row);
+            for (int col = 0; col < 9; col++) {
+                Piece piece = board.getPiece(row, col);
+                if (piece == null) {
+                    System.out.print("·· ");
+                } else {
+                    String name = piece.getChineseName();
+                    if (name.length() == 1) {
+                        name = name + " ";
+                    }
+                    String color = piece.getColor() == PieceColor.RED ? "红" : "黑";
+                    System.out.print(color.substring(0, 1) + name.substring(0, 1) + " ");
+                }
+            }
+            System.out.println();
+        }
+        System.out.println();
+    }
+    
+    /**
+     * 打印移动后的棋盘状态（用于GUI调试）
+     */
+    private void printBoardStateAfterMove(int fromRow, int fromCol, int toRow, int toCol) {
+        System.out.println("🔍 移动后棋盘状态验证:");
+        System.out.println("   移动: (" + fromRow + "," + fromCol + ") -> (" + toRow + "," + toCol + ")");
+        System.out.println("   起始位置现有棋子: " + (board.getPiece(fromRow, fromCol) != null ? board.getPiece(fromRow, fromCol).getChineseName() : "空"));
+        System.out.println("   目标位置现有棋子: " + (board.getPiece(toRow, toCol) != null ? board.getPiece(toRow, toCol).getChineseName() : "空"));
+        System.out.println("   最后移动标记: " + (lastMoveStart != null ? "(" + lastMoveStart.getX() + "," + lastMoveStart.getY() + ")" : "null") + 
+                          " -> " + (lastMoveEnd != null ? "(" + lastMoveEnd.getX() + "," + lastMoveEnd.getY() + ")" : "null"));
+        System.out.println("   当前玩家: " + currentPlayer + " (" + (currentPlayer == PieceColor.RED ? "红" : "黑") + "方)");
+        System.out.println("   网络模式状态: isNetworkMode=" + isNetworkMode + ", waitingForOpponentMove=" + waitingForOpponentMove);
+        
+        // 打印移动涉及的关键区域
+        System.out.println("   关键区域棋盘状态:");
+        int minRow = Math.max(0, Math.min(fromRow, toRow) - 1);
+        int maxRow = Math.min(9, Math.max(fromRow, toRow) + 1);
+        int minCol = Math.max(0, Math.min(fromCol, toCol) - 1);
+        int maxCol = Math.min(8, Math.max(fromCol, toCol) + 1);
+        
+        for (int row = minRow; row <= maxRow; row++) {
+            System.out.printf("     %d: ", row);
+            for (int col = minCol; col <= maxCol; col++) {
+                Piece piece = board.getPiece(row, col);
+                if (row == fromRow && col == fromCol) {
+                    System.out.print("[" + (piece != null ? piece.getChineseName().substring(0, 1) : "·") + "] ");
+                } else if (row == toRow && col == toCol) {
+                    System.out.print("<" + (piece != null ? piece.getChineseName().substring(0, 1) : "·") + "> ");
+                } else {
+                    System.out.print(" " + (piece != null ? piece.getChineseName().substring(0, 1) : "·") + "  ");
+                }
+            }
+            System.out.println();
+        }
+        System.out.println("     说明: [起始] <目标>");
+        System.out.println();
+    }
+    
+    /**
      * 计算棋盘面板的合理大小
      * 确保棋盘有足够的空间显示完整的棋盘和坐标
      */
     public Dimension calculateBoardSize() {
         // 计算棋盘本身的大小：9列 × 10行 的格子
-        // 中国象棋棋盘是9条纵线，10条横线，形成8×9的格子
-        // 但为了显示棋盘线条，我们需要9×10的空间
-        int boardWidth = 8 * CELL_SIZE;   // 8个格子宽度
-        int boardHeight = 9 * CELL_SIZE;  // 9个格子高度
+        // 中国象棋棋盘是9条纵线，10条横线，形成8×9个格子空间
+        // 但鼠标点击计算需要按照9×10的网格来计算坐标
+        int boardWidth = 9 * CELL_SIZE;   // 9个格子宽度（对应9列交点）
+        int boardHeight = 10 * CELL_SIZE;  // 10个格子高度（对应10行交点）
         
         // 加上边距：左右各MARGIN，上下各MARGIN
         // 还要加上坐标显示的额外空间
@@ -4179,4 +4475,1448 @@ public class BoardPanel extends JPanel {
         // 重写getMinimumSize方法
         return calculateBoardSize();
     }
+    
+    // ==================== 网络对战功能 ====================
+    
+    /**
+     * 设置网络事件监听器
+     */
+    public void setNetworkEventListener(NetworkClient.ClientEventListener listener) {
+        this.networkEventListener = listener;
+    }
+    
+    /**
+     * 启用网络模式并连接到服务器
+     */
+    public void enableNetworkMode(String serverHost, int serverPort, String playerName) {
+        if (isNetworkMode && networkClient != null && networkClient.isConnected()) {
+            showErrorInfo("已经在网络模式中！");
+            return;
+        }
+        
+        try {
+            // 禁用AI模式
+            disableAI();
+            
+            // 创建网络客户端
+            networkClient = new NetworkClient();
+            networkClient.setEventListener(new NetworkClient.ClientEventListener() {
+                @Override
+                public void onConnected() {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "已连接到服务器");
+                        System.out.println("✅ 已连接到服务器");
+                        if (networkEventListener != null) {
+                            networkEventListener.onConnected();
+                        }
+                    });
+                }
+                
+                @Override
+                public void onDisconnected(String reason) {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "与服务器断开连接: " + reason);
+                        System.out.println("❌ 与服务器断开连接: " + reason);
+                        isNetworkMode = false;
+                        waitingForOpponentMove = false;
+                        updateStatus();
+                        if (networkEventListener != null) {
+                            networkEventListener.onDisconnected(reason);
+                        }
+                    });
+                }
+                
+                @Override
+                public void onConnectionError(String error) {
+                    SwingUtilities.invokeLater(() -> {
+                        showErrorInfo("连接服务器失败: " + error);
+                        addAILog("network", "连接服务器失败: " + error);
+                        System.err.println("❌ 连接服务器失败: " + error);
+                    });
+                }
+                
+                @Override
+                public void onMessageReceived(NetworkMessage message) {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "收到消息: " + message.getType());
+                        System.out.println("📨 收到网络消息: " + message.getType());
+                    });
+                }
+                
+                @Override
+                public void onRoomCreated(String roomId) {
+                    SwingUtilities.invokeLater(() -> {
+                        BoardPanel.this.roomId = roomId;
+                        isHost = true;
+                        addAILog("network", "房间创建成功: " + roomId);
+                        System.out.println("🏠 房间创建成功: " + roomId);
+                        if (networkEventListener != null) {
+                            networkEventListener.onRoomCreated(roomId);
+                        }
+                    });
+                }
+                
+                @Override
+                public void onRoomJoined(String roomId, String opponentName) {
+                    SwingUtilities.invokeLater(() -> {
+                        BoardPanel.this.roomId = roomId;
+                        BoardPanel.this.opponentName = opponentName;
+                        addAILog("network", "加入房间成功: " + roomId + ", 对手: " + opponentName);
+                        System.out.println("🚪 加入房间成功: " + roomId + ", 对手: " + opponentName);
+                        if (networkEventListener != null) {
+                            networkEventListener.onRoomJoined(roomId, opponentName);
+                        }
+                    });
+                }
+                
+                @Override
+                public void onRoomListReceived(java.util.List<com.example.chinesechess.network.RoomInfo> rooms) {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "收到房间列表，共 " + rooms.size() + " 个房间");
+                        System.out.println("📋 收到房间列表，共 " + rooms.size() + " 个房间");
+                        // BoardPanel 中不需要处理房间列表，只记录日志
+                    });
+                }
+                
+                @Override
+                public void onGameStarted(String redPlayer, String blackPlayer, String yourColor) {
+                    SwingUtilities.invokeLater(() -> {
+                        // 设置网络模式和玩家颜色
+                        localPlayerColor = yourColor;
+                        isNetworkMode = true;
+                        
+                        // 初始化网络游戏状态
+                        initializeNetworkGame();
+                        
+                        addAILog("network", "游戏开始! 您执" + ("RED".equals(yourColor) ? "红" : "黑") + "方");
+                        System.out.println("🎮 网络游戏开始! 红方: " + redPlayer + ", 黑方: " + blackPlayer + ", 您的颜色: " + yourColor);
+                        
+                        // 如果是红方（先手），且轮到自己，则不需要等待
+                        if ("RED".equals(yourColor)) {
+                            waitingForOpponentMove = false;
+                            addAILog("network", "您是红方，轮到您先走！");
+                        } else {
+                            waitingForOpponentMove = true;
+                            addAILog("network", "您是黑方，等待红方先走...");
+                        }
+                        
+                        updateStatus();
+                        
+                        if (networkEventListener != null) {
+                            networkEventListener.onGameStarted(redPlayer, blackPlayer, yourColor);
+                        }
+                    });
+                }
+                
+                @Override
+                public void onMoveReceived(int fromRow, int fromCol, int toRow, int toCol) {
+                    SwingUtilities.invokeLater(() -> {
+                        executeOpponentMove(fromRow, fromCol, toRow, toCol);
+                    });
+                }
+                
+                @Override
+                public void onGameEnded(String winner, String reason) {
+                    SwingUtilities.invokeLater(() -> {
+                        String winnerText = "RED".equals(winner) ? "红方" : ("BLACK".equals(winner) ? "黑方" : "和棋");
+                        addAILog("network", "游戏结束: " + winnerText + " (" + reason + ")");
+                        System.out.println("🏁 网络游戏结束: " + winnerText + " (" + reason + ")");
+                        
+                        showGameEndDialog(winnerText + "获胜！\n原因: " + reason);
+                        
+                        if (networkEventListener != null) {
+                            networkEventListener.onGameEnded(winner, reason);
+                        }
+                    });
+                }
+                
+                @Override
+                public void onGameStateUpdate(String gameState, String currentPlayer, boolean isGameOver, String winner) {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "游戏状态更新: " + gameState + ", 当前玩家: " + currentPlayer);
+                        if (isGameOver) {
+                            String winnerText = "RED".equals(winner) ? "红方" : ("BLACK".equals(winner) ? "黑方" : "和棋");
+                            showGameEndDialog(winnerText + "获胜！");
+                        }
+                        updateStatus();
+                    });
+                }
+                
+                @Override
+                public void onError(String error) {
+                    SwingUtilities.invokeLater(() -> {
+                        showErrorInfo("网络错误: " + error);
+                        addAILog("network", "网络错误: " + error);
+                        System.err.println("❌ 网络错误: " + error);
+                        if (networkEventListener != null) {
+                            networkEventListener.onError(error);
+                        }
+                    });
+                }
+            });
+            
+            // 连接到服务器
+            addAILog("network", "正在连接到服务器 " + serverHost + ":" + serverPort + "...");
+            System.out.println("🌐 正在连接到服务器 " + serverHost + ":" + serverPort + "...");
+            networkClient.connect(serverHost, serverPort, playerName);
+            
+        } catch (Exception e) {
+            showErrorInfo("启用网络模式失败: " + e.getMessage());
+            addAILog("network", "启用网络模式失败: " + e.getMessage());
+            System.err.println("❌ 启用网络模式失败: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * 创建网络游戏房间
+     */
+    public void createNetworkRoom(String roomName, String password) {
+        if (networkClient == null || !networkClient.isConnected()) {
+            showErrorInfo("请先连接到服务器！");
+            return;
+        }
+        
+        try {
+            networkClient.createRoom(roomName, password);
+            addAILog("network", "正在创建房间: " + roomName);
+            System.out.println("🏠 正在创建房间: " + roomName);
+        } catch (Exception e) {
+            showErrorInfo("创建房间失败: " + e.getMessage());
+            addAILog("network", "创建房间失败: " + e.getMessage());
+            System.err.println("❌ 创建房间失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 加入网络游戏房间
+     */
+    public void joinNetworkRoom(String roomId, String password) {
+        if (networkClient == null || !networkClient.isConnected()) {
+            showErrorInfo("请先连接到服务器！");
+            return;
+        }
+        
+        try {
+            networkClient.joinRoom(roomId, password);
+            addAILog("network", "正在加入房间: " + roomId);
+            System.out.println("🚪 正在加入房间: " + roomId);
+        } catch (Exception e) {
+            showErrorInfo("加入房间失败: " + e.getMessage());
+            addAILog("network", "加入房间失败: " + e.getMessage());
+            System.err.println("❌ 加入房间失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 执行对手的移动
+     */
+    private void executeOpponentMove(int fromRow, int fromCol, int toRow, int toCol) {
+        try {
+            System.out.println("\n🔄🔄🔄 [GUI DEBUG] 开始执行对手移动 🔄🔄🔄");
+            System.out.println("📦 接收到的移动坐标: (" + fromRow + "," + fromCol + ") -> (" + toRow + "," + toCol + ")");
+            addAILog("network", "执行对手移动: (" + fromRow + "," + fromCol + ") -> (" + toRow + "," + toCol + ")");
+            
+            // 详细调试信息
+            System.out.println("🐛 执行前状态检查:");
+            System.out.println("   - isNetworkMode: " + isNetworkMode);
+            System.out.println("   - localPlayerColor: " + localPlayerColor);
+            System.out.println("   - currentPlayer: " + currentPlayer + " (" + (currentPlayer == PieceColor.RED ? "红" : "黑") + "方)");
+            System.out.println("   - isBoardFlipped: " + isBoardFlipped);
+            System.out.println("   - waitingForOpponentMove: " + waitingForOpponentMove);
+            System.out.println("   - 当前线程: " + Thread.currentThread().getName());
+            System.out.println("   - 是否在EDT线程: " + javax.swing.SwingUtilities.isEventDispatchThread());
+            
+            // 坐标处理逻辑：网络传输的坐标是基于服务器的统一坐标系统（标准坐标）
+            // 需要根据本地棋盘状态将服务器标准坐标转换为本地逻辑坐标
+            int actualFromRow, actualFromCol, actualToRow, actualToCol;
+            
+            // 如果是黑方且棋盘已翻转，需要将服务器标准坐标转换为本地逻辑坐标
+            if ("BLACK".equals(localPlayerColor) && isBoardFlipped) {
+                actualFromRow = 9 - fromRow;
+                actualFromCol = 8 - fromCol;
+                actualToRow = 9 - toRow;
+                actualToCol = 8 - toCol;
+                System.out.println("🔄 黑方翻转棋盘：将服务器标准坐标转换为本地逻辑坐标");
+                System.out.println("   服务器坐标: (" + fromRow + "," + fromCol + ") -> (" + toRow + "," + toCol + ")");
+                System.out.println("   本地逻辑坐标: (" + actualFromRow + "," + actualFromCol + ") -> (" + actualToRow + "," + actualToCol + ")");
+                addAILog("network", "转换服务器坐标为本地逻辑坐标（黑方翻转）");
+            } else {
+                // 红方或棋盘未翻转，直接使用服务器标准坐标
+                actualFromRow = fromRow;
+                actualFromCol = fromCol;
+                actualToRow = toRow;
+                actualToCol = toCol;
+                System.out.println("📡 红方或未翻转：直接使用服务器标准坐标: (" + fromRow + "," + fromCol + ") -> (" + toRow + "," + toCol + ")");
+                addAILog("network", "直接使用服务器标准坐标执行对手移动");
+            }
+            
+            // 验证移动是否合法
+            Piece piece = board.getPiece(actualFromRow, actualFromCol);
+            System.out.println("🔍 检查起始位置 (" + actualFromRow + "," + actualFromCol + ") 的棋子: " + (piece != null ? piece.getChineseName() + "(" + piece.getColor() + ")" : "无棋子"));
+            
+            // 打印目标位置信息
+            Piece targetPiece = board.getPiece(actualToRow, actualToCol);
+            System.out.println("🎯 检查目标位置 (" + actualToRow + "," + actualToCol + ") 的棋子: " + (targetPiece != null ? targetPiece.getChineseName() + "(" + targetPiece.getColor() + ")" : "空位"));
+            
+            if (piece == null) {
+                System.out.println("⚠️ 对手移动无效: 起始位置 (" + actualFromRow + "," + actualFromCol + ") 没有棋子");
+                System.out.println("   原始网络坐标: (" + fromRow + "," + fromCol + "), 本地棋盘翻转: " + isBoardFlipped);
+                System.out.println("   预期对手颜色: " + ("RED".equals(localPlayerColor) ? "BLACK" : "RED"));
+                
+                // 详细打印当前棋盘状态用于调试
+                System.out.println("\n📋 当前棋盘状态（用于调试对手移动失败）:");
+                printBoardForDebug();
+                
+                addAILog("network", "❌ 对手移动失败: 起始位置无棋子，可能是坐标系统问题");
+                showErrorInfo("对手移动失败: 坐标不匹配\n可能的原因:\n• 网络同步问题\n• 棋盘状态不一致\n建议刷新或重新连接");
+                return;
+            }
+            
+            // 验证移动的棋子颜色是否正确（应该是对手的棋子）
+            String expectedOpponentColor = "RED".equals(localPlayerColor) ? "BLACK" : "RED";
+            PieceColor expectedOpponentPieceColor = "RED".equals(localPlayerColor) ? PieceColor.BLACK : PieceColor.RED;
+            
+            if (piece.getColor() != expectedOpponentPieceColor) {
+                System.out.println("⚠️ 对手移动颜色异常: 移动的棋子是 " + piece.getColor() + "，但期望对手颜色是 " + expectedOpponentColor);
+                System.out.println("   - 本地玩家颜色: " + localPlayerColor);
+                System.out.println("   - 移动的棋子: " + piece.getChineseName() + "(" + piece.getColor() + ")");
+                System.out.println("   - 当前轮到: " + currentPlayer + "方");
+                
+                // 这种情况可能是游戏状态不同步，尝试推断正确的本地玩家颜色
+                if (localPlayerColor == null) {
+                    System.out.println("🔄 检测到本地玩家颜色未设置，从对手移动推断...");
+                    localPlayerColor = (piece.getColor() == PieceColor.RED) ? "BLACK" : "RED";
+                    System.out.println("💡 推断本地玩家颜色为: " + localPlayerColor);
+                    addAILog("network", "从对手移动推断本地玩家颜色: " + localPlayerColor);
+                    
+                    // 根据推断的颜色设置棋盘翻转
+                    if ("BLACK".equals(localPlayerColor) && !isBoardFlipped) {
+                        isBoardFlipped = true;
+                        System.out.println("🔄 推断为黑方，自动翻转棋盘");
+                        addAILog("network", "推断为黑方玩家，自动翻转棋盘视角");
+                    }
+                    
+                    // 更新expectedOpponentPieceColor，用于后续验证
+                    expectedOpponentPieceColor = "RED".equals(localPlayerColor) ? PieceColor.BLACK : PieceColor.RED;
+                    expectedOpponentColor = "RED".equals(localPlayerColor) ? "BLACK" : "RED";
+                    
+                    System.out.println("🔄 更新后期望对手颜色: " + expectedOpponentColor);
+                    
+                    // 重新验证棋子颜色是否匹配
+                    if (piece.getColor() != expectedOpponentPieceColor) {
+                        System.out.println("❌ 推断后仍然颜色不匹配，拒绝执行移动");
+                        addAILog("network", "❌ 棋子颜色验证失败，移动被拒绝");
+                        showErrorInfo("对手移动验证失败：棋子颜色不匹配\n可能的原因:\n• 网络消息错误\n• 棋盘状态不同步\n建议重新连接");
+                        return;
+                    } else {
+                        System.out.println("✅ 推断后棋子颜色匹配，继续执行移动");
+                        addAILog("network", "✅ 颜色推断成功，继续执行移动");
+                    }
+                } else {
+                    // 本地玩家颜色已设置但棋子颜色不匹配，这是严重的同步问题
+                    System.out.println("❌ 严重同步问题：本地玩家颜色已知但对手棋子颜色不符预期");
+                    addAILog("network", "❌ 检测到严重的游戏状态同步问题");
+                    
+                    // 检查是否是"自己移动自己的棋子"的情况（严重错误）
+                    PieceColor myPieceColor = "RED".equals(localPlayerColor) ? PieceColor.RED : PieceColor.BLACK;
+                    if (piece.getColor() == myPieceColor) {
+                        System.out.println("🚨 检测到致命错误：收到移动自己棋子的指令！");
+                        addAILog("network", "🚨 致命错误：收到移动自己棋子的网络消息");
+                        showErrorInfo("网络同步严重错误！\n\n检测到试图移动您自己的棋子。\n这通常表示：\n• 服务器状态异常\n• 网络消息混乱\n• 客户端状态错误\n\n强烈建议立即重新连接游戏。");
+                        return;
+                    }
+                    
+                    // 如果不是致命错误，给出警告但尝试继续
+                    System.out.println("⚠️ 棋子颜色与预期不符，但尝试继续执行移动（可能是特殊情况）...");
+                    addAILog("network", "⚠️ 检测到棋子颜色异常，但继续执行移动");
+                }
+            } else {
+                System.out.println("✅ 对手移动棋子颜色验证通过");
+                addAILog("network", "对手移动验证通过");
+            }
+            
+            // 验证移动是否合法
+            Position start = new Position(actualFromRow, actualFromCol);
+            Position end = new Position(actualToRow, actualToCol);
+            
+            System.out.println("⚙️ 验证对手移动合法性...");
+            
+            boolean isValidMove = piece.isValidMove(board, start, end);
+            boolean isMoveSafe = board.isMoveSafe(start, end, piece.getColor());
+            
+            System.out.println("   - 棋子移动规则验证: " + (isValidMove ? "✅ 通过" : "❌ 失败"));
+            System.out.println("   - 移动安全性验证: " + (isMoveSafe ? "✅ 通过" : "❌ 失败"));
+            
+            if (!isValidMove) {
+                System.out.println("❌ 对手移动无效: 不符合棋子移动规则");
+                addAILog("network", "❌ 对手移动失败: 不符合棋子移动规则");
+                showErrorInfo("对手移动无效：不符合棋子移动规则\n可能的原因：\n• 网络消息错误\n• 棋盘状态不同步");
+                return;
+            }
+            
+            if (!isMoveSafe) {
+                System.out.println("❌ 对手移动无效: 移动会导致自方将军被将军");
+                addAILog("network", "❌ 对手移动失败: 不符合安全性规则");
+                // 注意：在网络对战中，这种情况很少发生，因为服务器通常会验证移动合法性
+                // 但为了完整性，仍然进行这个检查
+                showErrorInfo("对手移动无效：不符合安全性规则\n这可能是网络同步问题，建议重新连接");
+                return;
+            }
+            
+            System.out.println("✅ 对手移动验证通过，开始执行...");
+            addAILog("network", "✅ 对手移动验证通过，开始执行");
+            
+            // 检查是否有被吃的棋子
+            Piece capturedPiece = board.getPiece(actualToRow, actualToCol);
+            if (capturedPiece != null) {
+                System.out.println("🍽️ 对手吃棋: " + capturedPiece.getChineseName() + "(" + capturedPiece.getColor() + ")");
+                addAILog("network", "对手吃棋: " + capturedPiece.getChineseName());
+            }
+            
+            // 保存棋盘状态
+            saveBoardState();
+            
+            // 执行移动
+            board.movePiece(start, end);
+            
+            // 更新移动标记 - 使用与棋盘逻辑坐标对应的坐标
+            // 对于网络对战，需要将标准坐标转换为本地逻辑坐标用于移动标记显示
+            int markFromRow, markFromCol, markToRow, markToCol;
+            
+            if ("BLACK".equals(localPlayerColor) && isBoardFlipped) {
+                // 黑方玩家且棋盘翻转：将标准坐标转换为本地逻辑坐标
+                markFromRow = 9 - actualFromRow;
+                markFromCol = 8 - actualFromCol; 
+                markToRow = 9 - actualToRow;
+                markToCol = 8 - actualToCol;
+                System.out.println("🔄 移动标记坐标转换（黑方翻转）: 标准(" + actualFromRow + "," + actualFromCol + ") -> 本地逻辑(" + markFromRow + "," + markFromCol + ")");
+            } else {
+                // 红方玩家或未翻转：直接使用标准坐标作为本地逻辑坐标
+                markFromRow = actualFromRow;
+                markFromCol = actualFromCol;
+                markToRow = actualToRow;
+                markToCol = actualToCol;
+                System.out.println("📍 移动标记坐标（红方或未翻转）: (" + markFromRow + "," + markFromCol + ") -> (" + markToRow + "," + markToCol + ")");
+            }
+            
+            lastMoveStart = new Position(markFromRow, markFromCol);
+            lastMoveEnd = new Position(markToRow, markToCol);
+            
+            // 播放落子音效
+            SoundPlayer.getInstance().playSound("piece_drop");
+            
+            String colorName = (piece.getColor() == PieceColor.RED) ? "红方" : "黑方";
+        System.out.println("📥 对手(" + colorName + ")移动: " + piece.getChineseName() + 
+                          " 从 (" + actualFromRow + "," + actualFromCol + ") 到 (" + actualToRow + "," + actualToCol + ") [本地坐标]");
+        addAILog("network", "对手移动: " + piece.getChineseName() + 
+                " 从 (" + fromRow + "," + fromCol + ") 到 (" + toRow + "," + toCol + ") [网络坐标]");
+        
+        // 切换玩家
+        PieceColor previousPlayer = currentPlayer;
+        currentPlayer = (currentPlayer == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
+        waitingForOpponentMove = false; // 现在轮到我了
+        
+        // 调试信息：玩家切换
+        System.out.println("🔄 玩家切换: " + (previousPlayer == PieceColor.RED ? "红方" : "黑方") + " -> " + (currentPlayer == PieceColor.RED ? "红方" : "黑方"));
+        System.out.println("   - 本地玩家颜色: " + localPlayerColor);
+        System.out.println("   - waitingForOpponentMove: " + waitingForOpponentMove);
+        
+        // 确保本地玩家可以操作
+        String myColorName = "RED".equals(localPlayerColor) ? "红方" : "黑方";
+        System.out.println("✅ 对手移动完成，现在轮到" + myColorName + "！");
+        addAILog("network", "对手移动完成，现在轮到您了！");
+            
+            // 检查游戏结束
+            gameState = board.checkGameState(currentPlayer);
+            updateStatus(); // 更新状态显示
+            
+            // 通知聊天面板更新棋盘状态
+            notifyChatPanelBoardUpdate();
+            
+            // 检查游戏是否结束
+            if (gameState == GameState.RED_WINS) {
+                SoundPlayer.getInstance().playSound("game_win");
+                showGameEndDialog("红方获胜！");
+            } else if (gameState == GameState.BLACK_WINS) {
+                SoundPlayer.getInstance().playSound("game_win");
+                showGameEndDialog("黑方获胜！");
+            } else if (gameState == GameState.DRAW) {
+                showGameEndDialog("和棋！");
+            }
+            
+            // 强制重绘棋盘，确保对手移动能够显示
+            System.out.println("🎨 [GUI DEBUG] 强制重绘棋盘 - executeOpponentMove完成");
+            SwingUtilities.invokeLater(() -> {
+                System.out.println("🎨 [GUI DEBUG] 在EDT线程中执行repaint()");
+                repaint();
+                System.out.println("🎨 [GUI DEBUG] repaint()调用完成");
+                
+                // 验证重绘后的棋盘状态
+                SwingUtilities.invokeLater(() -> {
+                    System.out.println("🔍 [GUI DEBUG] 重绘后验证棋盘状态:");
+                    printBoardStateAfterMove(actualFromRow, actualFromCol, actualToRow, actualToCol);
+                });
+            });
+            
+            // onOpponentMove 不在 ClientEventListener 接口中，移除此调用
+            
+        } catch (Exception e) {
+            System.err.println("执行对手移动时出错: " + e.getMessage());
+            e.printStackTrace();
+            addAILog("network", "执行对手移动时出错: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 修改handleMouseClick方法以支持网络对战
+     */
+    protected void handleNetworkMouseClick(int mouseX, int mouseY) {
+        // 如果在网络模式下且等待对手移动，忽略点击
+        if (isNetworkMode && waitingForOpponentMove) {
+            showErrorInfo("请等待对手移动！");
+            return;
+        }
+        
+        // 如果在网络模式下，检查是否轮到本地玩家
+        if (isNetworkMode) {
+            PieceColor myColor = "RED".equals(localPlayerColor) ? PieceColor.RED : PieceColor.BLACK;
+            if (currentPlayer != myColor) {
+                showErrorInfo("还没轮到您！");
+                return;
+            }
+        }
+        
+        // 调用原有的handleMouseClick逻辑
+        handleMouseClickInternal(mouseX, mouseY);
+    }
+    
+    /**
+     * 将原有的handleMouseClick逻辑提取为内部方法
+     */
+    private void handleMouseClickInternal(int mouseX, int mouseY) {
+        // 如果在残局设置模式下，忽略正常的鼠标点击
+        if (isSettingUpEndgame) {
+            return;
+        }
+        
+        // 如果在AI对AI模式下，禁用用户点击
+        if (isAIvsAIMode) {
+            return;
+        }
+        
+        // 如果游戏已结束、是AI回合或AI正在思考，忽略鼠标点击
+        if (gameState == GameState.RED_WINS || gameState == GameState.BLACK_WINS || 
+            gameState == GameState.DRAW || isAITurn() || isAIThinking) {
+            return;
+        }
+        
+        // 将鼠标坐标转换为显示坐标
+        int displayCol = (mouseX - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
+        int displayRow = (mouseY - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
+        
+        // 检查显示坐标是否在棋盘范围内
+        if (displayRow < 0 || displayRow >= 10 || displayCol < 0 || displayCol >= 9) {
+            return;
+        }
+        
+        // 转换为逻辑坐标
+        int row = getLogicalRow(displayRow);
+        int col = getLogicalCol(displayCol);
+        
+        Piece clickedPiece = board.getPiece(row, col);
+        
+        if (selectedPiece == null) {
+            // 没有选中棋子，尝试选择棋子
+            if (clickedPiece != null && clickedPiece.getColor() == currentPlayer) {
+                selectedPiece = clickedPiece;
+                selectedRow = row;
+                selectedCol = col;
+                calculateValidMoves();
+                repaint();
+            }
+        } else {
+            // 已经选中棋子，尝试移动
+            if (row == selectedRow && col == selectedCol) {
+                // 点击同一个位置，取消选择
+                clearSelection();
+            } else if (clickedPiece != null && clickedPiece.getColor() == currentPlayer) {
+                // 点击同色棋子，重新选择
+                selectedPiece = clickedPiece;
+                selectedRow = row;
+                selectedCol = col;
+                calculateValidMoves();
+                repaint();
+            } else {
+                // 尝试移动棋子
+                Position start = new Position(selectedRow, selectedCol);
+                Position end = new Position(row, col);
+                if (selectedPiece.isValidMove(board, start, end)) {
+                    // 检查移动是否安全（不会导致己方将军被将军）
+                    if (board.isMoveSafe(start, end, currentPlayer)) {
+                        // 如果在网络模式下，发送移动给对手
+                        if (isNetworkMode) {
+                            // TODO: 发送网络移动
+                            // networkClient.sendMove(selectedRow, selectedCol, row, col);
+                            waitingForOpponentMove = true; // 等待对手确认
+                        }
+                        
+                        // 保存当前棋盘状态
+                        saveBoardState();
+                        
+                        // 记录移动标记
+                        lastMoveStart = new Position(start.getX(), start.getY());
+                        lastMoveEnd = new Position(end.getX(), end.getY());
+                        
+                        // 执行移动
+                        board.movePiece(start, end);
+                        
+                        // 播放落子音效
+                        SoundPlayer.getInstance().playSound("piece_drop");
+                        
+                        // 显示移动信息
+                        String playerType = isNetworkMode ? "本地玩家" : "玩家";
+                        String colorName = (selectedPiece.getColor() == PieceColor.RED) ? "红方" : "黑方";
+                        System.out.println("🎯 " + playerType + "(" + colorName + ")移动: " + selectedPiece.getChineseName() + 
+                                          " 从 (" + selectedRow + "," + selectedCol + ") 到 (" + row + "," + col + ")");
+                        
+                        if (isNetworkMode) {
+                            addAILog("network", "本地移动: " + selectedPiece.getChineseName() + 
+                                    " 从 (" + selectedRow + "," + selectedCol + ") 到 (" + row + "," + col + ")");
+                        }
+                        
+                        // 切换玩家
+                        currentPlayer = (currentPlayer == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
+                        clearSelection();
+                        
+                        // 用户操作完成后，清除AI建议标记
+                        if (showAISuggestion) {
+                            clearAISuggestion();
+                        }
+                        
+                        // 检查游戏状态
+                        gameState = board.checkGameState(currentPlayer);
+                        updateStatus(); // 更新状态显示
+                        
+                        // 通知聊天面板更新棋盘状态
+                        notifyChatPanelBoardUpdate();
+                        
+                        // 检查游戏是否结束
+                        if (gameState == GameState.RED_WINS) {
+                            SoundPlayer.getInstance().playSound("game_win");
+                            showGameEndDialog("红方获胜！");
+                        } else if (gameState == GameState.BLACK_WINS) {
+                            SoundPlayer.getInstance().playSound("game_win");
+                            showGameEndDialog("黑方获胜！");
+                        } else if (gameState == GameState.DRAW) {
+                            showGameEndDialog("和棋！");
+                        } else if (gameState == GameState.PLAYING || gameState == GameState.IN_CHECK) {
+                            // 在网络模式下不需要触发AI移动
+                            if (!isNetworkMode) {
+                                // 如果游戏未结束且启用了AI且现在是AI回合，触发AI移动
+                                if (isAIvsAIMode) {
+                                    // AI vs AI模式下，延迟执行下一步AI移动
+                                    SwingUtilities.invokeLater(() -> {
+                                        Timer timer = new Timer(1000, e -> performAIvsAIMove());
+                                        timer.setRepeats(false);
+                                        timer.start();
+                                    });
+                                } else if (isAITurn()) {
+                                    SwingUtilities.invokeLater(this::performAIMove);
+                                }
+                            }
+                        }
+                    } else {
+                        // 移动会导致己方将军被将军
+                        System.out.println("无效移动: 此移动会导致己方将军被将军!");
+                    }
+                } else {
+                    // 无效移动，保持选择状态
+                    System.out.println("无效移动!");
+                }
+            }
+        }
+    }
+    
+    /**
+     * 断开网络连接
+     */
+    public void disconnectFromNetwork() {
+        // TODO: 网络功能待实现
+        /*
+        if (networkClient != null) {
+            networkClient.disconnect();
+            networkClient.shutdown();
+            networkClient = null;
+        }
+        */
+        
+        isNetworkMode = false;
+        isHost = false;
+        localPlayerColor = null;
+        opponentName = null;
+        roomId = null;
+        waitingForOpponentMove = false;
+        
+        updateStatus();
+        System.out.println("🔌 已断开网络连接");
+        addAILog("network", "已断开网络连接");
+    }
+    
+    /**
+     * 检查是否在网络模式
+     */
+    public boolean isNetworkMode() {
+        return isNetworkMode;
+    }
+    
+    /**
+     * 检查是否是房主
+     */
+    public boolean isHost() {
+        return isHost;
+    }
+    
+    /**
+     * 获取本地玩家颜色
+     */
+    public String getLocalPlayerColor() {
+        return localPlayerColor;
+    }
+    
+    /**
+     * 获取对手名称
+     */
+    public String getOpponentName() {
+        return opponentName;
+    }
+    
+    /**
+     * 获取房间ID
+     */
+    public String getRoomId() {
+        return roomId;
+    }
+    
+    /**
+     * 检查是否正在等待对手移动
+     */
+    public boolean isWaitingForOpponentMove() {
+        return waitingForOpponentMove;
+    }
+    
+    /**
+     * 离开当前房间
+     */
+    public void leaveRoom() {
+        // TODO: 网络功能待实现
+        /*
+        if (networkClient != null && networkClient.isConnected()) {
+            networkClient.leaveRoom();
+        }
+        */
+        
+        roomId = null;
+        opponentName = null;
+        isHost = false;
+        waitingForOpponentMove = false;
+        
+        // 重置游戏状态
+        restartGame();
+        
+        addAILog("network", "已离开房间");
+    }
+    
+    /**
+     * 设置网络模式
+     * @param networkMode 是否启用网络模式
+     */
+    public void setNetworkMode(boolean networkMode) {
+        this.isNetworkMode = networkMode;
+        
+        if (networkMode) {
+            // 启用网络模式时，禁用AI
+            disableAI();
+            disableAIvsAI();
+            
+            addAILog("network", "网络模式已启用");
+            System.out.println("🌐 BoardPanel 网络模式已启用");
+        } else {
+            // 禁用网络模式时，重置网络相关状态
+            isHost = false;
+            localPlayerColor = null;
+            opponentName = null;
+            roomId = null;
+            waitingForOpponentMove = false;
+            
+            addAILog("network", "网络模式已禁用");
+            System.out.println("🔌 BoardPanel 网络模式已禁用");
+        }
+        
+        updateStatus();
+    }
+    
+/**
+     * 设置网络客户端
+     * @param networkClient 网络客户端实例
+     */
+    public void setNetworkClient(NetworkClient networkClient) {
+        this.networkClient = networkClient;
+        
+        if (networkClient != null) {
+            // 创建链式事件监听器，支持多个监听器同时工作
+            NetworkClient.ClientEventListener boardPanelListener = createChainedEventListener(networkClient);
+            
+            // 在设置网络模式时保存旧的监听器（如果有的话）
+            NetworkClient.ClientEventListener oldListener = null;
+            try {
+                // 此处使用反射获取旧的监听器
+                java.lang.reflect.Field listenerField = NetworkClient.class.getDeclaredField("eventListener");
+                listenerField.setAccessible(true);
+                oldListener = (NetworkClient.ClientEventListener) listenerField.get(networkClient);
+                System.out.println("🔍 当前已有的监听器: " + (oldListener != null ? oldListener.getClass().getSimpleName() : "null"));
+            } catch (Exception e) {
+                System.err.println("⚠️ 无法获取当前监听器: " + e.getMessage());
+            }
+            
+            // 如果发现已存在监听器，则设置为外部链式监听器
+            if (oldListener != null && boardPanelListener instanceof NetworkClient.ClientEventListener) {
+                try {
+                    // 调用chain方法设置外部监听器
+                    java.lang.reflect.Method chainMethod = boardPanelListener.getClass().getMethod("chainExternalListener", NetworkClient.ClientEventListener.class);
+                    chainMethod.invoke(boardPanelListener, oldListener);
+                    System.out.println("🔗 成功链接已有监听器到BoardPanel监听器");
+                } catch (Exception e) {
+                    System.err.println("⚠️ 链接监听器失败: " + e.getMessage());
+                }
+            }
+            
+            // 设置链式监听器到网络客户端
+            networkClient.setEventListener(boardPanelListener);
+            
+            // 重要：检查是否有未处理的游戏状态
+            // 如果网络模式已启用但本地玩家颜色未设置，可能错过了GameStartMessage
+            if (isNetworkMode && localPlayerColor == null) {
+                System.out.println("⚠️ 检测到网络模式已启用但本地玩家颜色未设置，可能错过了游戏开始消息");
+                addAILog("network", "检测到可能错过了游戏开始消息，尝试同步游戏状态");
+                
+                // 请求服务器同步当前游戏状态
+                requestGameStateSynchronization();
+            }
+            
+            addAILog("network", "网络客户端已设置，监听器已更新");
+            System.out.println("📡 BoardPanel 网络客户端已设置，监听器已更新");
+        } else {
+            addAILog("network", "网络客户端已清除");
+            System.out.println("📡 BoardPanel 网络客户端已清除");
+        }
+    }
+    
+    /**
+     * 创建链式事件监听器，支持多个监听器协同工作
+     */
+    private NetworkClient.ClientEventListener createChainedEventListener(NetworkClient networkClient) {
+        // 获取现有的事件监听器（如果可能的话）
+        // 注意：由于NetworkClient可能没有提供获取现有监听器的方法，
+        // 我们创建一个包装器来确保事件能正确传播
+        
+        return new NetworkClient.ClientEventListener() {
+            // 存储外部设置的监听器（如果有的话）
+            private NetworkClient.ClientEventListener externalListener = null;
+            
+            // 设置外部监听器
+            public void setExternalListener(NetworkClient.ClientEventListener listener) {
+                this.externalListener = listener;
+            }
+            
+            // 转发事件到外部监听器（如果存在）
+            private void forwardToExternalListener(String eventName, Runnable event) {
+                try {
+                    if (externalListener != null) {
+                        event.run();
+                    }
+                } catch (Exception e) {
+                    System.err.println("⚠️ 转发事件到外部监听器时出错 [" + eventName + "]: " + e.getMessage());
+                }
+            }
+            
+            // 提供链式监听器接口，允许外部设置额外的监听器
+            public void chainExternalListener(NetworkClient.ClientEventListener listener) {
+                this.externalListener = listener;
+                System.out.println("🔗 外部监听器已链接到BoardPanel监听器");
+            }
+                @Override
+                public void onConnected() {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "已连接到服务器");
+                        System.out.println("🌐 BoardPanel: 已连接到服务器");
+                    });
+                }
+                
+                @Override
+                public void onDisconnected(String reason) {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "与服务器断开连接: " + reason);
+                        System.out.println("🔌 BoardPanel: 与服务器断开连接: " + reason);
+                        showErrorInfo("网络连接断开: " + reason);
+                    });
+                }
+                
+                @Override
+                public void onConnectionError(String error) {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "连接错误: " + error);
+                        System.err.println("❌ BoardPanel: 连接错误: " + error);
+                        showErrorInfo("网络连接错误: " + error);
+                    });
+                }
+                
+                @Override
+                public void onMessageReceived(NetworkMessage message) {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "收到消息: " + message.getType());
+                        System.out.println("📨 BoardPanel: 收到网络消息: " + message.getType());
+                    });
+                }
+                
+                @Override
+                public void onRoomCreated(String roomId) {
+                    SwingUtilities.invokeLater(() -> {
+                        BoardPanel.this.roomId = roomId;
+                        isHost = true;
+                        addAILog("network", "房间创建成功: " + roomId + " (作为房主)");
+                        System.out.println("🏠 BoardPanel: 房间创建成功: " + roomId + " (作为房主)");
+                    });
+                }
+                
+                @Override
+                public void onRoomJoined(String roomId, String opponentName) {
+                    SwingUtilities.invokeLater(() -> {
+                        BoardPanel.this.roomId = roomId;
+                        BoardPanel.this.opponentName = opponentName;
+                        isHost = false;
+                        roomJoinTimestamp = System.currentTimeMillis();
+                        addAILog("network", "加入房间成功: " + roomId + ", 对手: " + opponentName);
+                        System.out.println("🚪 BoardPanel: 加入房间成功: " + roomId + ", 对手: " + opponentName);
+                        
+                        // 启动GameStart消息检测定时器
+                        startGameStartDetectionTimer();
+                    });
+                }
+                
+                @Override
+                public void onRoomListReceived(java.util.List<RoomInfo> rooms) {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "收到房间列表，共 " + rooms.size() + " 个房间");
+                        System.out.println("📋 BoardPanel: 收到房间列表，共 " + rooms.size() + " 个房间");
+                    });
+                }
+                
+                @Override
+                public void onGameStarted(String redPlayer, String blackPlayer, String yourColor) {
+                    SwingUtilities.invokeLater(() -> {
+                        // 标记已收到GameStart消息
+                        gameStartReceived = true;
+                        
+                        // 停止GameStart检测定时器（如果正在运行）
+                        stopGameStartDetectionTimer();
+                        
+                        // 调试信息：游戏开始前的状态
+                        System.out.println("🔍 DEBUG: onGameStarted 被调用");
+                        System.out.println("   - 调用前 localPlayerColor: " + localPlayerColor);
+                        System.out.println("   - 调用前 isNetworkMode: " + isNetworkMode);
+                        System.out.println("   - 传入的 yourColor: " + yourColor);
+                        
+                        // 设置网络模式和玩家颜色
+                        localPlayerColor = yourColor;
+                        isNetworkMode = true;
+                        
+                        // 调试信息：设置后的状态
+                        System.out.println("   - 设置后 localPlayerColor: " + localPlayerColor);
+                        System.out.println("   - 设置后 isNetworkMode: " + isNetworkMode);
+                        
+                        // 初始化网络游戏状态
+                        initializeNetworkGame();
+                        
+                        addAILog("network", "游戏开始! 您执" + ("RED".equals(yourColor) ? "红" : "黑") + "方");
+                        System.out.println("🎮 BoardPanel: 网络游戏开始! 红方: " + redPlayer + ", 黑方: " + blackPlayer + ", 您的颜色: " + yourColor);
+                        
+                        // 如果是红方（先手），且轮到自己，则不需要等待
+                        if ("RED".equals(yourColor)) {
+                            waitingForOpponentMove = false;
+                            addAILog("network", "您是红方，轮到您先走！");
+                            System.out.println("🎯 BoardPanel: 您是红方，轮到您先走！");
+                        } else {
+                            waitingForOpponentMove = true;
+                            addAILog("network", "您是黑方，等待红方先走...");
+                            System.out.println("⏳ BoardPanel: 您是黑方，等待红方先走...");
+                        }
+                        
+                        updateStatus();
+                    });
+                }
+                
+                @Override
+                public void onMoveReceived(int fromRow, int fromCol, int toRow, int toCol) {
+                    SwingUtilities.invokeLater(() -> {
+                        // 检测是否错过了游戏开始消息，需要推断本地玩家颜色
+                        if (localPlayerColor == null && isNetworkMode) {
+                            inferLocalPlayerColorFromOpponentMove(fromRow, fromCol);
+                        }
+                        executeOpponentMove(fromRow, fromCol, toRow, toCol);
+                    });
+                }
+                
+                @Override
+                public void onGameEnded(String winner, String reason) {
+                    SwingUtilities.invokeLater(() -> {
+                        String winnerText = "RED".equals(winner) ? "红方" : ("BLACK".equals(winner) ? "黑方" : "和棋");
+                        addAILog("network", "游戏结束: " + winnerText + " (" + reason + ")");
+                        System.out.println("🏁 BoardPanel: 网络游戏结束: " + winnerText + " (" + reason + ")");
+                        
+                        showGameEndDialog(winnerText + "获胜！\n原因: " + reason);
+                    });
+                }
+                
+                @Override
+                public void onGameStateUpdate(String gameState, String currentPlayer, boolean isGameOver, String winner) {
+                    SwingUtilities.invokeLater(() -> {
+                        addAILog("network", "游戏状态更新: " + gameState + ", 当前玩家: " + currentPlayer);
+                        System.out.println("🔄 BoardPanel: 游戏状态更新: " + gameState + ", 当前玩家: " + currentPlayer);
+                        if (isGameOver) {
+                            String winnerText = "RED".equals(winner) ? "红方" : ("BLACK".equals(winner) ? "黑方" : "和棋");
+                            showGameEndDialog(winnerText + "获胜！");
+                        }
+                        updateStatus();
+                    });
+                }
+                
+                @Override
+                public void onError(String error) {
+                    SwingUtilities.invokeLater(() -> {
+                        showErrorInfo("网络错误: " + error);
+                        addAILog("network", "网络错误: " + error);
+                        System.err.println("❌ BoardPanel: 网络错误: " + error);
+                    });
+                }
+            };
+        }
+    
+    /**
+     * 设置本地玩家颜色
+     * @param color 本地玩家颜色 ("RED" 或 "BLACK")
+     */
+    public void setLocalPlayerColor(String color) {
+        this.localPlayerColor = color;
+        
+        addAILog("network", "本地玩家颜色设置为: " + color);
+        System.out.println("🎯 BoardPanel 本地玩家颜色设置为: " + color);
+        
+        updateStatus();
+    }
+    
+    /**
+     * 设置对手名称
+     * @param name 对手名称
+     */
+    public void setOpponentName(String name) {
+        this.opponentName = name;
+        
+        addAILog("network", "对手名称设置为: " + name);
+        System.out.println("👤 BoardPanel 对手名称设置为: " + name);
+        
+        updateStatus();
+    }
+    
+    /**
+     * 请求服务器同步游戏状态
+     * 当BoardPanel检测到可能错过了游戏开始消息时调用此方法
+     */
+    private void requestGameStateSynchronization() {
+        if (networkClient == null || !networkClient.isConnected()) {
+            String errorMsg = "无法请求游戏状态同步: 网络客户端未连接";
+            System.err.println("⚠️ " + errorMsg);
+            addAILog("network", errorMsg);
+            showErrorInfo(errorMsg + "，请检查网络连接");
+            return;
+        }
+        
+        try {
+            addAILog("network", "正在请求服务器同步游戏状态...");
+            System.out.println("🔄 正在请求服务器同步游戏状态...");
+            
+            // 获取客户端信息
+            String playerId = networkClient.getPlayerId();
+            String currentRoomId = this.roomId; // 使用BoardPanel中存储的房间ID
+            
+            // 调试信息：显示当前状态
+            System.out.println("🔍 DEBUG: 同步请求前的状态检查:");
+            System.out.println("   - playerId: " + (playerId != null ? playerId : "null"));
+            System.out.println("   - BoardPanel.roomId: " + (currentRoomId != null ? currentRoomId : "null"));
+            System.out.println("   - isNetworkMode: " + isNetworkMode);
+            System.out.println("   - localPlayerColor: " + localPlayerColor);
+            System.out.println("   - networkClient.isConnected(): " + networkClient.isConnected());
+            
+            // 验证必需信息
+            if (playerId == null) {
+                String errorMsg = "无法发送同步请求：玩家ID未设置（可能连接认证未完成）";
+                System.err.println("⚠️ " + errorMsg);
+                addAILog("network", errorMsg);
+                showErrorInfo("网络连接尚未完全建立，请稍后再试或重新连接");
+                return;
+            }
+            
+            if (currentRoomId == null) {
+                String errorMsg = "无法发送同步请求：房间ID未设置（可能尚未加入房间）";
+                System.err.println("⚠️ " + errorMsg);
+                addAILog("network", errorMsg);
+                showErrorInfo("尚未加入游戏房间，无法同步游戏状态");
+                return;
+            }
+            
+            // 创建同步请求消息
+            GameStateSyncRequestMessage syncRequest = new GameStateSyncRequestMessage(
+                playerId, 
+                currentRoomId, 
+                "boardpanel_missed_gamestart_auto_recovery"
+            );
+            
+            // 验证消息序列化
+            try {
+                String jsonMessage = syncRequest.toJson();
+                if (jsonMessage == null || jsonMessage.trim().isEmpty()) {
+                    throw new Exception("序列化结果为空");
+                }
+                System.out.println("🔍 发送的同步请求消息: " + jsonMessage);
+                
+                // 发送消息
+                networkClient.sendNetworkMessage(syncRequest);
+                
+                addAILog("network", "✅ 已发送游戏状态同步请求到服务器");
+                System.out.println("✅ 已发送游戏状态同步请求到服务器");
+                
+                // 设置合理的超时时间和fallback机制
+                Timer fallbackTimer = new Timer(10000, e -> { // 10秒超时
+                    if (localPlayerColor == null && isNetworkMode) {
+                        System.out.println("⏰ 游戏状态同步超时，尝试其他恢复方式...");
+                        addAILog("network", "游戏状态同步超时，将依赖对手移动进行颜色推断");
+                        
+                        // 提供用户友好的错误信息
+                        String timeoutMsg = "网络游戏状态同步超时。\n\n" +
+                                           "可能的原因：\n" +
+                                           "• 服务器繁忙或不支持状态同步\n" +
+                                           "• 网络连接不稳定\n" +
+                                           "• 游戏房间状态异常\n\n" +
+                                           "系统将尝试在对手移动时自动恢复游戏状态。\n" +
+                                           "如果问题持续，建议重新加入房间。";
+                        showErrorInfo(timeoutMsg);
+                        
+                        // 设置一个提示，告诉用户系统会自动恢复
+                        addAILog("network", "💡 提示：当对手移动棋子时，系统将自动推断您的颜色并恢复游戏");
+                    }
+                });
+                fallbackTimer.setRepeats(false);
+                fallbackTimer.start();
+                
+            } catch (Exception serializeEx) {
+                System.err.println("❌ 消息序列化失败: " + serializeEx.getMessage());
+                addAILog("network", "消息序列化失败: " + serializeEx.getMessage());
+                showErrorInfo("同步请求失败: 消息格式错误");
+                serializeEx.printStackTrace();
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ 请求游戏状态同步失败: " + e.getMessage());
+            addAILog("network", "请求游戏状态同步失败: " + e.getMessage());
+            showErrorInfo("同步请求失败: " + e.getMessage() + "\n建议重新加入房间");
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * 从对手移动推断本地玩家颜色
+     * 当客户端错过了游戏开始消息时的fallback机制
+     * 
+     * @param opponentFromRow 对手移动的起始行
+     * @param opponentFromCol 对手移动的起始列
+     */
+    private void inferLocalPlayerColorFromOpponentMove(int opponentFromRow, int opponentFromCol) {
+        try {
+            System.out.println("🔍 开始从对手移动推断本地玩家颜色...");
+            System.out.println("   对手移动的起始位置: (" + opponentFromRow + "," + opponentFromCol + ")");
+            addAILog("network", "检测到错过游戏开始消息，正在从对手移动推断您的颜色...");
+            
+            // 获取对手移动的棋子
+            Piece opponentPiece = board.getPiece(opponentFromRow, opponentFromCol);
+            
+            if (opponentPiece == null) {
+                System.err.println("⚠️ 无法推断玩家颜色：对手移动的起始位置没有棋子");
+                addAILog("network", "无法推断玩家颜色：对手移动位置无棋子，可能是坐标问题");
+                
+                // 尝试请求服务器同步
+                showErrorInfo("网络同步出现问题，正在尝试恢复...");
+                requestGameStateSynchronization();
+                return;
+            }
+            
+            // 获取对手的颜色
+            PieceColor opponentColor = opponentPiece.getColor();
+            String opponentColorName = (opponentColor == PieceColor.RED) ? "红" : "黑";
+            
+            // 推断本地玩家的颜色（与对手相反）
+            String inferredLocalColor = (opponentColor == PieceColor.RED) ? "BLACK" : "RED";
+            String localColorName = "BLACK".equals(inferredLocalColor) ? "黑" : "红";
+            
+            System.out.println("🧩 推断结果：");
+            System.out.println("   - 对手棋子: " + opponentPiece.getChineseName() + "（" + opponentColorName + "方）");
+            System.out.println("   - 推断本地玩家颜色: " + inferredLocalColor + "（" + localColorName + "方）");
+            
+            // 设置推断的本地玩家颜色
+            localPlayerColor = inferredLocalColor;
+            
+            // 自动启用网络模式（如果尚未启用）
+            if (!isNetworkMode) {
+                isNetworkMode = true;
+                System.out.println("🌐 自动启用网络模式");
+            }
+            
+            // 根据推断的颜色自动翻转棋盘（黑方玩家看到翻转的棋盘）
+            if ("BLACK".equals(inferredLocalColor)) {
+                if (!isBoardFlipped) {
+                    isBoardFlipped = true;
+                    addAILog("network", "您是黑方，已自动翻转棋盘视角");
+                    System.out.println("🔄 检测到您是黑方，自动翻转棋盘视角");
+                    repaint(); // 立即重绘棋盘以显示翻转效果
+                }
+            } else {
+                if (isBoardFlipped) {
+                    isBoardFlipped = false;
+                    addAILog("network", "您是红方，已重置棋盘为标准视角");
+                    System.out.println("🔄 检测到您是红方，重置棋盘为标准视角");
+                    repaint(); // 立即重绘棋盘
+                }
+            }
+            
+            // 设置等待状态
+            // 如果对手刚刚移动，说明现在轮到我们了
+            waitingForOpponentMove = false;
+            
+            // 记录推断成功的日志
+            addAILog("network", "✅ 玩家颜色推断成功！您执" + localColorName + "方，对手执" + opponentColorName + "方");
+            System.out.println("✅ 玩家颜色推断成功！本地玩家: " + localColorName + "方，对手: " + opponentColorName + "方");
+            
+            // 更新状态显示
+            updateStatus();
+            
+            // 向用户显示恢复成功的提示
+            showErrorInfo("✅ 网络游戏状态已自动恢复！\n\n" +
+                "您执" + localColorName + "方\n" +
+                "对手执" + opponentColorName + "方\n" +
+                "现在轮到您了！");
+            
+            // 可选：播放提示音
+            SoundPlayer.getInstance().playSound("game_start");
+            
+        } catch (Exception e) {
+            System.err.println("❌ 推断玩家颜色时出错: " + e.getMessage());
+            e.printStackTrace();
+            addAILog("network", "推断玩家颜色失败: " + e.getMessage());
+            
+            // 显示错误并尝试其他恢复方式
+            showErrorInfo("自动恢复游戏状态失败: " + e.getMessage() + "\n\n建议重新加入房间");
+            
+            // 尝试请求服务器同步作为备选方案
+            requestGameStateSynchronization();
+        }
+    }
+    
+    /**
+     * 启动GameStart消息检测定时器
+     * 在加入房间后启动，如果在指定时间内没有收到GameStart消息，则执行恢复逻辑
+     */
+    private void startGameStartDetectionTimer() {
+        // 停止之前的定时器（如果正在运行）
+        stopGameStartDetectionTimer();
+        
+        // 重置状态
+        gameStartReceived = false;
+        
+        System.out.println("⏰ 启动GameStart检测定时器，延迟" + GAMESTART_DETECTION_DELAY_MS + "毫秒");
+        addAILog("network", "启动GameStart消息检测定时器，将在" + (GAMESTART_DETECTION_DELAY_MS / 1000) + "秒后检测");
+        
+        gameStartDetectionTimer = new Timer(GAMESTART_DETECTION_DELAY_MS, e -> {
+            // 检查是否收到了GameStart消息
+            if (!gameStartReceived && isNetworkMode) {
+                System.out.println("⚠️ 检测到错过GameStart消息，启动恢复机制");
+                addAILog("network", "未在预期时间内收到GameStart消息，启动恢复机制");
+                handleMissedGameStartMessage();
+            } else {
+                System.out.println("✅ GameStart消息检测正常，定时器结束");
+                addAILog("network", "GameStart消息检测正常");
+            }
+        });
+        
+        gameStartDetectionTimer.setRepeats(false);
+        gameStartDetectionTimer.start();
+    }
+    
+    /**
+     * 停止GameStart消息检测定时器
+     */
+    private void stopGameStartDetectionTimer() {
+        if (gameStartDetectionTimer != null && gameStartDetectionTimer.isRunning()) {
+            gameStartDetectionTimer.stop();
+            System.out.println("⏹️ 停止GameStart检测定时器");
+            addAILog("network", "停止GameStart检测定时器");
+        }
+        gameStartDetectionTimer = null;
+    }
+    
+    /**
+     * 处理错过GameStart消息的情况
+     * 当检测定时器触发时调用此方法进行恢复
+     */
+    private void handleMissedGameStartMessage() {
+        try {
+            System.out.println("🔄 处理错过的GameStart消息...");
+            addAILog("network", "检测到可能错过了GameStart消息，正在尝试恢复...");
+            
+            // 首先尝试请求服务器同步游戏状态
+            requestGameStateSynchronization();
+            
+            // 设置超时机制，如果服务器同步失败，提供用户友好的提示
+            Timer fallbackTimer = new Timer(8000, e -> { // 8秒后的兜底提示
+                if (localPlayerColor == null && isNetworkMode) {
+                    System.out.println("💡 提供GameStart消息恢复指导");
+                    addAILog("network", "正在等待游戏开始或对手移动...");
+                    
+                    String guidanceMsg = "正在等待网络游戏开始...\n\n" +
+                                        "如果游戏已经开始但您没有收到通知：\n" +
+                                        "• 等待对手移动，系统将自动检测您的颜色\n" +
+                                        "• 或者尝试重新加入房间\n\n" +
+                                        "请确保网络连接稳定。";
+                    showErrorInfo(guidanceMsg);
+                }
+            });
+            fallbackTimer.setRepeats(false);
+            fallbackTimer.start();
+            
+        } catch (Exception e) {
+            System.err.println("❌ 处理错过GameStart消息时出错: " + e.getMessage());
+            addAILog("network", "GameStart消息恢复失败: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * 初始化网络游戏状态 - 替代restartGame以便正确处理网络模式
+     */
+    private void initializeNetworkGame() {
+        System.out.println("🔧 [DEBUG] 开始初始化网络游戏状态...");
+        System.out.println("   - 初始化前 localPlayerColor: " + localPlayerColor);
+        System.out.println("   - 初始化前 isBoardFlipped: " + isBoardFlipped);
+        System.out.println("   - 初始化前 currentPlayer: " + currentPlayer);
+        
+        // 重置棋盘到标准初始状态
+        System.out.println("🔧 [DEBUG] 重置棋盘到标准初始状态...");
+        board.initializeBoard();
+        
+        // 验证棋盘初始化是否正确
+        System.out.println("🔧 [DEBUG] 验证棋盘初始化状态:");
+        Piece redRook = board.getPiece(9, 0); // 红方左车
+        Piece blackRook = board.getPiece(0, 0); // 黑方左车
+        System.out.println("   - 红方左车 (9,0): " + (redRook != null ? redRook.getChineseName() + "(" + redRook.getColor() + ")" : "null"));
+        System.out.println("   - 黑方左车 (0,0): " + (blackRook != null ? blackRook.getChineseName() + "(" + blackRook.getColor() + ")" : "null"));
+        
+        // 检查关键位置的棋子
+        Piece redCannon = board.getPiece(7, 7); // 红方右炮
+        Piece blackCannon = board.getPiece(2, 1); // 黑方左炮
+        System.out.println("   - 红方右炮 (7,7): " + (redCannon != null ? redCannon.getChineseName() + "(" + redCannon.getColor() + ")" : "null"));
+        System.out.println("   - 黑方左炮 (2,1): " + (blackCannon != null ? blackCannon.getChineseName() + "(" + blackCannon.getColor() + ")" : "null"));
+        
+        // 设置当前玩家 - 红方先手
+        currentPlayer = PieceColor.RED;
+        System.out.println("🔧 [DEBUG] 设置当前玩家为红方先手");
+        
+        // 设置游戏状态
+        gameState = GameState.PLAYING;
+        
+        // 清除选择状态
+        clearSelection();
+        
+        // 重置AI状态
+        isAIThinking = false;
+        
+        // 清空历史记录
+        boardHistory.clear();
+        stateCounter = 0;
+        
+        // 清除移动标记
+        lastMoveStart = null;
+        lastMoveEnd = null;
+        
+        // 清除AI建议
+        clearAISuggestion();
+        
+        // 重置暂停状态
+        isGamePaused = false;
+        
+        // 网络模式下，根据玩家颜色自动翻转棋盘
+        // 黑方玩家看到翻转后的棋盘，使其棋子在底部
+        System.out.println("🔧 [DEBUG] 根据玩家颜色设置棋盘翻转状态...");
+        if ("BLACK".equals(localPlayerColor)) {
+            if (!isBoardFlipped) {
+                isBoardFlipped = true;
+                addAILog("network", "检测到您是黑方，已自动翻转棋盘");
+                System.out.println("🔄 检测到黑方玩家，自动翻转棋盘");
+            } else {
+                System.out.println("🔄 黑方玩家，棋盘已经是翻转状态");
+            }
+        } else if ("RED".equals(localPlayerColor)) {
+            if (isBoardFlipped) {
+                isBoardFlipped = false;
+                addAILog("network", "检测到您是红方，已重置棋盘方向");
+                System.out.println("🔄 检测到红方玩家，重置棋盘方向");
+            } else {
+                System.out.println("🔄 红方玩家，棋盘保持标准方向");
+            }
+        }
+        
+        // 再次验证关键位置（考虑翻转后的显示）
+        System.out.println("🔧 [DEBUG] 初始化后的最终状态验证:");
+        System.out.println("   - localPlayerColor: " + localPlayerColor);
+        System.out.println("   - isBoardFlipped: " + isBoardFlipped);
+        System.out.println("   - currentPlayer: " + currentPlayer);
+        
+        // 验证关键测试位置
+        if ("BLACK".equals(localPlayerColor) && isBoardFlipped) {
+            // 黑方翻转棋盘，服务器坐标(7,7)应该转换为本地逻辑坐标(2,1)
+            int testLocalRow = 9 - 7; // = 2
+            int testLocalCol = 8 - 7; // = 1
+            Piece testPiece = board.getPiece(testLocalRow, testLocalCol);
+            System.out.println("   - 测试位置：服务器(7,7) -> 黑方本地(" + testLocalRow + "," + testLocalCol + "): " + 
+                             (testPiece != null ? testPiece.getChineseName() + "(" + testPiece.getColor() + ")" : "null"));
+            
+            // 应该找到红方的炮
+            if (testPiece != null && testPiece.getColor() == PieceColor.RED) {
+                System.out.println("✅ 坐标转换验证通过：在期望位置找到红方棋子");
+            } else {
+                System.out.println("❌ 坐标转换验证失败：期望红方棋子但找到 " + 
+                                 (testPiece != null ? testPiece.getColor() : "null"));
+            }
+        }
+        
+        // 网络模式下，等待状态由玩家颜色决定
+        // 这个逻辑在onGameStarted回调中已经处理
+        
+        System.out.println("🌐 网络游戏初始化完成");
+        addAILog("network", "网络游戏初始化完成");
+        
+        // 强制重绘棋盘确保初始化后的状态正确显示
+        SwingUtilities.invokeLater(() -> {
+            System.out.println("🎨 [DEBUG] 网络游戏初始化后强制重绘棋盘");
+            repaint();
+        });
+    }
+    
 }

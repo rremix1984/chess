@@ -114,14 +114,43 @@ public class FairyStockfishAI {
             System.out.println("🔍 [调试] FEN: " + fen);
             addToAILog("分析局面: " + fen);
             
-            // 添加棋盘状态调试信息
-            System.out.println("🔍 [调试] 棋盘状态检查:");
-            for (int row = 5; row <= 7; row++) {
+            // 添加全面的棋盘状态调试信息
+            System.out.println("🔍 [调试] 完整棋盘状态检查:");
+            addToAILog("完整棋盘状态:");
+            for (int row = 0; row < 10; row++) {
+                StringBuilder rowStr = new StringBuilder();
+                rowStr.append("  第").append(row).append("行: ");
+                boolean hasAnyPiece = false;
                 for (int col = 0; col < 9; col++) {
                     Piece piece = board.getPiece(row, col);
                     if (piece != null) {
-                        System.out.println("  位置(" + row + "," + col + "): " + piece.getClass().getSimpleName() + " " + piece.getColor());
+                        hasAnyPiece = true;
+                        String pieceInfo = "[" + col + ":" + piece.getClass().getSimpleName() + "-" + piece.getColor() + "] ";
+                        rowStr.append(pieceInfo);
                     }
+                }
+                if (!hasAnyPiece) {
+                    rowStr.append("空行");
+                }
+                System.out.println(rowStr.toString());
+                if (hasAnyPiece) {
+                    addToAILog(rowStr.toString());
+                }
+            }
+            
+            // 验证FEN与实际棋盘的一致性
+            System.out.println("🔍 [调试] 验证FEN准确性...");
+            addToAILog("验证FEN准确性");
+            
+            // 特别检查关键位置是否有棋子
+            System.out.println("🔍 [调试] 检查关键位置:");
+            String[] testPositions = {"e0", "e9", "d0", "f0", "d9", "f9", "g0", "g9", "c0", "c9", "h2", "b2", "h7", "b7"};
+            for (String pos : testPositions) {
+                Position position = FenConverter.uciToPosition(pos);
+                if (position != null) {
+                    Piece piece = board.getPiece(position.getX(), position.getY());
+                    String pieceInfo = piece != null ? piece.getClass().getSimpleName() + "-" + piece.getColor() : "空";
+                    System.out.println("  " + pos + "(" + position.getX() + "," + position.getY() + "): " + pieceInfo);
                 }
             }
             addToAILog("AI难度: " + difficulty + "/10 (" + getDifficultyName() + ")");
@@ -208,8 +237,24 @@ public class FairyStockfishAI {
             // 验证起始位置有棋子且属于当前AI
             Piece piece = board.getPiece(start.getX(), start.getY());
             if (piece == null) {
-                System.out.println("⚠️ 起始位置无棋子: " + uciMove + " (位置: " + start.getX() + "," + start.getY() + ")");
+                System.out.println("⚠️ [Fairy-Stockfish] 起始位置无棋子: " + uciMove + " (位置: " + start.getX() + "," + start.getY() + ")");
                 addToAILog("起始位置无棋子: " + uciMove);
+                
+                // 详细的棋盘状态调试
+                System.out.println("🔍 [Fairy-Stockfish] 棋盘状态调试:");
+                addToAILog("棋盘状态调试:");
+                for (int debugRow = Math.max(0, start.getX() - 2); debugRow <= Math.min(9, start.getX() + 2); debugRow++) {
+                    for (int debugCol = Math.max(0, start.getY() - 2); debugCol <= Math.min(8, start.getY() + 2); debugCol++) {
+                        Piece debugPiece = board.getPiece(debugRow, debugCol);
+                        String debugInfo = "位置(" + debugRow + "," + debugCol + "): " + 
+                            (debugPiece != null ? debugPiece.getClass().getSimpleName() + "-" + debugPiece.getColor() : "空");
+                        System.out.println("  " + debugInfo);
+                        addToAILog("  " + debugInfo);
+                    }
+                }
+                
+                System.out.println("❌ [Fairy-Stockfish] 走法转换失败: " + uciMove);
+                addToAILog("走法转换失败: " + uciMove);
                 return null;
             }
             
