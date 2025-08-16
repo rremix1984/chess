@@ -1,0 +1,40 @@
+name: Mirror to Gitee
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Gitee (mirror all refs)
+        env:
+          GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          if [ -z "${GITEE_USERNAME}" ] || [ -z "${GITEE_TOKEN}" ]; then
+            echo "Missing secrets GITEE_USERNAME or GITEE_TOKEN" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global --add safe.directory "$PWD"
+
+          # NOTE: Update the owner/repo if different on Gitee
+          GITEE_URL="https://${GITEE_USERNAME}:${GITEE_TOKEN}@gitee.com/wangxiaozhe1984/chinese.git"
+
+          git remote add gitee "$GITEE_URL" || git remote set-url gitee "$GITEE_URL"
+          # Mirror pushes ALL refs (branches, tags) and deletes
+          git push --mirror gitee
