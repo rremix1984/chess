@@ -432,4 +432,61 @@ public class ChessGameServer {
             e.printStackTrace();
         }
     }
+
+    /**
+     * 构建给定玩家的房间状态快照（用于同步）
+     */
+    public GameStateSyncResponseMessage buildSyncResponse(String requesterPlayerId, String roomId) {
+        GameRoom room = rooms.get(roomId);
+        if (room == null || !room.hasPlayer(requesterPlayerId)) {
+            return new GameStateSyncResponseMessage(
+                "server",
+                roomId,
+                room == null ? "房间不存在" : "玩家不在该房间内"
+            );
+        }
+
+        // 获取红黑双方玩家ID
+        String redPlayerId = room.getRedPlayer();
+        String blackPlayerId = room.getBlackPlayer();
+
+        // 通过客户端映射获取玩家名称
+        String redPlayerName = redPlayerId != null && clients.get(redPlayerId) != null
+                ? clients.get(redPlayerId).getPlayerName() : "";
+        String blackPlayerName = blackPlayerId != null && clients.get(blackPlayerId) != null
+                ? clients.get(blackPlayerId).getPlayerName() : "";
+
+        // 计算请求者颜色
+        String yourColor = null;
+        if (requesterPlayerId.equals(redPlayerId)) {
+            yourColor = "RED";
+        } else if (requesterPlayerId.equals(blackPlayerId)) {
+            yourColor = "BLACK";
+        } else {
+            // 不是对局双方（旁观），暂不支持
+            return new GameStateSyncResponseMessage("server", roomId, "当前仅支持对局双方同步");
+        }
+
+        // 当前服务器未跟踪轮到谁，开局默认红方先手
+        String currentPlayer = "RED";
+
+        // 游戏开始/结束状态
+        boolean isGameStarted = "PLAYING".equalsIgnoreCase(room.getGameState());
+        boolean isGameOver = false; // 服务器暂不跟踪胜负
+        String winner = null;
+
+        return new GameStateSyncResponseMessage(
+            "server",
+            room.getRoomId(),
+            redPlayerName,
+            blackPlayerName,
+            yourColor,
+            currentPlayer,
+            room.getGameState(),
+            isGameStarted,
+            isGameOver,
+            winner
+        );
+    }
+
 }

@@ -88,6 +88,9 @@ public class ClientHandler implements Runnable {
                 case MOVE:
                     handleMoveMessage((MoveMessage) message);
                     break;
+                case GAME_STATE_SYNC_REQUEST:
+                    handleGameStateSyncRequest((GameStateSyncRequestMessage) message);
+                    break;
                 case LEAVE_ROOM:
                     handleLeaveRoomMessage((LeaveRoomMessage) message);
                     break;
@@ -299,6 +302,23 @@ public class ClientHandler implements Runnable {
         System.out.println("🧹 客户端资源清理完成: " + (playerName != null ? playerName : "未知客户端"));
     }
     
+
+    /**
+     * 处理游戏状态同步请求
+     */
+    private void handleGameStateSyncRequest(GameStateSyncRequestMessage request) {
+        try {
+            GameStateSyncResponseMessage resp = server.buildSyncResponse(playerId, request.getRoomId());
+            sendMessage(resp);
+            System.out.println("🔄 处理同步请求: room=" + request.getRoomId() + ", success=" + resp.isSuccess());
+        } catch (Exception e) {
+            System.err.println("❌ 同步请求处理失败: " + e.getMessage());
+            GameStateSyncResponseMessage err = new GameStateSyncResponseMessage("server", request.getRoomId(), "服务器内部错误");
+            sendMessage(err);
+        }
+    }
+
+
     // ==================== Getters ====================
     
     public String getPlayerId() {

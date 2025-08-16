@@ -3,6 +3,7 @@ package com.example.chinesechess.ui;
 import com.example.chinesechess.network.NetworkClient;
 import com.example.chinesechess.network.RoomInfo;
 import com.example.chinesechess.network.RoomListRequestMessage;
+import com.example.chinesechess.network.GameStateSyncRequestMessage;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -359,6 +360,15 @@ public class NetworkRoomFrame extends JFrame implements NetworkClient.ClientEven
             // 这样可以确保BoardPanel的监听器在游戏开始消息到达之前就已经被设置
             gameFrame.setNetworkClient(networkClient);
             System.out.println("📡 网络客户端已转移给GameFrame和BoardPanel");
+            // 监听器就绪后立即请求一次状态同步，避免遗漏GAME_START
+            try {
+                GameStateSyncRequestMessage syncReq = new GameStateSyncRequestMessage(
+                    networkClient.getPlayerId(), roomId, "listener_ready");
+                networkClient.sendNetworkMessage(syncReq);
+                System.out.println("🔄 已发送状态同步请求: room=" + roomId);
+            } catch (Exception ex) {
+                System.err.println("⚠️ 发送同步请求失败: " + ex.getMessage());
+            }
             
             // Step 4: 延迟显示游戏界面，确保监听器完全设置完成
             SwingUtilities.invokeLater(() -> {
