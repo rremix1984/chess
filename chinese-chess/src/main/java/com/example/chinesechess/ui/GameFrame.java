@@ -3,6 +3,7 @@ package com.example.chinesechess.ui;
 import com.example.chinesechess.core.Board;
 import com.example.chinesechess.core.PieceColor;
 import com.example.common.utils.OllamaModelManager;
+import com.example.common.game.GameContext;
 import com.example.chinesechess.VictoryAnimation;
 import com.example.chinesechess.ui.AILogPanel;
 import com.example.chinesechess.ui.BoardPanel;
@@ -109,6 +110,7 @@ public class GameFrame extends JFrame {
         // 创建棋盘
         Board board = new Board();
         boardPanel = new BoardPanel(board);
+        boardPanel.setBorder(BorderFactory.createEmptyBorder(6,6,6,6));
         
         // 创建聊天面板
         chatPanel = new ChatPanel();
@@ -139,12 +141,24 @@ public class GameFrame extends JFrame {
         // 创建右侧面板容器
         JPanel rightPanel = new JPanel(new BorderLayout());
         rightPanel.add(rightTabbedPane, BorderLayout.CENTER);
+        rightPanel.setBorder(BorderFactory.createEmptyBorder(6,6,6,6));
+        rightPanel.setMinimumSize(new Dimension(260,400));
         
         
         // 创建主要内容面板（棋盘+右侧面板）
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, boardPanel, rightPanel);
-        splitPane.setResizeWeight(0.75);
+        splitPane.setResizeWeight(0.8);
+        splitPane.setContinuousLayout(true);
+        splitPane.setOneTouchExpandable(true);
         add(splitPane, BorderLayout.CENTER);
+
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                revalidate();
+                repaint();
+            }
+        });
 
         // 创建控制面板
         JPanel controlPanel = createControlPanel();
@@ -426,6 +440,9 @@ public class GameFrame extends JFrame {
         networkGameButton.setPreferredSize(new Dimension(100, 30));
         networkGameButton.addActionListener(e -> startNetworkGame());
         styleButton(networkGameButton);
+        if (GameContext.isSinglePlayer()) {
+            networkGameButton.setVisible(false);
+        }
         rightPanel.add(networkGameButton);
         
         // 返回主菜单按钮

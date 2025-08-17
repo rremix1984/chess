@@ -611,7 +611,8 @@ public class NetworkClient {
      * 检查是否已连接
      */
     public boolean isConnected() {
-        return isConnected && socket != null && socket.isConnected() && !socket.isClosed();
+        return connectionState == ConnectionState.CONNECTED &&
+                socket != null && socket.isConnected() && !socket.isClosed();
     }
     
     /**

@@ -54,13 +54,14 @@ public class ChatPanel extends JPanel {
      */
     private void initializeUI() {
         setLayout(new BorderLayout());
-        // 象棋模式：右侧布局，设置合适的宽度和高度
-        setPreferredSize(new Dimension(300, 400));
+        // 象棋模式：右侧布局，保持最小尺寸但允许自适应
+        setMinimumSize(new Dimension(200, 300));
         
         // 创建标题边框
         TitledBorder border = BorderFactory.createTitledBorder("AI棋局讨论");
         border.setTitleFont(new Font("宋体", Font.BOLD, 12));
-        setBorder(border);
+        setBorder(BorderFactory.createCompoundBorder(border,
+                BorderFactory.createEmptyBorder(6,6,6,6)));
         
         // 聊天显示区域
         chatArea = new JTextArea();
