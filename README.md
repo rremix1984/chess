@@ -62,6 +62,11 @@ curl -L -o ~/.pikafish/pikafish.nnue \
 - 游戏参数
 - 界面设置
 
+### 可选开关
+
+- **放宽安全校验**：在 `game-common/src/main/resources/config.properties` 中设置 `allow.unsafe.move=false` 可恢复严格规则。
+- **胜利/提示动画**：`OverlayLayer` 提供胜利横幅与烟花效果，默认启用，可在代码中按需关闭。
+
 ## 项目结构
 
 ```

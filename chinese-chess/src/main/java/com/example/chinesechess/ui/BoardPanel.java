@@ -37,6 +37,7 @@ import com.example.chinesechess.network.NetworkClient;
 import com.example.chinesechess.network.*;
 import com.example.chinesechess.network.NetworkMessage.MessageType;
 import com.example.chinesechess.network.GameStateSyncRequestMessage;
+import com.example.common.ui.overlay.OverlayLayer;
 
 public class BoardPanel extends JPanel {
 
@@ -91,6 +92,7 @@ public class BoardPanel extends JPanel {
     }
 
     private GameState gameState = GameState.PLAYING;
+    private OverlayLayer overlayLayer;
     
     // 棋盘翻转状态
     private boolean isBoardFlipped = false;
@@ -163,6 +165,13 @@ public class BoardPanel extends JPanel {
         
         // 设置背景色
         setBackground(new Color(245, 222, 179)); // 棋盘背景色
+
+        // 叠加层，用于显示横幅和烟花等效果
+        setLayout(null);
+        overlayLayer = new OverlayLayer();
+        overlayLayer.setOpaque(false);
+        overlayLayer.setBounds(0, 0, boardSize.width, boardSize.height);
+        add(overlayLayer);
 
         addMouseListener(new MouseAdapter() {
             @Override
@@ -746,9 +755,11 @@ public class BoardPanel extends JPanel {
                              clearAISuggestion();
                          }
                          
-                         // 检查游戏状态
-                         gameState = board.checkGameState(currentPlayer);
-                         updateStatus(); // 更新状态显示
+                        // 检查游戏状态
+                        GameState prevState = gameState;
+                        gameState = board.checkGameState(currentPlayer);
+                        handleGameStateTransition(prevState, gameState);
+                        updateStatus(); // 更新状态显示
                          
                          // 通知聊天面板更新棋盘状态
                          notifyChatPanelBoardUpdate();
@@ -984,10 +995,13 @@ public class BoardPanel extends JPanel {
         
         // 绘制3D背景
         draw3DBackground(g2d);
-        
+
         // 绘制3D棋盘
         draw3DChessBoard(g2d);
-        
+
+        // 绘制兵/卒/炮初始位置标记
+        drawInitialMarks(g2d);
+
         // 绘制九宫格
         draw3DPalaceLines(g2d);
         
@@ -1230,15 +1244,39 @@ public class BoardPanel extends JPanel {
             g2d.setColor(new Color(139, 69, 19));
         }
         
-        // 绘制垂直线
+        // 绘制垂直线，河道处留空
+        int riverTop = MARGIN + 4 * CELL_SIZE;
+        int riverBottom = MARGIN + 5 * CELL_SIZE;
         for (int i = 0; i < 9; i++) {
             int x = MARGIN + i * CELL_SIZE;
-            // 主线
-            g2d.drawLine(x, MARGIN, x, MARGIN + 9 * CELL_SIZE);
+            // 上半部分
+            g2d.drawLine(x, MARGIN, x, riverTop);
+            // 下半部分
+            g2d.drawLine(x, riverBottom, x, MARGIN + 9 * CELL_SIZE);
             // 添加3D效果的高光线
             g2d.setColor(new Color(160, 82, 45, 100));
-            g2d.drawLine(x + 1, MARGIN, x + 1, MARGIN + 9 * CELL_SIZE);
+            g2d.drawLine(x + 1, MARGIN, x + 1, riverTop);
+            g2d.drawLine(x + 1, riverBottom, x + 1, MARGIN + 9 * CELL_SIZE);
             g2d.setColor(new Color(139, 69, 19));
+        }
+    }
+
+    /** 绘制兵/卒/炮初始位置的十字标记 */
+    private void drawInitialMarks(Graphics2D g2d) {
+        g2d.setColor(new Color(80, 60, 40, 120));
+        g2d.setStroke(new BasicStroke(2f));
+        int size = CELL_SIZE / 3;
+        int half = size / 2;
+        int[][] positions = {
+            {3,0},{3,2},{3,4},{3,6},{3,8},
+            {6,0},{6,2},{6,4},{6,6},{6,8},
+            {2,1},{2,7},{7,1},{7,7}
+        };
+        for (int[] p : positions) {
+            int cx = MARGIN + p[1] * CELL_SIZE;
+            int cy = MARGIN + p[0] * CELL_SIZE;
+            g2d.drawLine(cx - half, cy, cx + half, cy);
+            g2d.drawLine(cx, cy - half, cx, cy + half);
         }
     }
     
@@ -2024,8 +2062,10 @@ public class BoardPanel extends JPanel {
             currentPlayer = (currentPlayer == PieceColor.RED) ? PieceColor.BLACK : PieceColor.RED;
             
             // 检查游戏状态
+            GameState prevState = gameState;
             gameState = board.checkGameState(currentPlayer);
-            
+            handleGameStateTransition(prevState, gameState);
+
             // 更新状态显示
             updateStatus();
             
@@ -2322,7 +2362,9 @@ public class BoardPanel extends JPanel {
         
         try {
             // 首先检查当前游戏状态
+            GameState prevState = gameState;
             gameState = board.checkGameState(currentPlayer);
+            handleGameStateTransition(prevState, gameState);
             
             // 如果游戏状态表明游戏已经结束，直接处理
             if (gameState != GameState.PLAYING && gameState != GameState.IN_CHECK) {
@@ -2454,6 +2496,19 @@ public class BoardPanel extends JPanel {
             default:
                 // 游戏继续
                 break;
+        }
+    }
+
+    private void handleGameStateTransition(GameState previous, GameState current) {
+        if (overlayLayer == null) return;
+        if (current == GameState.IN_CHECK && previous != GameState.IN_CHECK) {
+            overlayLayer.showBanner("将军", OverlayLayer.Style.ALERT, 1200);
+        } else if (current == GameState.RED_WINS) {
+            overlayLayer.showBanner("红方胜利", OverlayLayer.Style.VICTORY, 2000);
+            overlayLayer.playFireworks(2000);
+        } else if (current == GameState.BLACK_WINS) {
+            overlayLayer.showBanner("黑方胜利", OverlayLayer.Style.VICTORY, 2000);
+            overlayLayer.playFireworks(2000);
         }
     }
 
@@ -4926,7 +4981,9 @@ public class BoardPanel extends JPanel {
         addAILog("network", "对手移动完成，现在轮到您了！");
             
             // 检查游戏结束
+            GameState prevState = gameState;
             gameState = board.checkGameState(currentPlayer);
+            handleGameStateTransition(prevState, gameState);
             updateStatus(); // 更新状态显示
             
             // 通知聊天面板更新棋盘状态
@@ -5093,7 +5150,9 @@ public class BoardPanel extends JPanel {
                         }
                         
                         // 检查游戏状态
+                        GameState prevState = gameState;
                         gameState = board.checkGameState(currentPlayer);
+                        handleGameStateTransition(prevState, gameState);
                         updateStatus(); // 更新状态显示
                         
                         // 通知聊天面板更新棋盘状态
