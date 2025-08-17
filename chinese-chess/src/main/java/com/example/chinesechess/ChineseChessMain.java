@@ -1,7 +1,7 @@
 package com.example.chinesechess;
 
 import com.example.chinesechess.ui.GameFrame;
-import com.example.chinesechess.ui.NetworkRoomFrame;
+import com.example.chinesechess.ui.UnifiedNetworkRoomFrame;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -189,7 +189,7 @@ public class ChineseChessMain {
      */
     private static void startNetworkGame() {
         System.out.println("🌐 启动网络对弈模式...");
-        NetworkRoomFrame networkFrame = new NetworkRoomFrame();
+        UnifiedNetworkRoomFrame networkFrame = new UnifiedNetworkRoomFrame();
         networkFrame.setVisible(true);
     }
 }

@@ -4,19 +4,21 @@ import com.example.chinesechess.network.NetworkClient;
 import com.example.chinesechess.network.RoomInfo;
 import com.example.chinesechess.network.RoomListRequestMessage;
 import com.example.chinesechess.network.GameStateSyncRequestMessage;
+import com.example.chinesechess.network.ChessGameServer;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.net.BindException;
 import java.util.List;
 
 /**
  * 网络房间主界面
  * 管理服务器连接、房间列表、创建和加入房间等功能
  */
-public class NetworkRoomFrame extends JFrame implements NetworkClient.ClientEventListener {
+public class UnifiedNetworkRoomFrame extends JFrame implements NetworkClient.ClientEventListener {
     
     private NetworkClient networkClient;
     private JLabel connectionStatusLabel;
@@ -25,17 +27,24 @@ public class NetworkRoomFrame extends JFrame implements NetworkClient.ClientEven
     private JTextField serverHostField;
     private JTextField serverPortField;
     private JTextField playerNameField;
-    
+    private JLabel serverStatusLabel;
+    private JButton serverControlButton;
+    private JPanel serverAlertPanel;
+    private ChessGameServer localServer;
+    private Thread serverThread;
+
     // 连接状态
     private boolean isConnected = false;
-    
-    public NetworkRoomFrame() {
+
+    public UnifiedNetworkRoomFrame() {
         initializeUI();
         setupEventHandlers();
-        
+
         // 创建网络客户端
         networkClient = new NetworkClient();
         networkClient.setEventListener(this);
+
+        autoStartServerWithDetection();
     }
     
     private void initializeUI() {
@@ -45,9 +54,13 @@ public class NetworkRoomFrame extends JFrame implements NetworkClient.ClientEven
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
         
-        // 创建顶部连接面板
+        // 创建顶部连接面板和告警条
         JPanel connectionPanel = createConnectionPanel();
-        add(connectionPanel, BorderLayout.NORTH);
+        serverAlertPanel = createServerAlertPanel();
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(connectionPanel, BorderLayout.NORTH);
+        topPanel.add(serverAlertPanel, BorderLayout.SOUTH);
+        add(topPanel, BorderLayout.NORTH);
         
         // 创建中央房间列表面板
         JPanel roomListPanel = createRoomListPanel();
@@ -88,11 +101,30 @@ public class NetworkRoomFrame extends JFrame implements NetworkClient.ClientEven
         JButton connectButton = new JButton("连接");
         connectButton.addActionListener(e -> connectToServer());
         panel.add(connectButton);
-        
+
         JButton disconnectButton = new JButton("断开");
         disconnectButton.addActionListener(e -> disconnectFromServer());
         panel.add(disconnectButton);
-        
+
+        serverControlButton = new JButton("创建服务器");
+        serverControlButton.addActionListener(e -> toggleServer());
+        panel.add(serverControlButton);
+
+        serverStatusLabel = new JLabel("服务器: 未运行");
+        panel.add(serverStatusLabel);
+
+        return panel;
+    }
+
+    private JPanel createServerAlertPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panel.setBackground(new Color(255, 228, 181));
+        JLabel label = new JLabel("本地服务器未运行。点击‘启动游戏服务器’一键开启。");
+        JButton startBtn = new JButton("启动游戏服务器");
+        startBtn.addActionListener(e -> toggleServer());
+        panel.add(label);
+        panel.add(startBtn);
+        panel.setVisible(false);
         return panel;
     }
     
@@ -152,6 +184,58 @@ public class NetworkRoomFrame extends JFrame implements NetworkClient.ClientEven
                 }
             }
         });
+    }
+
+    private void toggleServer() {
+        if (localServer == null) {
+            autoStartServerWithDetection();
+        } else {
+            stopLocalServer();
+        }
+    }
+
+    private void stopLocalServer() {
+        if (localServer != null) {
+            localServer.stop();
+            if (serverThread != null && serverThread.isAlive()) {
+                serverThread.interrupt();
+            }
+            localServer = null;
+        }
+        serverStatusLabel.setText("服务器: 未运行");
+        serverControlButton.setText("创建服务器");
+        serverAlertPanel.setVisible(true);
+    }
+
+    private void autoStartServerWithDetection() {
+        String portText = serverPortField.getText().trim();
+        int port;
+        try {
+            port = Integer.parseInt(portText);
+        } catch (NumberFormatException e) {
+            serverStatusLabel.setText("服务器: 未运行");
+            serverAlertPanel.setVisible(true);
+            return;
+        }
+
+        try {
+            localServer = new ChessGameServer(port);
+            serverThread = new Thread(() -> localServer.start());
+            serverThread.start();
+            serverStatusLabel.setText("服务器: 运行中:" + port);
+            serverControlButton.setText("停止服务器");
+            serverAlertPanel.setVisible(false);
+        } catch (RuntimeException e) {
+            localServer = null;
+            if (e.getCause() instanceof BindException) {
+                serverStatusLabel.setText("服务器: 运行中(外部)");
+                serverAlertPanel.setVisible(false);
+            } else {
+                serverStatusLabel.setText("服务器: 未运行");
+                serverAlertPanel.setVisible(true);
+            }
+            serverControlButton.setText("创建服务器");
+        }
     }
     
     private void connectToServer() {
