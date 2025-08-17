@@ -1,6 +1,6 @@
 package com.example.common.sound;
 
-import com.example.common.config.GameConfig;
+import com.example.chinesechess.config.ChineseChessConfig;
 
 /**
  * 音效播放工具类
@@ -9,8 +9,8 @@ import com.example.common.config.GameConfig;
 public class SoundPlayer {
     
     private static SoundPlayer instance;
-    private boolean enabled = GameConfig.ENABLE_SOUND_EFFECTS;
-    private float volume = GameConfig.SOUND_VOLUME;
+    private boolean enabled = ChineseChessConfig.ENABLE_SOUND_EFFECTS;
+    private float volume = ChineseChessConfig.SOUND_VOLUME;
     
     private SoundPlayer() {
         // 私有构造函数，实现单例模式
