@@ -39,7 +39,6 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     private JLabel serverStatusLabel;
     private JButton serverControlButton;
     private JButton connectButton;
-    private JButton disconnectButton;
     private JPanel serverAlertPanel;
     private ChessGameServer localServer;
     private Thread serverThread;
@@ -138,11 +137,6 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         connectButton.addActionListener(e -> connectToServer());
         panel.add(connectButton);
 
-        disconnectButton = new JButton("断开");
-        disconnectButton.addActionListener(e -> disconnectFromServer());
-        disconnectButton.setEnabled(false);
-        panel.add(disconnectButton);
-
         serverControlButton = new JButton("启动服务器");
         serverControlButton.addActionListener(e -> toggleServer());
         panel.add(serverControlButton);
@@ -230,14 +224,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         }
         connectionStatusLabel.setText("连接中...");
         connectButton.setEnabled(false);
-        disconnectButton.setEnabled(false);
         networkClient.connect("localhost", 8080, playerNameField.getText().trim());
-    }
-
-    private void disconnectFromServer() {
-        if (networkClient.getConnectionState() == ConnectionState.CONNECTED) {
-            networkClient.disconnect();
-        }
     }
 
     private void refreshRoomList() {
@@ -254,7 +241,15 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
             return;
         }
 
-        String roomName = JOptionPane.showInputDialog(this, "请输入房间名:", "创建房间", JOptionPane.PLAIN_MESSAGE);
+        String defaultName = playerNameField.getText().trim() + "的房间";
+        String roomName = (String) JOptionPane.showInputDialog(
+                this,
+                "请输入房间名:",
+                "创建房间",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                null,
+                defaultName);
         if (roomName != null && !roomName.trim().isEmpty()) {
             networkClient.createRoom(roomName.trim(), "", selectedGameType);
         }
@@ -316,24 +311,27 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
 
     @Override
     public void onConnected() {
-        connectionStatusLabel.setText("已连接");
-        connectButton.setEnabled(false);
-        disconnectButton.setEnabled(true);
-        refreshRoomList();
+        SwingUtilities.invokeLater(() -> {
+            connectionStatusLabel.setText("已连接");
+            connectButton.setEnabled(false);
+            refreshRoomList();
+        });
     }
 
     @Override
     public void onDisconnected(String reason) {
-        connectionStatusLabel.setText("未连接");
-        connectButton.setEnabled(true);
-        disconnectButton.setEnabled(false);
+        SwingUtilities.invokeLater(() -> {
+            connectionStatusLabel.setText("未连接");
+            connectButton.setEnabled(true);
+        });
     }
 
     @Override
     public void onConnectionError(String error) {
-        connectionStatusLabel.setText("连接错误: " + error);
-        connectButton.setEnabled(true);
-        disconnectButton.setEnabled(false);
+        SwingUtilities.invokeLater(() -> {
+            connectionStatusLabel.setText("连接错误: " + error);
+            connectButton.setEnabled(true);
+        });
     }
 
     @Override
