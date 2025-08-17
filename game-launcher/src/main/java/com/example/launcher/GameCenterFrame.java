@@ -3,7 +3,7 @@ package com.example.launcher;
 import com.example.chinesechess.network.*;
 import com.example.chinesechess.network.ConnectionState;
 import com.example.chinesechess.ui.GameFrame;
-import com.example.launcher.util.GameContext;
+import com.example.common.game.GameContext;
 import com.example.launcher.util.GameDisplay;
 import com.example.launcher.util.GameIconFactory;
 
@@ -38,6 +38,8 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     private JLabel connectionStatusLabel;
     private JLabel serverStatusLabel;
     private JButton serverControlButton;
+    private JButton connectButton;
+    private JButton disconnectButton;
     private JPanel serverAlertPanel;
     private ChessGameServer localServer;
     private Thread serverThread;
@@ -60,6 +62,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         setupEventHandlers();
         autoStartServerWithDetection();
         startRoomRefreshTimer();
+        SwingUtilities.invokeLater(this::connectToServer);
     }
 
     private void initUI() {
@@ -115,7 +118,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     }
 
     private void startRoomRefreshTimer() {
-        roomRefreshTimer = new Timer(5000, e -> {
+        roomRefreshTimer = new Timer(2000, e -> {
             if (networkClient.isConnected()) {
                 refreshRoomList();
             }
@@ -131,12 +134,13 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         playerNameField = new JTextField("Player" + (int)(Math.random() * 1000), 10);
         panel.add(playerNameField);
 
-        JButton connectButton = new JButton("连接");
+        connectButton = new JButton("连接");
         connectButton.addActionListener(e -> connectToServer());
         panel.add(connectButton);
 
-        JButton disconnectButton = new JButton("断开");
+        disconnectButton = new JButton("断开");
         disconnectButton.addActionListener(e -> disconnectFromServer());
+        disconnectButton.setEnabled(false);
         panel.add(disconnectButton);
 
         serverControlButton = new JButton("启动服务器");
@@ -203,7 +207,6 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         singlePlayerButton.addActionListener(e -> {
             GameContext.setSinglePlayer(true);
             startSelectedGame();
-            GameContext.setSinglePlayer(false);
         });
         panel.add(singlePlayerButton);
 
@@ -226,6 +229,8 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
             return;
         }
         connectionStatusLabel.setText("连接中...");
+        connectButton.setEnabled(false);
+        disconnectButton.setEnabled(false);
         networkClient.connect("localhost", 8080, playerNameField.getText().trim());
     }
 
@@ -312,17 +317,23 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     @Override
     public void onConnected() {
         connectionStatusLabel.setText("已连接");
+        connectButton.setEnabled(false);
+        disconnectButton.setEnabled(true);
         refreshRoomList();
     }
 
     @Override
     public void onDisconnected(String reason) {
         connectionStatusLabel.setText("未连接");
+        connectButton.setEnabled(true);
+        disconnectButton.setEnabled(false);
     }
 
     @Override
     public void onConnectionError(String error) {
         connectionStatusLabel.setText("连接错误: " + error);
+        connectButton.setEnabled(true);
+        disconnectButton.setEnabled(false);
     }
 
     @Override
@@ -331,6 +342,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     @Override
     public void onRoomCreated(String roomId) {
         SwingUtilities.invokeLater(() -> {
+            refreshRoomList();
             if ("chinese-chess".equals(selectedGameType)) {
                 startNetworkGame(roomId, "");
             } else {
@@ -342,6 +354,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     @Override
     public void onRoomJoined(String roomId, String opponentName) {
         SwingUtilities.invokeLater(() -> {
+            refreshRoomList();
             if ("chinese-chess".equals(selectedGameType)) {
                 startNetworkGame(roomId, opponentName);
             } else {
@@ -353,7 +366,15 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     @Override
     public void onRoomListReceived(List<RoomInfo> rooms) {
         SwingUtilities.invokeLater(() -> {
+            String selectedId = null;
+            int selectedRow = roomTable.getSelectedRow();
+            if (selectedRow >= 0) {
+                selectedId = (String) tableModel.getValueAt(selectedRow, 0);
+            }
+
             tableModel.setRowCount(0);
+            int rowIndex = 0;
+            int toSelect = -1;
             for (RoomInfo room : rooms) {
                 Object[] row = {
                         room.getRoomId(),
@@ -363,6 +384,13 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
                         room.getHostName()
                 };
                 tableModel.addRow(row);
+                if (selectedId != null && selectedId.equals(room.getRoomId())) {
+                    toSelect = rowIndex;
+                }
+                rowIndex++;
+            }
+            if (toSelect >= 0) {
+                roomTable.setRowSelectionInterval(toSelect, toSelect);
             }
             connectionStatusLabel.setText("房间列表已更新");
         });
@@ -412,8 +440,8 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     private void startChineseChess() {
         SwingUtilities.invokeLater(() -> {
             try {
-                Class<?> gameFrameClass = Class.forName("com.example.chinesechess.ChineseChessMain");
-                gameFrameClass.getMethod("main", String[].class).invoke(null, (Object) new String[]{});
+                JFrame frame = new GameFrame();
+                showGameWindow(frame);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -492,6 +520,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
                 @Override
                 public void windowClosed(java.awt.event.WindowEvent e) {
                     networkClient.leaveRoomSafely();
+                    GameContext.setSinglePlayer(false);
                     GameCenterFrame.this.setVisible(true);
                     GameCenterFrame.this.toFront();
                     refreshRoomList();
@@ -509,6 +538,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         frame.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosed(java.awt.event.WindowEvent e) {
+                GameContext.setSinglePlayer(false);
                 GameCenterFrame.this.setVisible(true);
                 GameCenterFrame.this.toFront();
                 refreshRoomList();

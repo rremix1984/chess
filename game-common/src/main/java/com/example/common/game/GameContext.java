@@ -1,4 +1,4 @@
-package com.example.launcher.util;
+package com.example.common.game;
 
 /**
  * Global context for runtime options such as single player flag.
