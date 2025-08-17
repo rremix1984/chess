@@ -377,8 +377,17 @@ public class GameSelectionFrame extends JFrame {
             dispose(); // 关闭选择界面
             SwingUtilities.invokeLater(() -> {
                 try {
-                    // 使用反射来动态加载围棋游戏界面
-                    Class<?> gameFrameClass = Class.forName("com.example.go.GoFrame");
+                    // 让用户选择是启动对弈模式还是死活训练模式
+                    String[] options = {"对弈模式", "死活训练"};
+                    int choice = JOptionPane.showOptionDialog(null, "请选择围棋模式", "围棋", JOptionPane.DEFAULT_OPTION,
+                            JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+
+                    String className = "com.example.go.GoFrame";
+                    if (choice == 1) {
+                        className = "com.example.go.GoLifeAndDeathFrame";
+                    }
+
+                    Class<?> gameFrameClass = Class.forName(className);
                     Object frame = gameFrameClass.getDeclaredConstructor().newInstance();
                     gameFrameClass.getMethod("setVisible", boolean.class).invoke(frame, true);
                 } catch (Exception e) {
