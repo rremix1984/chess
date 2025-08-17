@@ -2,6 +2,7 @@ package com.example.common.ui.overlay;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.font.GlyphVector;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -11,7 +12,7 @@ import java.util.Random;
  * 覆盖层，可在棋盘上方绘制横幅文本和简单烟花粒子效果。
  */
 public class OverlayLayer extends JComponent {
-    public enum Style { VICTORY, ALERT }
+    public enum Style { VICTORY, ALERT, ALERT_BRUSH }
 
     private String bannerText;
     private Style bannerStyle;
@@ -19,6 +20,7 @@ public class OverlayLayer extends JComponent {
     private Timer bannerTimer;
 
     private final List<Particle> particles = new ArrayList<>();
+    private final List<Ring> rings = new ArrayList<>();
     private Timer particleTimer;
     private final Random random = new Random();
 
@@ -27,7 +29,7 @@ public class OverlayLayer extends JComponent {
         this.bannerText = text;
         this.bannerStyle = style;
         long start = System.currentTimeMillis();
-        long fade = 400;
+        long fade = (style == Style.ALERT_BRUSH) ? 200 : 400;
         long end = start + durationMs;
         if (bannerTimer != null) {
             bannerTimer.stop();
@@ -90,6 +92,29 @@ public class OverlayLayer extends JComponent {
         particleTimer.start();
     }
 
+    /** 播放冲击波环效果 */
+    public void playImpactRing(int x, int y) {
+        rings.add(new Ring(x, y));
+        if (impactTimer == null) {
+            impactTimer = new Timer(16, e -> {
+                Iterator<Ring> it = rings.iterator();
+                while (it.hasNext()) {
+                    Ring r = it.next();
+                    r.age += 16;
+                    if (r.age > 200) {
+                        it.remove();
+                    }
+                }
+                if (rings.isEmpty()) {
+                    impactTimer.stop();
+                    impactTimer = null;
+                }
+                repaint();
+            });
+            impactTimer.start();
+        }
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -106,12 +131,42 @@ public class OverlayLayer extends JComponent {
         if (bannerText != null && bannerAlpha > 0f) {
             Composite old = g2d.getComposite();
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, bannerAlpha));
-            g2d.setFont(getFont().deriveFont(Font.BOLD, 64f));
-            FontMetrics fm = g2d.getFontMetrics();
-            int x = (getWidth() - fm.stringWidth(bannerText)) / 2;
-            int y = getHeight() / 2;
-            g2d.setColor(Color.RED);
-            g2d.drawString(bannerText, x, y);
+            if (bannerStyle == Style.ALERT_BRUSH) {
+                Font base = getFont().deriveFont(Font.BOLD, 72f);
+                Font font = base;
+                GlyphVector gv = font.createGlyphVector(g2d.getFontRenderContext(), bannerText);
+                Shape shape = gv.getOutline();
+                Rectangle bounds = shape.getBounds();
+                int x = (getWidth() - bounds.width) / 2 - bounds.x;
+                int y = bounds.height + 10;
+                g2d.translate(x, y);
+                g2d.setStroke(new BasicStroke(8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2d.setColor(Color.WHITE);
+                g2d.draw(shape);
+                g2d.setColor(new Color(0xC00000));
+                g2d.fill(shape);
+                g2d.translate(-x, -y);
+            } else {
+                g2d.setFont(getFont().deriveFont(Font.BOLD, 64f));
+                FontMetrics fm = g2d.getFontMetrics();
+                int x = (getWidth() - fm.stringWidth(bannerText)) / 2;
+                int y = getHeight() / 2;
+                g2d.setColor(Color.RED);
+                g2d.drawString(bannerText, x, y);
+            }
+            g2d.setComposite(old);
+        }
+
+        // 绘制冲击波环
+        for (Ring r : rings) {
+            float alpha = 1f - r.age / 200f;
+            if (alpha <= 0f) continue;
+            Composite old = g2d.getComposite();
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+            int radius = (int)(r.age * 0.4);
+            g2d.setColor(new Color(255, 0, 0));
+            g2d.setStroke(new BasicStroke(3f));
+            g2d.drawOval(r.x - radius, r.y - radius, radius * 2, radius * 2);
             g2d.setComposite(old);
         }
     }
@@ -121,4 +176,12 @@ public class OverlayLayer extends JComponent {
         int life;
         Color color;
     }
+
+    private static class Ring {
+        int x, y;
+        int age;
+        Ring(int x, int y) { this.x = x; this.y = y; }
+    }
+
+    private Timer impactTimer;
 }
