@@ -16,9 +16,11 @@ import com.example.common.utils.ExceptionHandler;
 import com.example.common.utils.PerformanceMonitor;
 import com.example.common.utils.ResourceManager;
 import com.example.common.config.GameConfig;
+import com.example.chinesechess.ui.render.PieceRenderer;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
@@ -2548,158 +2550,31 @@ public class BoardPanel extends JPanel {
     private void drawPiece(Graphics g, Piece piece, int row, int col) {
         Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        
+
         int centerX = MARGIN + col * CELL_SIZE;
         int centerY = MARGIN + row * CELL_SIZE;
-        int pieceSize = (int)(CELL_SIZE * 0.75); // 减小棋子大小，使其更紧凑
-        int x = centerX - pieceSize / 2;
-        int y = centerY - pieceSize / 2;
-        
-        // 绘制3D棋子
-        draw3DPieceBase(g2d, piece, centerX, centerY, pieceSize);
-        
-        // 绘制棋子文字
-        draw3DPieceText(g2d, piece, centerX, centerY, pieceSize);
+        int diameter = (int) (CELL_SIZE * 0.75);
+
+        PieceRenderer.PieceType type = mapPieceType(piece);
+        PieceRenderer.Side side = piece.getColor() == PieceColor.RED ? PieceRenderer.Side.RED : PieceRenderer.Side.BLACK;
+        BufferedImage img = PieceRenderer.render(type, side, diameter, 1f);
+
+        g2d.drawImage(img, centerX - diameter / 2, centerY - diameter / 2, null);
     }
-    
-    /**
-     * 绘制3D棋子底座
-     */
-    private void draw3DPieceBase(Graphics2D g2d, Piece piece, int centerX, int centerY, int size) {
-        // 绘制棋子阴影
-        drawPieceShadow(g2d, centerX, centerY, size);
-        
-        // 绘制棋子主体
-        drawPieceBody(g2d, piece, centerX, centerY, size);
-        
-        // 绘制棋子边框
-        drawPieceBorder(g2d, piece, centerX, centerY, size);
-        
-        // 绘制棋子高光
-        drawPieceHighlight(g2d, centerX, centerY, size);
-    }
-    
-    /**
-     * 绘制棋子阴影
-     */
-    private void drawPieceShadow(Graphics2D g2d, int centerX, int centerY, int size) {
-        int shadowOffset = 6;
-        int shadowSize = size + 4;
-        
-        // 创建阴影渐变
-        RadialGradientPaint shadowGradient = new RadialGradientPaint(
-            centerX + shadowOffset, centerY + shadowOffset, shadowSize / 2,
-            new float[]{0.0f, 1.0f},
-            new Color[]{new Color(0, 0, 0, 80), new Color(0, 0, 0, 0)}
-        );
-        
-        g2d.setPaint(shadowGradient);
-        g2d.fillOval(centerX - shadowSize / 2 + shadowOffset, 
-                    centerY - shadowSize / 2 + shadowOffset, 
-                    shadowSize, shadowSize);
-    }
-    
-    /**
-     * 绘制棋子主体
-     */
-    private void drawPieceBody(Graphics2D g2d, Piece piece, int centerX, int centerY, int size) {
-        Color baseColor;
-        Color lightColor;
-        Color darkColor;
-        
-        if (piece.getColor() == com.example.chinesechess.core.PieceColor.RED) {
-            // 红方棋子：鲜明的红色
-            baseColor = new Color(220, 20, 20);
-            lightColor = new Color(255, 100, 100);
-            darkColor = new Color(150, 0, 0);
-        } else {
-            // 黑方棋子：深黑色，增强对比度
-            baseColor = new Color(20, 20, 20);
-            lightColor = new Color(80, 80, 80);
-            darkColor = new Color(0, 0, 0);
+
+    private PieceRenderer.PieceType mapPieceType(Piece piece) {
+        if (piece instanceof Chariot) return PieceRenderer.PieceType.CHE;
+        if (piece instanceof Horse) return PieceRenderer.PieceType.MA;
+        if (piece instanceof Cannon) return PieceRenderer.PieceType.PAO;
+        if (piece instanceof General) {
+            return piece.getColor() == PieceColor.RED ? PieceRenderer.PieceType.SHUAI : PieceRenderer.PieceType.JIANG;
         }
-        
-        // 创建球形渐变效果
-        RadialGradientPaint bodyGradient = new RadialGradientPaint(
-            centerX - size / 6, centerY - size / 6, size / 2,
-            new float[]{0.0f, 0.7f, 1.0f},
-            new Color[]{lightColor, baseColor, darkColor}
-        );
-        
-        g2d.setPaint(bodyGradient);
-        g2d.fillOval(centerX - size / 2, centerY - size / 2, size, size);
-    }
-    
-    /**
-     * 绘制棋子边框
-     */
-    private void drawPieceBorder(Graphics2D g2d, Piece piece, int centerX, int centerY, int size) {
-        g2d.setStroke(new BasicStroke(2));
-        
-        Color borderColor;
-        if (piece.getColor() == com.example.chinesechess.core.PieceColor.RED) {
-            // 红方棋子：深红色边框
-            borderColor = new Color(100, 0, 0);
-        } else {
-            // 黑方棋子：深灰色边框，增强对比
-            borderColor = new Color(120, 120, 120);
+        if (piece instanceof Soldier) {
+            return piece.getColor() == PieceColor.RED ? PieceRenderer.PieceType.BING : PieceRenderer.PieceType.ZU;
         }
-        
-        g2d.setColor(borderColor);
-        g2d.drawOval(centerX - size / 2, centerY - size / 2, size, size);
-        
-        // 内边框
-        g2d.setStroke(new BasicStroke(1));
-        g2d.setColor(new Color(255, 255, 255, 100));
-        g2d.drawOval(centerX - size / 2 + 2, centerY - size / 2 + 2, size - 4, size - 4);
-    }
-    
-    /**
-     * 绘制棋子高光
-     */
-    private void drawPieceHighlight(Graphics2D g2d, int centerX, int centerY, int size) {
-        int highlightSize = size / 3;
-        int highlightX = centerX - size / 4;
-        int highlightY = centerY - size / 4;
-        
-        // 创建高光渐变
-        RadialGradientPaint highlightGradient = new RadialGradientPaint(
-            highlightX, highlightY, highlightSize / 2,
-            new float[]{0.0f, 1.0f},
-            new Color[]{new Color(255, 255, 255, 180), new Color(255, 255, 255, 0)}
-        );
-        
-        g2d.setPaint(highlightGradient);
-        g2d.fillOval(highlightX - highlightSize / 2, highlightY - highlightSize / 2, 
-                    highlightSize, highlightSize);
-    }
-    
-    /**
-     * 绘制3D棋子文字
-     */
-    private void draw3DPieceText(Graphics2D g2d, Piece piece, int centerX, int centerY, int size) {
-        String text = piece.getChineseName();
-        Font font = new Font("宋体", Font.BOLD, size / 2);
-        g2d.setFont(font);
-        
-        FontMetrics fm = g2d.getFontMetrics();
-        int stringWidth = fm.stringWidth(text);
-        int stringHeight = fm.getAscent();
-        
-        int textX = centerX - stringWidth / 2;
-        int textY = centerY + stringHeight / 2 - 2;
-        
-        // 绘制文字阴影
-        g2d.setColor(new Color(0, 0, 0, 150));
-        g2d.drawString(text, textX + 1, textY + 1);
-        
-        // 绘制主文字
-        g2d.setColor(Color.WHITE);
-        g2d.drawString(text, textX, textY);
-        
-        // 绘制文字高光
-        g2d.setColor(new Color(255, 255, 255, 200));
-        g2d.drawString(text, textX - 1, textY - 1);
+        if (piece instanceof Advisor) return PieceRenderer.PieceType.SHI;
+        if (piece instanceof Elephant) return PieceRenderer.PieceType.XIANG;
+        throw new IllegalArgumentException("Unknown piece type: " + piece.getClass());
     }
     
     /**
@@ -6042,8 +5917,10 @@ public class BoardPanel extends JPanel {
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
         }
         int size = (int)(CELL_SIZE * 0.75 * scale);
-        draw3DPieceBase(g2d, piece, centerX, centerY, size);
-        draw3DPieceText(g2d, piece, centerX, centerY, size);
+        PieceRenderer.PieceType type = mapPieceType(piece);
+        PieceRenderer.Side side = piece.getColor() == PieceColor.RED ? PieceRenderer.Side.RED : PieceRenderer.Side.BLACK;
+        BufferedImage img = PieceRenderer.render(type, side, size, 1f);
+        g2d.drawImage(img, centerX - size / 2, centerY - size / 2, null);
         g2d.setComposite(old);
     }
 
