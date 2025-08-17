@@ -90,7 +90,7 @@ public final class PieceRenderer {
         int margin = Math.max(2, Math.round(d * 0.04f));
         int cx = d / 2, cy = d / 2;
         int rOuter = d / 2 - margin;
-        int rimW   = Math.max(3, Math.round(d * 0.08f));
+        int rimW   = Math.max(3, Math.round(d * 0.10f));
         int rInner = rOuter - rimW;
 
         BufferedImage img = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
@@ -177,7 +177,7 @@ public final class PieceRenderer {
         RadialGradientPaint vignette = new RadialGradientPaint(
                 new Point2D.Float(cx, cy), rInner,
                 new float[]{0f, 1f},
-                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 40)});
+                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 45)});
         g.setPaint(vignette);
         g.fill(face);
 
@@ -206,7 +206,7 @@ public final class PieceRenderer {
 
     private static void paintGlyph(Graphics2D g, String text, Side side, int cx, int cy, int rInner) {
         Color main = (side == Side.RED) ? RED_GLYPH : BLACK_GLYPH;
-        int fontSize = Math.max(24, Math.round(rInner * 1.2f));
+        int fontSize = Math.max(24, Math.round(rInner * 1.15f));
         Font font = g.getFont().deriveFont(Font.BOLD, fontSize);
         g.setFont(font);
         FontMetrics fm = g.getFontMetrics();
