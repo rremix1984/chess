@@ -101,7 +101,7 @@ public class GameFrame extends JFrame {
     public GameFrame() {
         setTitle("🌎 中国象棋 - AI对弈版");
         setSize(1400, 1000); // 进一步增加窗口尺寸，确保棋盘有足够空间
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null); // 居中显示
         setLayout(new BorderLayout());
         setMinimumSize(new Dimension(1200, 900)); // 设置最小尺寸
@@ -142,17 +142,16 @@ public class GameFrame extends JFrame {
         
         
         // 创建主要内容面板（棋盘+右侧面板）
-        JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.add(boardPanel, BorderLayout.CENTER);
-        mainPanel.add(rightPanel, BorderLayout.EAST);
-        add(mainPanel, BorderLayout.CENTER);
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, boardPanel, rightPanel);
+        splitPane.setResizeWeight(0.75);
+        add(splitPane, BorderLayout.CENTER);
 
-    // 创建控制面板
-    JPanel controlPanel = createControlPanel();
-    add(controlPanel, BorderLayout.NORTH);
-    
-    // 创建AI对AI配置面板
-    createAIvsAIConfigPanel();
+        // 创建控制面板
+        JPanel controlPanel = createControlPanel();
+        add(controlPanel, BorderLayout.NORTH);
+
+        // 创建AI对AI配置面板
+        createAIvsAIConfigPanel();
 
         // 创建状态栏
         statusLabel = new JLabel("🔴 当前玩家: 红方", JLabel.CENTER);
@@ -232,11 +231,17 @@ public class GameFrame extends JFrame {
     private JPanel createControlPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createTitledBorder("🎮 AI对弈控制"));
-        panel.setPreferredSize(new Dimension(1300, 80)); // 减小控制面板高度，为棋盘留出更多空间
+        panel.setPreferredSize(new Dimension(0, 80)); // 只固定高度
 
         // 左侧：基本设置（紧凑布局）
-        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-        
+        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2));
+
+        // 返回按钮
+        JButton backButton = new JButton("返回大厅");
+        styleButton(backButton);
+        backButton.addActionListener(e -> dispose());
+        leftPanel.add(backButton);
+
         // 玩家颜色选择
         leftPanel.add(new JLabel("颜色:"));
         playerColorComboBox = new JComboBox<>(new String[]{"红方", "黑方"});
@@ -292,10 +297,10 @@ public class GameFrame extends JFrame {
         panel.add(leftPanel, BorderLayout.CENTER);
 
         // 右侧：控制按钮
-        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 2));
         
         // 对弈模式选择面板
-        JPanel gameModePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        JPanel gameModePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
         gameModePanel.setPreferredSize(new Dimension(300, 35));
         gameModePanel.setBorder(BorderFactory.createTitledBorder("对弈模式"));
         

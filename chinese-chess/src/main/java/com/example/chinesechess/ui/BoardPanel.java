@@ -157,11 +157,9 @@ public class BoardPanel extends JPanel {
         initializePieceSelectionMenu();
         initializeErrorInfoPanel();
         
-        // 设置棋盘面板的首选大小和最小大小
+        // 设置棋盘面板的首选大小
         Dimension boardSize = calculateBoardSize();
         setPreferredSize(boardSize);
-        setMinimumSize(boardSize);
-        setSize(boardSize);
         
         // 设置背景色
         setBackground(new Color(245, 222, 179)); // 棋盘背景色
