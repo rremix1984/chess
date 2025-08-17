@@ -103,9 +103,13 @@ public final class PieceRenderer {
         paintRim(g, cx, cy, rOuter, rimW);
         // 3) 内盘 + 木纹/回退
         paintFace(g, cx, cy, rInner);
-        // 4) 顶部柔和高光
+        // 4) 错位深色内圈
+        paintInnerRimOffset(g, cx, cy, rInner, d);
+        // 5) 内盘暗角
+        paintVignette(g, cx, cy, rInner);
+        // 6) 顶部柔和高光
         paintSpecular(g, cx, cy, rInner);
-        // 5) 文字浮雕
+        // 7) 文字浮雕
         paintGlyph(g, toGlyph(type, side), side, cx, cy, rInner);
 
         g.dispose();
@@ -173,14 +177,37 @@ public final class PieceRenderer {
             drawFineWoodLines(g, cx, cy, rInner, face);
         }
 
-        // 轻暗角
+        g.setPaint(old);
+    }
+
+    private static void paintVignette(Graphics2D g, int cx, int cy, int rInner) {
+        Shape face = new Ellipse2D.Float(cx - rInner, cy - rInner, rInner * 2f, rInner * 2f);
+        Paint old = g.getPaint();
         RadialGradientPaint vignette = new RadialGradientPaint(
                 new Point2D.Float(cx, cy), rInner,
                 new float[]{0f, 1f},
-                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 45)});
+                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 50)});
         g.setPaint(vignette);
         g.fill(face);
+        g.setPaint(old);
+    }
 
+    // 错位深色内圈：圆心向右下偏移制造厚度错觉
+    private static void paintInnerRimOffset(Graphics2D g, int cx, int cy, int rInner, int d) {
+        int offset = Math.max(2, Math.round(d * 0.04f)); // 错位量
+        int ringR = Math.max(1, Math.round(d * 0.02f));  // 圆环粗细
+
+        int ox = cx + offset;
+        int oy = cy + offset;
+
+        Stroke bak = g.getStroke();
+        Paint old = g.getPaint();
+
+        g.setStroke(new BasicStroke(ringR, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.setPaint(new Color(0x7A, 0x5A, 0x3B));
+        g.draw(new Ellipse2D.Float(ox - rInner, oy - rInner, rInner * 2f, rInner * 2f));
+
+        g.setStroke(bak);
         g.setPaint(old);
     }
 
