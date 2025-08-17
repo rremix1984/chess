@@ -154,6 +154,9 @@ public class BoardPanel extends JPanel {
     private long roomJoinTimestamp = 0;
     private static final int GAMESTART_DETECTION_DELAY_MS = 5000; // 5秒后检测
 
+    // 当前棋子移动动画
+    private PieceAnimation currentAnimation = null;
+
     public BoardPanel(Board board) {
         this.board = board;
         initializePieceSelectionMenu();
@@ -520,6 +523,7 @@ public class BoardPanel extends JPanel {
         drawBoard(g);
         drawValidMoves(g);
         drawPieces(g);
+        drawCurrentAnimation((Graphics2D) g);
         drawSelection(g);
         drawAISuggestion(g); // 绘制AI建议标记
     }
@@ -717,11 +721,11 @@ public class BoardPanel extends JPanel {
                          lastMoveStart = new Position(start.getX(), start.getY());
                          lastMoveEnd = new Position(end.getX(), end.getY());
                          
-                         // 执行移动
-                         board.movePiece(start, end);
-                         
-                         // 播放落子音效
-                         SoundPlayer.getInstance().playSound("piece_drop");
+                        // 执行移动
+                        board.movePiece(start, end);
+
+                        // 启动移动动画（包含落子音效）
+                        startMoveAnimation(selectedPiece, start, end, capturedPiece);
                          
                          // 显示移动信息
                          String playerType;
@@ -1233,8 +1237,13 @@ public class BoardPanel extends JPanel {
         g2d.setStroke(new BasicStroke(2));
         g2d.setColor(new Color(139, 69, 19));
         
-        // 绘制水平线
+        // 绘制水平线，河道处留空
+        int riverTop = 4;  // 河道上边界所在行索引
+        int riverBottom = 5; // 河道下边界所在行索引
         for (int i = 0; i < 10; i++) {
+            if (i == riverTop || i == riverBottom) {
+                continue; // 跳过河道边界线，使河道无网格线
+            }
             int y = MARGIN + i * CELL_SIZE;
             // 主线
             g2d.drawLine(MARGIN, y, MARGIN + 8 * CELL_SIZE, y);
@@ -1243,30 +1252,31 @@ public class BoardPanel extends JPanel {
             g2d.drawLine(MARGIN, y + 1, MARGIN + 8 * CELL_SIZE, y + 1);
             g2d.setColor(new Color(139, 69, 19));
         }
-        
+
         // 绘制垂直线，河道处留空
-        int riverTop = MARGIN + 4 * CELL_SIZE;
-        int riverBottom = MARGIN + 5 * CELL_SIZE;
+        int riverTopPixel = MARGIN + 4 * CELL_SIZE;
+        int riverBottomPixel = MARGIN + 5 * CELL_SIZE;
         for (int i = 0; i < 9; i++) {
             int x = MARGIN + i * CELL_SIZE;
             // 上半部分
-            g2d.drawLine(x, MARGIN, x, riverTop);
+            g2d.drawLine(x, MARGIN, x, riverTopPixel);
             // 下半部分
-            g2d.drawLine(x, riverBottom, x, MARGIN + 9 * CELL_SIZE);
+            g2d.drawLine(x, riverBottomPixel, x, MARGIN + 9 * CELL_SIZE);
             // 添加3D效果的高光线
             g2d.setColor(new Color(160, 82, 45, 100));
-            g2d.drawLine(x + 1, MARGIN, x + 1, riverTop);
-            g2d.drawLine(x + 1, riverBottom, x + 1, MARGIN + 9 * CELL_SIZE);
+            g2d.drawLine(x + 1, MARGIN, x + 1, riverTopPixel);
+            g2d.drawLine(x + 1, riverBottomPixel, x + 1, MARGIN + 9 * CELL_SIZE);
             g2d.setColor(new Color(139, 69, 19));
         }
     }
 
     /** 绘制兵/卒/炮初始位置的十字标记 */
     private void drawInitialMarks(Graphics2D g2d) {
-        g2d.setColor(new Color(80, 60, 40, 120));
+        g2d.setColor(new Color(80, 60, 40, 150));
         g2d.setStroke(new BasicStroke(2f));
-        int size = CELL_SIZE / 3;
-        int half = size / 2;
+        int len = CELL_SIZE / 6; // 角标长度
+        int gap = CELL_SIZE / 12; // 中心点与角标的距离
+        int dotSize = CELL_SIZE / 10; // 中心点大小
         int[][] positions = {
             {3,0},{3,2},{3,4},{3,6},{3,8},
             {6,0},{6,2},{6,4},{6,6},{6,8},
@@ -1275,8 +1285,25 @@ public class BoardPanel extends JPanel {
         for (int[] p : positions) {
             int cx = MARGIN + p[1] * CELL_SIZE;
             int cy = MARGIN + p[0] * CELL_SIZE;
-            g2d.drawLine(cx - half, cy, cx + half, cy);
-            g2d.drawLine(cx, cy - half, cx, cy + half);
+
+            // 中心点
+            g2d.fillOval(cx - dotSize/2, cy - dotSize/2, dotSize, dotSize);
+
+            // 左上角
+            g2d.drawLine(cx - gap - len, cy - gap, cx - gap, cy - gap);
+            g2d.drawLine(cx - gap, cy - gap - len, cx - gap, cy - gap);
+
+            // 右上角
+            g2d.drawLine(cx + gap, cy - gap - len, cx + gap, cy - gap);
+            g2d.drawLine(cx + gap, cy - gap, cx + gap + len, cy - gap);
+
+            // 左下角
+            g2d.drawLine(cx - gap - len, cy + gap, cx - gap, cy + gap);
+            g2d.drawLine(cx - gap, cy + gap, cx - gap, cy + gap + len);
+
+            // 右下角
+            g2d.drawLine(cx + gap, cy + gap, cx + gap + len, cy + gap);
+            g2d.drawLine(cx + gap, cy + gap, cx + gap, cy + gap + len);
         }
     }
     
@@ -1524,6 +1551,10 @@ public class BoardPanel extends JPanel {
             for (int j = 0; j < 9; j++) {
                 Piece piece = board.getPiece(i, j);
                 if (piece != null) {
+                    if (currentAnimation != null && piece == currentAnimation.piece && i == currentAnimation.endRow && j == currentAnimation.endCol) {
+                        // 该棋子由动画绘制，跳过
+                        continue;
+                    }
                     // 使用显示坐标绘制棋子
                     int displayRow = getDisplayRow(i);
                     int displayCol = getDisplayCol(j);
@@ -2045,6 +2076,7 @@ public class BoardPanel extends JPanel {
             Position start = aiMove.getStart();
             Position end = aiMove.getEnd();
             Piece movingPiece = board.getPiece(start.getX(), start.getY());
+            Piece capturedPiece = board.getPiece(end.getX(), end.getY());
             
             // 记录AI决策
             String moveDescription = formatMoveDescription(movingPiece, start, end);
@@ -2053,6 +2085,7 @@ public class BoardPanel extends JPanel {
             
             // 执行移动
             board.movePiece(start, end);
+            startMoveAnimation(movingPiece, start, end, capturedPiece);
             
             // 设置移动痕迹标记（确保AI移动也能显示移动痕迹）
             lastMoveStart = new Position(start.getX(), start.getY());
@@ -3114,12 +3147,14 @@ public class BoardPanel extends JPanel {
         Position start = aiMove.getStart();
         Position end = aiMove.getEnd();
         Piece piece = board.getPiece(start.getX(), start.getY());
+        Piece capturedPiece = board.getPiece(end.getX(), end.getY());
 
         // 保存棋盘状态
         saveBoardState();
 
         // 执行移动
         board.movePiece(start, end);
+        startMoveAnimation(piece, start, end, capturedPiece);
 
         // 更新最后一步移动标记
         lastMoveStart = start;
@@ -4956,8 +4991,7 @@ public class BoardPanel extends JPanel {
             lastMoveStart = new Position(markFromRow, markFromCol);
             lastMoveEnd = new Position(markToRow, markToCol);
             
-            // 播放落子音效
-            SoundPlayer.getInstance().playSound("piece_drop");
+            // 落子音效在动画中处理
             
             String colorName = (piece.getColor() == PieceColor.RED) ? "红方" : "黑方";
         System.out.println("📥 对手(" + colorName + ")移动: " + piece.getChineseName() + 
@@ -5125,9 +5159,9 @@ public class BoardPanel extends JPanel {
                         
                         // 执行移动
                         board.movePiece(start, end);
-                        
-                        // 播放落子音效
-                        SoundPlayer.getInstance().playSound("piece_drop");
+
+                        // 启动移动动画（包含落子音效）
+                        startMoveAnimation(selectedPiece, start, end, capturedPiece);
                         
                         // 显示移动信息
                         String playerType = isNetworkMode ? "本地玩家" : "玩家";
@@ -5975,5 +6009,153 @@ public class BoardPanel extends JPanel {
             repaint();
         });
     }
-    
+
+    // --- 动画相关方法 ---
+
+    /** 绘制当前走子动画 */
+    private void drawCurrentAnimation(Graphics2D g2d) {
+        if (currentAnimation != null) {
+            currentAnimation.draw(g2d);
+        }
+    }
+
+    /** 启动走子动画 */
+    private void startMoveAnimation(Piece piece, Position start, Position end, Piece captured) {
+        int startRow = getDisplayRow(start.getX());
+        int startCol = getDisplayCol(start.getY());
+        int endRow = getDisplayRow(end.getX());
+        int endCol = getDisplayCol(end.getY());
+        int startX = MARGIN + startCol * CELL_SIZE;
+        int startY = MARGIN + startRow * CELL_SIZE;
+        int endX = MARGIN + endCol * CELL_SIZE;
+        int endY = MARGIN + endRow * CELL_SIZE;
+        int capX = MARGIN + endCol * CELL_SIZE;
+        int capY = MARGIN + endRow * CELL_SIZE;
+        currentAnimation = new PieceAnimation(piece, startX, startY, endX, endY, end.getX(), end.getY(), captured, capX, capY);
+        currentAnimation.start();
+    }
+
+    /** 在指定中心点绘制棋子 */
+    private void drawPieceAt(Graphics2D g2d, Piece piece, int centerX, int centerY, double scale, float alpha) {
+        Composite old = g2d.getComposite();
+        if (alpha < 1f) {
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+        }
+        int size = (int)(CELL_SIZE * 0.75 * scale);
+        draw3DPieceBase(g2d, piece, centerX, centerY, size);
+        draw3DPieceText(g2d, piece, centerX, centerY, size);
+        g2d.setComposite(old);
+    }
+
+    private double easeOutCubic(double t) {
+        t -= 1.0;
+        return t * t * t + 1.0;
+    }
+
+    /** 棋子移动动画类 */
+    private class PieceAnimation {
+        Piece piece;
+        int startX, startY, endX, endY;
+        int endRow, endCol;
+        int ctrlX, ctrlY;
+        double moveProgress = 0.0;
+        double bounceProgress = 0.0;
+        Timer timer;
+        Piece capturedPiece;
+        int capturedX, capturedY;
+        float capturedAlpha = 1f;
+        double scale = 1.0;
+
+        PieceAnimation(Piece piece, int startX, int startY, int endX, int endY, int endRow, int endCol, Piece capturedPiece, int capX, int capY) {
+            this.piece = piece;
+            this.startX = startX;
+            this.startY = startY;
+            this.endX = endX;
+            this.endY = endY;
+            this.endRow = endRow;
+            this.endCol = endCol;
+            this.capturedPiece = capturedPiece;
+            this.capturedX = capX;
+            this.capturedY = capY;
+            this.ctrlX = (startX + endX) / 2;
+            int peak = (int)(CELL_SIZE * 0.35);
+            this.ctrlY = Math.min(startY, endY) - peak;
+        }
+
+        void start() {
+            if (capturedPiece != null) {
+                startFade();
+            } else {
+                startMove();
+            }
+        }
+
+        private void startFade() {
+            int fadeDuration = 120;
+            timer = new Timer(40, e -> {
+                capturedAlpha -= 40f / fadeDuration;
+                if (capturedAlpha <= 0f) {
+                    capturedAlpha = 0f;
+                    timer.stop();
+                    startMove();
+                }
+                repaint();
+            });
+            timer.start();
+        }
+
+        private void startMove() {
+            int duration = Math.min(320, Math.max(220, GameConfig.MOVE_ANIMATION_DURATION));
+            timer = new Timer(16, e -> {
+                moveProgress += 16.0 / duration;
+                if (moveProgress >= 1.0) {
+                    moveProgress = 1.0;
+                    timer.stop();
+                    startBounce();
+                }
+                repaint();
+            });
+            timer.start();
+        }
+
+        private void startBounce() {
+            SoundPlayer.getInstance().playSound("piece_drop");
+            bounceProgress = 0.0;
+            timer = new Timer(16, e -> {
+                bounceProgress += 16.0 / 60.0;
+                scale = 1.06 - 0.06 * easeOutCubic(Math.min(1.0, bounceProgress));
+                if (bounceProgress >= 1.0) {
+                    timer.stop();
+                    finish();
+                }
+                repaint();
+            });
+            timer.start();
+        }
+
+        private void finish() {
+            scale = 1.0;
+            currentAnimation = null;
+            repaint();
+        }
+
+        void draw(Graphics2D g2d) {
+            if (capturedPiece != null && capturedAlpha > 0f) {
+                drawPieceAt(g2d, capturedPiece, capturedX, capturedY, 1.0, capturedAlpha);
+            }
+            double t = moveProgress;
+            double hNorm = 4 * t * (1 - t);
+            int groundX = (int)(startX + (endX - startX) * t);
+            int groundY = (int)(startY + (endY - startY) * t);
+            int x = (int)((1 - t) * (1 - t) * startX + 2 * (1 - t) * t * ctrlX + t * t * endX);
+            int y = (int)((1 - t) * (1 - t) * startY + 2 * (1 - t) * t * ctrlY + t * t * endY);
+            int shadowW = (int)(CELL_SIZE * 0.7 * (1 - 0.3 * hNorm));
+            int shadowH = shadowW / 2;
+            Composite old = g2d.getComposite();
+            g2d.setColor(new Color(0, 0, 0, (int)(80 * (1 - hNorm))));
+            g2d.fillOval(groundX - shadowW/2, groundY - shadowH/2 + CELL_SIZE/4, shadowW, shadowH);
+            g2d.setComposite(old);
+            drawPieceAt(g2d, piece, x, y, scale, 1f);
+        }
+    }
 }

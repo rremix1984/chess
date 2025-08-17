@@ -146,15 +146,17 @@ public class GameFrame extends JFrame {
         
         
         // 创建主要内容面板（棋盘+右侧面板）
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, boardPanel, rightPanel);
-        splitPane.setResizeWeight(0.8);
+        final JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, boardPanel, rightPanel);
         splitPane.setContinuousLayout(true);
         splitPane.setOneTouchExpandable(true);
+        splitPane.setDividerLocation(boardPanel.getPreferredSize().width + splitPane.getDividerSize());
         add(splitPane, BorderLayout.CENTER);
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
+                int divider = boardPanel.getPreferredSize().width + splitPane.getDividerSize();
+                splitPane.setDividerLocation(Math.min(divider, getWidth() - rightPanel.getMinimumSize().width));
                 revalidate();
                 repaint();
             }
