@@ -14,22 +14,27 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.net.BindException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 
 /**
  * 游戏中心界面，左侧显示游戏列表，右侧为房间管理
  */
 public class GameCenterFrame extends JFrame implements NetworkClient.ClientEventListener {
 
-    private static final Map<String, String> GAME_MAP = Map.of(
-            "中国象棋", "chinese-chess",
-            "国际象棋", "international-chess",
-            "五子棋", "gomoku",
-            "围棋", "go-game",
-            "坦克大战", "tank-battle-game",
-            "大富翁", "monopoly"
-    );
+    private static final Map<String, String> GAME_MAP;
+    static {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("中国象棋", "chinese-chess");
+        map.put("国际象棋", "international-chess");
+        map.put("五子棋", "gomoku");
+        map.put("围棋", "go-game");
+        map.put("坦克大战", "tank-battle-game");
+        map.put("大富翁", "monopoly");
+        GAME_MAP = Collections.unmodifiableMap(map);
+    }
 
     private NetworkClient networkClient;
     private JTable roomTable;
@@ -486,7 +491,19 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         SwingUtilities.invokeLater(() -> {
             try {
                 Class<?> gameClass = Class.forName("com.tankbattle.TankBattleGame");
-                gameClass.getMethod("main", String[].class).invoke(null, (Object) new String[]{});
+                try {
+                    java.lang.reflect.Constructor<?> ctor = gameClass.getDeclaredConstructor(Runnable.class);
+                    GameCenterFrame.this.setVisible(false);
+                    Runnable onExit = () -> SwingUtilities.invokeLater(() -> {
+                        GameContext.setSinglePlayer(false);
+                        GameCenterFrame.this.setVisible(true);
+                        GameCenterFrame.this.toFront();
+                        refreshRoomList();
+                    });
+                    ctor.newInstance(onExit);
+                } catch (NoSuchMethodException ex) {
+                    gameClass.getMethod("main", String[].class).invoke(null, (Object) new String[]{});
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }

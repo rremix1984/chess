@@ -105,16 +105,15 @@ public class GameFrame extends JFrame {
 
     public GameFrame() {
         setTitle("🌎 中国象棋 - AI对弈版");
-        setSize(1400, 1000); // 进一步增加窗口尺寸，确保棋盘有足够空间
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setLocationRelativeTo(null); // 居中显示
         setLayout(new BorderLayout());
-        setMinimumSize(new Dimension(1200, 900)); // 设置最小尺寸
 
         // 创建棋盘
         Board board = new Board();
         boardPanel = new BoardPanel(board);
         boardPanel.setBorder(BorderFactory.createEmptyBorder(6,6,6,6));
+        Dimension boardSize = new Dimension(800, 800);
+        boardPanel.setPreferredSize(boardSize);
         
         // 创建聊天面板
         chatPanel = new ChatPanel();
@@ -146,8 +145,8 @@ public class GameFrame extends JFrame {
         JPanel rightPanel = new JPanel(new BorderLayout());
         rightPanel.add(rightTabbedPane, BorderLayout.CENTER);
         rightPanel.setBorder(BorderFactory.createEmptyBorder(6,6,6,6));
-        rightPanel.setPreferredSize(new Dimension(FIXED_AI_WIDTH, 400));
-        rightPanel.setMinimumSize(new Dimension(FIXED_AI_WIDTH, 400));
+        rightPanel.setPreferredSize(new Dimension(FIXED_AI_WIDTH, boardSize.height));
+        rightPanel.setMinimumSize(new Dimension(FIXED_AI_WIDTH, boardSize.height));
         rightPanel.setMaximumSize(new Dimension(FIXED_AI_WIDTH, Integer.MAX_VALUE));
         
         
@@ -157,7 +156,7 @@ public class GameFrame extends JFrame {
         splitPane.setResizeWeight(1.0);
         splitPane.setOneTouchExpandable(false);
         splitPane.setDividerSize(6);
-        splitPane.setDividerLocation(getWidth() - FIXED_AI_WIDTH);
+        splitPane.setDividerLocation(boardSize.width);
         splitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, evt -> {
             int fixed = splitPane.getWidth() - FIXED_AI_WIDTH;
             if ((int)evt.getNewValue() != fixed) {
@@ -185,7 +184,7 @@ public class GameFrame extends JFrame {
         statusLabel = new JLabel("🔴 当前玩家: 红方", JLabel.CENTER);
         statusLabel.setFont(new Font("宋体", Font.BOLD, 14));
         statusLabel.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
-        statusLabel.setPreferredSize(new Dimension(1300, 30)); // 减小状态栏高度，为棋盘留出更多空间
+        statusLabel.setPreferredSize(new Dimension(0, 30));
         add(statusLabel, BorderLayout.SOUTH);
 
         // 设置BoardPanel的状态更新回调
@@ -193,6 +192,8 @@ public class GameFrame extends JFrame {
         
         // 默认启用大模型AI
         initializeDefaultAI();
+        pack();
+        setLocationRelativeTo(null);
     }
     
     /**
