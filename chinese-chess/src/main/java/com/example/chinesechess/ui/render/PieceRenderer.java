@@ -1,33 +1,50 @@
 package com.example.chinesechess.ui.render;
 
-import javax.swing.*;
-import java.awt.*;
-import java.awt.geom.*;
+import javax.imageio.ImageIO;
+import javax.swing.ImageIcon;
+import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Composite;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.LinearGradientPaint;
+import java.awt.Paint;
+import java.awt.RadialGradientPaint;
+import java.awt.RenderingHints;
+import java.awt.Shape;
+import java.awt.Rectangle;
+import java.awt.Stroke;
+import java.awt.TexturePaint;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
-import java.awt.image.BufferedImageOp;
 import java.awt.image.ConvolveOp;
 import java.awt.image.Kernel;
+import java.io.File;
+import java.io.IOException;
 import java.net.URL;
+import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
- * Renders Chinese chess pieces with realistic wood style.
- * Results are cached based on piece properties to avoid recomputation.
+ * 中国象棋棋子渲染器（木质立体风格）
+ * - 外沿立体（外深内浅），内盘木纹，柔和高光，贴地阴影，文字浮雕
+ * - 尺寸从直径 d 推导，高 DPI 友好
+ * - 可选木纹贴图；无贴图时程序化木纹回退
+ * - 渲染结果带缓存；异常返回占位图，不抛错
  */
 public final class PieceRenderer {
+
+    // ===== 枚举 =====
     public enum Side { RED, BLACK }
-    public enum PieceType {
-        CHE, MA, PAO, SHUAI, JIANG, SHI, XIANG, BING, ZU
-    }
+    public enum PieceType { CHE, MA, PAO, SHUAI, JIANG, SHI, XIANG, BING, ZU }
 
-    private static final Map<String, BufferedImage> CACHE = new ConcurrentHashMap<>();
-    private static Image WOOD_TEX;
-    private static final Logger LOG = Logger.getLogger(PieceRenderer.class.getName());
-
-    // ===== 色板 =====
+    // ===== 色板（可微调）=====
     private static final Color WOOD_DEEP   = new Color(0x8F6B4B);
     private static final Color WOOD_MID    = new Color(0xB99367);
     private static final Color WOOD_LIGHT  = new Color(0xD7B487);
@@ -36,152 +53,240 @@ public final class PieceRenderer {
     private static final Color RED_GLYPH   = new Color(0xD83A3A);
     private static final Color BLACK_GLYPH = new Color(0x222222);
 
+    // 可选：木纹贴图（若存在优先使用）
+    private static Image WOOD_TEX;
+
+    // 结果缓存：type|side|diameter|uiScale|hasTexture
+    private static final Map<String, BufferedImage> CACHE = new ConcurrentHashMap<>();
+
     static {
-        // Optional wood texture loading
+        // 尝试从资源加载木纹贴图（可选）
         try {
             URL url = PieceRenderer.class.getResource("/assets/wood/wood_a.jpg");
-            if (url != null) {
-                WOOD_TEX = new ImageIcon(url).getImage();
-            }
-        } catch (Exception ignore) {}
+            if (url != null) WOOD_TEX = new ImageIcon(url).getImage();
+        } catch (Throwable ignore) {}
     }
 
     private PieceRenderer() {}
 
-    // 高 DPI 抗锯齿统一开启
-    private static void enableAA(Graphics2D g) {
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-    }
+    /** 外部可注入自定义木纹贴图（可选）。 */
+    public static void setWoodTexture(Image img) { WOOD_TEX = img; CACHE.clear(); }
 
-    /**
-     * Returns cached image or renders a new one when missing.
-     */
+    /** 渲染一枚棋子（带缓存）。 */
     public static BufferedImage render(PieceType type, Side side, int diameterPx, float uiScale) {
         String key = type + "|" + side + "|" + diameterPx + "|" + uiScale + "|" + (WOOD_TEX != null);
         return CACHE.computeIfAbsent(key, k -> {
             try {
                 return drawOne(type, side, diameterPx, uiScale);
-            } catch (Exception ex) {
-                LOG.log(Level.WARNING, "Failed to render piece " + k, ex);
-                return placeholder(diameterPx);
+            } catch (Throwable t) {
+                System.err.println("[PieceRenderer] render failed: " + t);
+                return placeholder(type, side, diameterPx);
             }
         });
     }
 
-    private static BufferedImage drawOne(PieceType type, Side side, int d, float uiScale) {
-        int scaledD = Math.max(1, Math.round(d * uiScale));
-        int margin = Math.max(2, Math.round(scaledD * 0.04f));
-        BufferedImage img = new BufferedImage(scaledD, scaledD, BufferedImage.TYPE_INT_ARGB);
+    // ====== 核心渲染 ======
+    static BufferedImage drawOne(PieceType type, Side side, int d, float uiScale) {
+        int margin = Math.max(2, Math.round(d * 0.04f));
+        int cx = d / 2, cy = d / 2;
+        int rOuter = d / 2 - margin;
+        int rimW   = Math.max(3, Math.round(d * 0.08f));
+        int rInner = rOuter - rimW;
+
+        BufferedImage img = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         enableAA(g);
 
-        int cx = scaledD / 2;
-        int cy = scaledD / 2;
-        int rOuter = scaledD / 2 - margin;
-        int rimW = Math.round(Math.max(3f, scaledD * 0.08f));
-        int rInner = rOuter - rimW;
-
-        // 1) drop shadow
-        paintDropShadow(g, cx, cy, rOuter, scaledD);
-
-        // 2) rim
+        // 1) 贴地阴影（先绘）
+        paintDropShadow(g, cx, cy, rOuter, d);
+        // 2) 立体外沿（环）
         paintRim(g, cx, cy, rOuter, rimW);
-
-        // 3) face
+        // 3) 内盘 + 木纹/回退
         paintFace(g, cx, cy, rInner);
-
-        // 4) specular highlight
+        // 4) 顶部柔和高光
         paintSpecular(g, cx, cy, rInner);
-
-        // 5) glyph
-        String text = toGlyph(type, side);
-        paintGlyph(g, text, side, cx, cy, rInner);
+        // 5) 文字浮雕
+        paintGlyph(g, toGlyph(type, side), side, cx, cy, rInner);
 
         g.dispose();
-
-        if (uiScale != 1f) {
-            BufferedImage scaled = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2 = scaled.createGraphics();
-            enableAA(g2);
-            g2.drawImage(img, 0, 0, d, d, null);
-            g2.dispose();
-            return scaled;
-        }
         return img;
     }
 
-    // 半透明椭圆 + 模糊，位置略低；让棋子“贴地”
+    // ====== 各绘制步骤 ======
+
     private static void paintDropShadow(Graphics2D g, int cx, int cy, int rOuter, int d) {
         int w = Math.round(rOuter * 1.4f);
         int h = Math.round(rOuter * 0.35f);
         int y = cy + rOuter / 2;
+
         BufferedImage shadow = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D sg = shadow.createGraphics();
-        enableAA(sg);
+        Graphics2D sg = shadow.createGraphics(); enableAA(sg);
         sg.setColor(new Color(0, 0, 0, 180));
-        sg.fillOval(cx - w / 2, y, w, h);
+        sg.fill(new Ellipse2D.Float(cx - w / 2f, y, w, h));
         sg.dispose();
-        float radius = Math.max(2, d / 60f);
-        g.drawImage(blur(shadow, radius), 0, 0, null);
+
+        BufferedImage blurred = gaussianBlur(shadow, Math.max(2f, d / 60f));
+        g.drawImage(blurred, 0, 0, null);
     }
 
-    // 外深内浅的径向渐变，再挖空形成环
     private static void paintRim(Graphics2D g, int cx, int cy, int rOuter, int rimW) {
-        float[] dist = {0f, 0.5f, 1f};
+        float[] dist = {0f, 0.6f, 1f};
         Color[] cols = {WOOD_DEEP, WOOD_MID, WOOD_LIGHT};
-        RadialGradientPaint rg = new RadialGradientPaint(new Point2D.Float(cx, cy), rOuter, dist, cols);
+        RadialGradientPaint rg = new RadialGradientPaint(
+                new Point2D.Float(cx, cy), rOuter, dist, cols);
         Shape outer = new Ellipse2D.Float(cx - rOuter, cy - rOuter, rOuter * 2f, rOuter * 2f);
+
         Composite bak = g.getComposite();
+        Paint old = g.getPaint();
+
         g.setPaint(rg);
         g.fill(outer);
+
+        // 挖空形成环
         int rInnerEdge = rOuter - rimW;
         g.setComposite(AlphaComposite.Clear);
         g.fill(new Ellipse2D.Float(cx - rInnerEdge, cy - rInnerEdge, rInnerEdge * 2f, rInnerEdge * 2f));
+
         g.setComposite(bak);
+        g.setPaint(old);
     }
 
-    // 内盘：木纹贴图优先；无贴图时程序化木纹 + 暗角
     private static void paintFace(Graphics2D g, int cx, int cy, int rInner) {
         Shape face = new Ellipse2D.Float(cx - rInner, cy - rInner, rInner * 2f, rInner * 2f);
-        Paint bak = g.getPaint();
+        Paint old = g.getPaint();
+
         if (WOOD_TEX != null) {
-            TexturePaint tp = new TexturePaint(toBuffered(WOOD_TEX),
+            TexturePaint tp = new TexturePaint(
+                    toBuffered(WOOD_TEX),
                     new Rectangle(cx - rInner, cy - rInner, Math.max(12, rInner), Math.max(12, rInner)));
             g.setPaint(tp);
             g.fill(face);
         } else {
+            // 线性渐变：浅→中→浅
             LinearGradientPaint lg = new LinearGradientPaint(
                     cx - rInner, cy - rInner, cx + rInner, cy + rInner,
                     new float[]{0f, 0.5f, 1f},
                     new Color[]{FACE_L0, FACE_L1, FACE_L0});
             g.setPaint(lg);
             g.fill(face);
+            // 程序化细木纹
             drawFineWoodLines(g, cx, cy, rInner, face);
-            overlayNoise(g, cx, cy, rInner, face);
         }
+
+        // 轻暗角
         RadialGradientPaint vignette = new RadialGradientPaint(
                 new Point2D.Float(cx, cy), rInner,
                 new float[]{0f, 1f},
                 new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 40)});
         g.setPaint(vignette);
         g.fill(face);
-        g.setPaint(bak);
+
+        g.setPaint(old);
     }
 
-    // 顶部柔和高光：中心偏左上，透明度随半径衰减
     private static void paintSpecular(Graphics2D g, int cx, int cy, int rInner) {
-        int ox = Math.round(rInner * 0.35f);
-        int oy = Math.round(rInner * 0.35f);
+        int ox = Math.round(rInner * 0.35f), oy = Math.round(rInner * 0.35f);
         RadialGradientPaint gloss = new RadialGradientPaint(
                 new Point2D.Float(cx - ox, cy - oy), rInner * 0.9f,
                 new float[]{0f, 0.6f, 1f},
-                new Color[]{new Color(255, 255, 255, 115), new Color(255, 255, 255, 35), new Color(255, 255, 255, 0)});
+                new Color[]{new Color(255, 255, 255, 115),
+                            new Color(255, 255, 255, 35),
+                            new Color(255, 255, 255, 0)});
         Shape face = new Ellipse2D.Float(cx - rInner, cy - rInner, rInner * 2f, rInner * 2f);
-        Paint bak = g.getPaint();
+        Paint old = g.getPaint();
         g.setPaint(gloss);
         g.fill(face);
-        g.setPaint(bak);
+        g.setPaint(old);
+    }
+
+    private static void paintGlyph(Graphics2D g, String text, Side side, int cx, int cy, int rInner) {
+        Color main = (side == Side.RED) ? RED_GLYPH : BLACK_GLYPH;
+        int fontSize = Math.max(24, Math.round(rInner * 1.2f));
+        Font font = g.getFont().deriveFont(Font.BOLD, fontSize);
+        g.setFont(font);
+        FontMetrics fm = g.getFontMetrics();
+        int tx = cx - fm.stringWidth(text) / 2;
+        int ty = cy + (fm.getAscent() - fm.getDescent()) / 2;
+
+        // 阴影
+        g.setColor(new Color(0, 0, 0, 120));
+        g.drawString(text, tx + 2, ty + 2);
+        // 白描边（八方向 1px）
+        g.setColor(Color.WHITE);
+        for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) {
+            if (dx == 0 && dy == 0) continue;
+            g.drawString(text, tx + dx, ty + dy);
+        }
+        // 主体
+        g.setColor(main);
+        g.drawString(text, tx, ty);
+    }
+
+    // ===== 小工具 =====
+
+    private static void enableAA(Graphics2D g) {
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
+    }
+
+    /** 简易程序化木纹：低强度横线，破坏镜面感即可。 */
+    private static void drawFineWoodLines(Graphics2D g, int cx, int cy, int rInner, Shape clip) {
+        Stroke bak = g.getStroke();
+        Shape oldClip = g.getClip();
+        g.setClip(clip);
+        g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL));
+        int top = cy - rInner, bottom = cy + rInner, left = cx - rInner, right = cx + rInner;
+        int step = Math.max(3, rInner / 8);
+        for (int y = top + step / 2; y < bottom; y += step) {
+            g.setColor(new Color(120, 90, 60, 18));
+            g.drawLine(left, y, right, y);
+        }
+        g.setClip(oldClip);
+        g.setStroke(bak);
+    }
+
+    /** 高斯模糊：分离卷积实现（横向 + 纵向） */
+    private static BufferedImage gaussianBlur(BufferedImage src, float radius) {
+        if (radius < 1f) return src;
+
+        int size = (int) Math.ceil(radius * 3) * 2 + 1; // 6σ+1
+        float[] kernelData = new float[size];
+        float sigma = radius;
+        float sum = 0f;
+        int mid = size / 2;
+
+        for (int i = 0; i < size; i++) {
+            float x = i - mid;
+            kernelData[i] = (float) Math.exp(-(x * x) / (2 * sigma * sigma));
+            sum += kernelData[i];
+        }
+        for (int i = 0; i < size; i++) kernelData[i] /= sum;
+
+        Kernel kernelH = new Kernel(size, 1, kernelData);
+        ConvolveOp opH = new ConvolveOp(kernelH, ConvolveOp.EDGE_NO_OP, null);
+
+        BufferedImage tmp = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        opH.filter(src, tmp);
+
+        Kernel kernelV = new Kernel(1, size, kernelData);
+        ConvolveOp opV = new ConvolveOp(kernelV, ConvolveOp.EDGE_NO_OP, null);
+
+        BufferedImage dst = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        opV.filter(tmp, dst);
+
+        return dst;
+    }
+
+    private static BufferedImage toBuffered(Image img) {
+        if (img instanceof BufferedImage bi) return bi;
+        BufferedImage out = new BufferedImage(img.getWidth(null), img.getHeight(null), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        enableAA(g);
+        g.drawImage(img, 0, 0, null);
+        g.dispose();
+        return out;
     }
 
     private static String toGlyph(PieceType t, Side s) {
@@ -198,112 +303,37 @@ public final class PieceRenderer {
         };
     }
 
-    private static void paintGlyph(Graphics2D g, String text, Side side, int cx, int cy, int rInner) {
-        Color main = (side == Side.RED) ? RED_GLYPH : BLACK_GLYPH;
-
-        int fontSize = Math.round(rInner * 1.2f);
-        Font font = g.getFont().deriveFont(Font.BOLD, fontSize);
-        g.setFont(font);
-        FontMetrics fm = g.getFontMetrics();
-        int tx = cx - fm.stringWidth(text) / 2;
-        int ty = cy + (fm.getAscent() - fm.getDescent()) / 2;
-
-        g.setColor(new Color(0, 0, 0, 120));
-        g.drawString(text, tx + 2, ty + 2);
-
-        g.setColor(Color.WHITE);
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                if (dx == 0 && dy == 0) continue;
-                g.drawString(text, tx + dx, ty + dy);
-            }
-        }
-
-        g.setColor(main);
-        g.drawString(text, tx, ty);
-    }
-
-    private static BufferedImage toBuffered(Image img) {
-        BufferedImage bi = new BufferedImage(img.getWidth(null), img.getHeight(null), BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = bi.createGraphics();
-        g2.drawImage(img, 0, 0, null);
-        g2.dispose();
-        return bi;
-    }
-
-    // === 小工具：程序化木纹线 + 噪声 + 简易模糊 ===
-    private static void drawFineWoodLines(Graphics2D g, int cx, int cy, int rInner, Shape clip) {
-        Stroke bakS = g.getStroke();
-        Shape bakClip = g.getClip();
-        g.setClip(clip);
-        g.setStroke(new BasicStroke(1f));
-        int top = cy - rInner, bottom = cy + rInner;
-        int left = cx - rInner, right = cx + rInner;
-        int step = Math.max(3, rInner / 8);
-        for (int y = top + step / 2; y < bottom; y += step) {
-            g.setColor(new Color(120, 90, 60, 18));
-            g.drawLine(left, y, right, y);
-        }
-        g.setClip(bakClip);
-        g.setStroke(bakS);
-    }
-
-    private static void overlayNoise(Graphics2D g, int cx, int cy, int rInner, Shape clip) {
-        int size = rInner * 2;
-        BufferedImage noise = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
-        java.util.Random rand = new java.util.Random();
-        for (int y = 0; y < size; y++) {
-            for (int x = 0; x < size; x++) {
-                int gray = 120 + rand.nextInt(40);
-                int alpha = 8 + rand.nextInt(11); // 8-18
-                int rgb = (alpha << 24) | (gray << 16) | (gray << 8) | gray;
-                noise.setRGB(x, y, rgb);
-            }
-        }
-        noise = blur(noise, 1f);
-        Shape bak = g.getClip();
-        g.setClip(clip);
-        g.drawImage(noise, cx - rInner, cy - rInner, null);
-        g.setClip(bak);
-    }
-
-    /** 非严格的快速模糊（高斯核） */
-    private static BufferedImage blur(BufferedImage img, float radius) {
-        int r = Math.max(1, Math.round(radius));
-        int size = r * 2 + 1;
-        float sigma = r / 3f;
-        float[] data = new float[size * size];
-        float sum = 0f;
-        int idx = 0;
-        for (int y = -r; y <= r; y++) {
-            for (int x = -r; x <= r; x++) {
-                float value = (float) Math.exp(-(x * x + y * y) / (2 * sigma * sigma));
-                data[idx++] = value;
-                sum += value;
-            }
-        }
-        for (int i = 0; i < data.length; i++) {
-            data[i] /= sum;
-        }
-        Kernel kernel = new Kernel(size, size, data);
-        BufferedImageOp op = new ConvolveOp(kernel, ConvolveOp.EDGE_ZERO_FILL, null);
-        BufferedImage dst = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        op.filter(img, dst);
-        return dst;
-    }
-
-    /**
-     * Generates a simple placeholder piece when rendering fails.
-     */
-    private static BufferedImage placeholder(int d) {
+    private static BufferedImage placeholder(PieceType type, Side side, int d) {
         BufferedImage img = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setColor(new Color(220, 220, 220));
-        g.fillOval(0, 0, d, d);
+        enableAA(g);
+        g.setColor(new Color(230, 230, 230));
+        g.fillOval(2, 2, d - 4, d - 4);
         g.setColor(Color.GRAY);
-        g.drawOval(0, 0, d - 1, d - 1);
+        g.setStroke(new BasicStroke(Math.max(2, d * 0.04f)));
+        g.drawOval(2, 2, d - 4, d - 4);
+        g.setColor(side == Side.RED ? RED_GLYPH : BLACK_GLYPH);
+        String text = toGlyph(type, side);
+        int fs = Math.max(18, (int) (d * 0.45));
+        g.setFont(g.getFont().deriveFont(Font.BOLD, fs));
+        FontMetrics fm = g.getFontMetrics();
+        g.drawString(text, (d - fm.stringWidth(text)) / 2, (d + fm.getAscent() - fm.getDescent()) / 2);
         g.dispose();
         return img;
     }
+
+    // ===== 便捷 Demo：导出不同尺寸的棋子 PNG（可删）=====
+    public static void main(String[] args) throws IOException {
+        int[] sizes = {64, 96, 128, 192, 256};
+        for (int d : sizes) {
+            BufferedImage red = render(PieceType.SHUAI, Side.RED, d, 1.0f);
+            BufferedImage blk = render(PieceType.JIANG, Side.BLACK, d, 1.0f);
+            File f1 = new File("piece_RED_" + d + ".png");
+            File f2 = new File("piece_BLACK_" + d + ".png");
+            ImageIO.write(red, "PNG", f1);
+            ImageIO.write(blk, "PNG", f2);
+            System.out.println("Exported: " + f1.getAbsolutePath() + " , " + f2.getAbsolutePath());
+        }
+    }
 }
+
