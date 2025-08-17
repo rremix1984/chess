@@ -34,7 +34,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import javax.swing.Timer;
-import com.example.common.sound.SoundPlayer;
+import audio.SoundManager;
+import static audio.SoundManager.Event.*;
+import static audio.SoundManager.SoundProfile.*;
 import com.example.chinesechess.network.NetworkClient;
 import com.example.chinesechess.network.*;
 import com.example.chinesechess.network.NetworkMessage.MessageType;
@@ -777,10 +779,10 @@ public class BoardPanel extends JPanel {
                          
                          // 检查游戏是否结束
                          if (gameState == GameState.RED_WINS) {
-                             SoundPlayer.getInstance().playSound("game_win");
+                             SoundManager.play(WOOD, WIN);
                              showGameEndDialog("红方获胜！");
                          } else if (gameState == GameState.BLACK_WINS) {
-                             SoundPlayer.getInstance().playSound("game_win");
+                             SoundManager.play(WOOD, WIN);
                              showGameEndDialog("黑方获胜！");
                          } else if (gameState == GameState.DRAW) {
                              showGameEndDialog("和棋！");
@@ -2421,7 +2423,7 @@ public class BoardPanel extends JPanel {
                 addAILog("system", "游戏结束状态: " + gameState);
                 
                 // 播放胜利音效
-                SoundPlayer.getInstance().playSound("game_win");
+                SoundManager.play(WOOD, WIN);
                 
                 // 检查并显示游戏结束画面
                 checkGameEnd();
@@ -2443,7 +2445,7 @@ public class BoardPanel extends JPanel {
             System.out.println("🎊 游戏结束: " + aiColorName + "AI无法走棋，" + winnerColorName + "获胜！");
             
             // 播放胜利音效
-            SoundPlayer.getInstance().playSound("game_win");
+            SoundManager.play(WOOD, WIN);
             
             // 显示游戏结束画面
             SwingUtilities.invokeLater(() -> {
@@ -3814,8 +3816,8 @@ public class BoardPanel extends JPanel {
             // 通知聊天面板更新棋盘状态
             notifyChatPanelBoardUpdate();
             
-            // 播放悔棋音效
-            SoundPlayer.getInstance().playSound("undo_move");
+            // 播放悔棋音效（使用落子音代替）
+            SoundManager.play(WOOD, PIECE_DROP);
             
             addAILog("system", "悔棋操作完成 - 当前轮到" + (currentPlayer == PieceColor.RED ? "红方" : "黑方"));
             
@@ -4921,10 +4923,10 @@ public class BoardPanel extends JPanel {
             
             // 检查游戏是否结束
             if (gameState == GameState.RED_WINS) {
-                SoundPlayer.getInstance().playSound("game_win");
+                SoundManager.play(WOOD, WIN);
                 showGameEndDialog("红方获胜！");
             } else if (gameState == GameState.BLACK_WINS) {
-                SoundPlayer.getInstance().playSound("game_win");
+                SoundManager.play(WOOD, WIN);
                 showGameEndDialog("黑方获胜！");
             } else if (gameState == GameState.DRAW) {
                 showGameEndDialog("和棋！");
@@ -5090,10 +5092,10 @@ public class BoardPanel extends JPanel {
                         
                         // 检查游戏是否结束
                         if (gameState == GameState.RED_WINS) {
-                            SoundPlayer.getInstance().playSound("game_win");
+                            SoundManager.play(WOOD, WIN);
                             showGameEndDialog("红方获胜！");
                         } else if (gameState == GameState.BLACK_WINS) {
-                            SoundPlayer.getInstance().playSound("game_win");
+                            SoundManager.play(WOOD, WIN);
                             showGameEndDialog("黑方获胜！");
                         } else if (gameState == GameState.DRAW) {
                             showGameEndDialog("和棋！");
@@ -5702,7 +5704,7 @@ public class BoardPanel extends JPanel {
                 "现在轮到您了！");
             
             // 可选：播放提示音
-            SoundPlayer.getInstance().playSound("game_start");
+            SoundManager.play(WOOD, PIECE_DROP);
             
         } catch (Exception e) {
             System.err.println("❌ 推断玩家颜色时出错: " + e.getMessage());
@@ -6022,7 +6024,7 @@ public class BoardPanel extends JPanel {
         private void startBounce() {
             overlayLayer.playImpactRing(endX, endY);
             impactAnimator.blastAt(endRow, endCol, 2.5, 4, 160);
-            SoundPlayer.getInstance().playSound("piece_drop");
+            SoundManager.play(WOOD, capturedPiece != null ? PIECE_CAPTURE : PIECE_DROP);
             bounceProgress = 0.0;
             timer = new Timer(16, e -> {
                 bounceProgress += 16.0 / 60.0;

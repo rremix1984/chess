@@ -3,7 +3,9 @@ package com.example.gomoku.ui;
 import com.example.gomoku.core.GameState;
 import com.example.gomoku.core.GomokuBoard;
 import com.example.gomoku.ChatPanel;
-import com.example.common.sound.SoundPlayer;
+import audio.SoundManager;
+import static audio.SoundManager.Event.*;
+import static audio.SoundManager.SoundProfile.*;
 import com.example.gomoku.ai.GomokuZeroAI;
 // AI类已在同一个ui包中，无需导入
 
@@ -88,7 +90,7 @@ public class GomokuBoardPanel extends JPanel {
                 moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
                 
                 // 播放落子音效
-                SoundPlayer.getInstance().playSound("piece_drop");
+                SoundManager.play(STONE, PIECE_DROP);
                 
                 // 更新界面
                 repaint();
@@ -163,7 +165,7 @@ public class GomokuBoardPanel extends JPanel {
             moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
             
             // 播放落子音效
-            SoundPlayer.getInstance().playSound("piece_drop");
+                    SoundManager.play(STONE, PIECE_DROP);
             
             // 更新界面
             repaint();
@@ -180,12 +182,12 @@ public class GomokuBoardPanel extends JPanel {
             switch (board.getGameState()) {
                 case BLACK_WINS:
                     status = "⚫ 黑方获胜！";
-                    SoundPlayer.getInstance().playSound("game_win");
+                    SoundManager.play(STONE, WIN);
                     showVictoryAnimation(status);
                     break;
                 case RED_WINS: // 在五子棋中表示白方获胜
                     status = "⚪ 白方获胜！";
-                    SoundPlayer.getInstance().playSound("game_win");
+                    SoundManager.play(STONE, WIN);
                     showVictoryAnimation(status);
                     break;
                 case DRAW:
