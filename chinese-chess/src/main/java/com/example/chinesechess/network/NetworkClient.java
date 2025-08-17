@@ -19,7 +19,8 @@ public class NetworkClient {
     private Socket socket;
     private BufferedReader reader;
     private PrintWriter writer;
-    private boolean isConnected = false;
+    private volatile boolean isConnected = false;
+    private volatile ConnectionState connectionState = ConnectionState.DISCONNECTED;
     
     // 客户端信息
     private String playerId;
@@ -80,15 +81,16 @@ public class NetworkClient {
      * 连接到服务器
      */
     public void connect(String host, int port, String playerName) {
-        if (isConnected) {
-            notifyError("Already connected to server");
+        if (connectionState != ConnectionState.DISCONNECTED) {
+            notifyError("Already connecting or connected");
             return;
         }
-        
+
+        connectionState = ConnectionState.CONNECTING;
         this.serverHost = host;
         this.serverPort = port;
         this.playerName = playerName;
-        
+
         executorService.submit(() -> {
             try {
                 System.out.println("🌐 正在连接服务器: " + host + ":" + port);
@@ -104,16 +106,17 @@ public class NetworkClient {
                 writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"), true);
                 
                 isConnected = true;
-                
+                connectionState = ConnectionState.CONNECTED;
+
                 // 发送连接请求
                 sendConnectionRequest();
-                
+
                 // 启动消息监听
                 startMessageListener();
-                
+
                 // 启动心跳
                 startHeartbeat();
-                
+
                 System.out.println("✅ 服务器连接成功");
                 SwingUtilities.invokeLater(() -> {
                     if (eventListener != null) {
@@ -516,7 +519,21 @@ public class NetworkClient {
     }
 
     public void requestRoomList() {
-        requestRoomList("chinese-chess");
+        requestRoomList(null);
+    }
+
+    /**
+     * Leave room and swallow exceptions.
+     */
+    public void leaveRoomSafely() {
+        try {
+            leaveRoom();
+        } catch (Exception ignored) {
+        }
+    }
+
+    public ConnectionState getConnectionState() {
+        return connectionState;
     }
     
     /**
@@ -556,10 +573,14 @@ public class NetworkClient {
      * 断开连接
      */
     public void disconnect() {
+        if (connectionState == ConnectionState.DISCONNECTED) {
+            return;
+        }
         if (isConnected && playerId != null) {
             DisconnectMessage message = new DisconnectMessage(playerId, "client_disconnect");
             sendMessage(message);
         }
+        notifyDisconnected("客户端主动断开");
         cleanup();
     }
     
@@ -614,6 +635,7 @@ public class NetworkClient {
      */
     private void cleanup() {
         isConnected = false;
+        connectionState = ConnectionState.DISCONNECTED;
         
         // 取消消息监听任务
         if (messageListenerTask != null && !messageListenerTask.isDone()) {
@@ -655,6 +677,7 @@ public class NetworkClient {
      * 通知连接错误
      */
     private void notifyConnectionError(String error) {
+        connectionState = ConnectionState.DISCONNECTED;
         SwingUtilities.invokeLater(() -> {
             if (eventListener != null) {
                 eventListener.onConnectionError(error);
@@ -666,6 +689,7 @@ public class NetworkClient {
      * 通知断开连接
      */
     private void notifyDisconnected(String reason) {
+        connectionState = ConnectionState.DISCONNECTED;
         SwingUtilities.invokeLater(() -> {
             if (eventListener != null) {
                 eventListener.onDisconnected(reason);
