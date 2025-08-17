@@ -29,9 +29,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "编译完成，启动游戏选择界面..."
+echo "编译完成，启动游戏中心界面..."
 
-# 启动游戏启动器（使用打包后的JAR文件）
+# 启动游戏中心
 java -cp game-launcher/target/game-launcher-1.0-SNAPSHOT.jar com.example.launcher.GameLauncher
 
 if [ $? -ne 0 ]; then

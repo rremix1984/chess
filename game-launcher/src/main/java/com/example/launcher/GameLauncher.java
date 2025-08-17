@@ -10,7 +10,7 @@ public class GameLauncher {
         SwingUtilities.invokeLater(() -> {
             try {
                 System.out.println("正在启动多游戏平台...");
-                GameSelectionFrame frame = new GameSelectionFrame();
+                GameCenterFrame frame = new GameCenterFrame();
                 frame.setVisible(true);
             } catch (Exception e) {
                 e.printStackTrace();

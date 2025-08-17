@@ -11,8 +11,10 @@ public class RoomInfo {
     private int maxPlayers;
     private boolean hasPassword;
     private String gameStatus; // "waiting", "playing", "finished"
+    private String gameType;   // 游戏类型
     
-    public RoomInfo(String roomId, String roomName, String hostName, int currentPlayers, int maxPlayers, boolean hasPassword, String gameStatus) {
+    public RoomInfo(String roomId, String roomName, String hostName, int currentPlayers,
+                    int maxPlayers, boolean hasPassword, String gameStatus, String gameType) {
         this.roomId = roomId;
         this.roomName = roomName;
         this.hostName = hostName;
@@ -20,6 +22,7 @@ public class RoomInfo {
         this.maxPlayers = maxPlayers;
         this.hasPassword = hasPassword;
         this.gameStatus = gameStatus;
+        this.gameType = gameType;
     }
     
     // Getters and Setters
@@ -43,4 +46,7 @@ public class RoomInfo {
     
     public String getGameStatus() { return gameStatus; }
     public void setGameStatus(String gameStatus) { this.gameStatus = gameStatus; }
+
+    public String getGameType() { return gameType; }
+    public void setGameType(String gameType) { this.gameType = gameType; }
 }
