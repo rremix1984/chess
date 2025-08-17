@@ -473,8 +473,9 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     private void startGoGame() {
         SwingUtilities.invokeLater(() -> {
             try {
-                Class<?> gameClass = Class.forName("com.example.gogame.GoGame");
-                gameClass.getMethod("main", String[].class).invoke(null, (Object) new String[]{});
+                Class<?> gameFrameClass = Class.forName("com.example.go.GoFrame");
+                JFrame frame = (JFrame) gameFrameClass.getDeclaredConstructor().newInstance();
+                showGameWindow(frame);
             } catch (Exception e) {
                 e.printStackTrace();
             }
