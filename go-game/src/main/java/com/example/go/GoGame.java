@@ -271,7 +271,29 @@ public class GoGame {
         }
         return sb.toString();
     }
-    
+
+    /**
+     * 载入一个预设的棋盘位置，用于死活题等特殊模式
+     *
+     * @param newBoard      预设棋盘数组
+     * @param startingPlayer 先手棋色
+     */
+    public void loadPosition(int[][] newBoard, int startingPlayer) {
+        initializeBoard();
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            System.arraycopy(newBoard[i], 0, board[i], 0, BOARD_SIZE);
+        }
+        this.currentPlayer = startingPlayer;
+        moveHistory.clear();
+        capturedGroups.clear();
+        blackCaptured = 0;
+        whiteCaptured = 0;
+        gameEnded = false;
+        consecutivePasses = 0;
+        lastBoardState = null;
+        lastCapturePosition = null;
+    }
+
     // Getters
     public int[][] getBoard() {
         return board;
