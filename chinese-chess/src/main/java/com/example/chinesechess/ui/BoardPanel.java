@@ -95,6 +95,7 @@ public class BoardPanel extends JPanel {
 
     private GameState gameState = GameState.PLAYING;
     private OverlayLayer overlayLayer;
+    private ImpactAnimator impactAnimator;
     
     // 棋盘翻转状态
     private boolean isBoardFlipped = false;
@@ -177,6 +178,8 @@ public class BoardPanel extends JPanel {
         overlayLayer.setOpaque(false);
         overlayLayer.setBounds(0, 0, boardSize.width, boardSize.height);
         add(overlayLayer);
+
+        impactAnimator = new ImpactAnimator(this::repaint);
 
         addMouseListener(new MouseAdapter() {
             @Override
@@ -668,7 +671,7 @@ public class BoardPanel extends JPanel {
                  Position end = new Position(row, col);
                  if (selectedPiece.isValidMove(board, start, end)) {
                      // 检查移动是否安全（不会导致己方将军被将军）
-                     if (board.isMoveSafe(start, end, currentPlayer)) {
+                     if (checkMoveSafety(start, end, currentPlayer)) {
                          // 在网络模式下先发送移动给服务器，但不等待确认就立即执行本地移动
                          if (isNetworkMode && networkClient != null && networkClient.isConnected()) {
                              try {
@@ -817,6 +820,17 @@ public class BoardPanel extends JPanel {
         repaint();
     }
     
+    private boolean checkMoveSafety(Position start, Position end, PieceColor color) {
+        boolean safe = board.isMoveSafe(start, end, color);
+        if (!safe && GameConfig.getInstance().isAllowUnsafeMove()) {
+            if (overlayLayer != null) {
+                overlayLayer.showBanner("⚠ 走子可能不安全", OverlayLayer.Style.ALERT, 1200);
+            }
+            return true;
+        }
+        return safe;
+    }
+
     private void calculateValidMoves() {
         validMoves.clear();
         if (selectedPiece != null) {
@@ -826,8 +840,8 @@ public class BoardPanel extends JPanel {
                 for (int col = 0; col < 9; col++) {
                     Position end = new Position(row, col);
                     if (selectedPiece.isValidMove(board, start, end)) {
-                        // 同时检查移动是否安全（不会导致己方将军被将军）
-                        if (board.isMoveSafe(start, end, currentPlayer)) {
+                        boolean safe = board.isMoveSafe(start, end, currentPlayer);
+                        if (safe || GameConfig.getInstance().isAllowUnsafeMove()) {
                             validMoves.add(end);
                         }
                     }
@@ -1560,7 +1574,7 @@ public class BoardPanel extends JPanel {
                     // 使用显示坐标绘制棋子
                     int displayRow = getDisplayRow(i);
                     int displayCol = getDisplayCol(j);
-                    drawPiece(g, piece, displayRow, displayCol);
+                    drawPiece(g, piece, displayRow, displayCol, i, j);
                     
                     piecesDrawn++;
                     
@@ -2491,8 +2505,9 @@ public class BoardPanel extends JPanel {
                             for (int targetCol = 0; targetCol < 9; targetCol++) {
                                 Position end = new Position(targetRow, targetCol);
                                 
-                                if (piece.isValidMove(board, start, end) && 
-                                    board.isMoveSafe(start, end, currentPlayer)) {
+                                if (piece.isValidMove(board, start, end) &&
+                                    (board.isMoveSafe(start, end, currentPlayer) ||
+                                     GameConfig.getInstance().isAllowUnsafeMove())) {
                                     validMoves.add(new Move(start, end));
                                 }
                             }
@@ -2547,12 +2562,12 @@ public class BoardPanel extends JPanel {
         }
     }
 
-    private void drawPiece(Graphics g, Piece piece, int row, int col) {
+    private void drawPiece(Graphics g, Piece piece, int row, int col, int boardRow, int boardCol) {
         Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        int centerX = MARGIN + col * CELL_SIZE;
-        int centerY = MARGIN + row * CELL_SIZE;
+        int centerX = MARGIN + col * CELL_SIZE + impactAnimator.getOffsetX(boardRow, boardCol);
+        int centerY = MARGIN + row * CELL_SIZE + impactAnimator.getOffsetY(boardRow, boardCol);
         int diameter = (int) (CELL_SIZE * 0.75);
 
         PieceRenderer.PieceType type = mapPieceType(piece);
@@ -4412,11 +4427,13 @@ public class BoardPanel extends JPanel {
         // 但鼠标点击计算需要按照9×10的网格来计算坐标
         int boardWidth = 9 * CELL_SIZE;   // 9个格子宽度（对应9列交点）
         int boardHeight = 10 * CELL_SIZE;  // 10个格子高度（对应10行交点）
-        
-        // 加上边距：左右各MARGIN，上下各MARGIN
-        // 还要加上坐标显示的额外空间
+
+        int d = (int)(CELL_SIZE * 0.9);
+        int bottomMargin = Math.max((int)(d * 0.9), Math.min(d, (int)(d * 1.2)));
+
+        // 加上边距：左右各MARGIN，上方MARGIN，下方自适应边距
         int totalWidth = boardWidth + 2 * MARGIN;
-        int totalHeight = boardHeight + 2 * MARGIN;
+        int totalHeight = boardHeight + MARGIN + bottomMargin;
         
         // 确保最小尺寸
         int minWidth = Math.max(totalWidth, 600);
@@ -4807,6 +4824,10 @@ public class BoardPanel extends JPanel {
             
             boolean isValidMove = piece.isValidMove(board, start, end);
             boolean isMoveSafe = board.isMoveSafe(start, end, piece.getColor());
+            if (!isMoveSafe && GameConfig.getInstance().isAllowUnsafeMove()) {
+                overlayLayer.showBanner("⚠ 对手走子可能不安全", OverlayLayer.Style.ALERT, 1200);
+                isMoveSafe = true;
+            }
             
             System.out.println("   - 棋子移动规则验证: " + (isValidMove ? "✅ 通过" : "❌ 失败"));
             System.out.println("   - 移动安全性验证: " + (isMoveSafe ? "✅ 通过" : "❌ 失败"));
@@ -5017,7 +5038,7 @@ public class BoardPanel extends JPanel {
                 Position end = new Position(row, col);
                 if (selectedPiece.isValidMove(board, start, end)) {
                     // 检查移动是否安全（不会导致己方将军被将军）
-                    if (board.isMoveSafe(start, end, currentPlayer)) {
+                    if (checkMoveSafety(start, end, currentPlayer)) {
                         // 如果在网络模式下，发送移动给对手
                         if (isNetworkMode) {
                             // TODO: 发送网络移动
@@ -5906,6 +5927,9 @@ public class BoardPanel extends JPanel {
         int endY = MARGIN + endRow * CELL_SIZE;
         int capX = MARGIN + endCol * CELL_SIZE;
         int capY = MARGIN + endRow * CELL_SIZE;
+        if (captured != null && overlayLayer != null) {
+            overlayLayer.showBanner("吃", OverlayLayer.Style.ALERT_BRUSH, 1200);
+        }
         currentAnimation = new PieceAnimation(piece, startX, startY, endX, endY, end.getX(), end.getY(), captured, capX, capY);
         currentAnimation.start();
     }
@@ -5996,6 +6020,8 @@ public class BoardPanel extends JPanel {
         }
 
         private void startBounce() {
+            overlayLayer.playImpactRing(endX, endY);
+            impactAnimator.blastAt(endRow, endCol, 2.5, 4, 160);
             SoundPlayer.getInstance().playSound("piece_drop");
             bounceProgress = 0.0;
             timer = new Timer(16, e -> {

@@ -34,6 +34,8 @@ public class GameFrame extends JFrame {
     private JComboBox<String> difficultyComboBox;
     private JComboBox<String> aiTypeComboBox;
     private JComboBox<String> modelComboBox;
+
+    private static final int FIXED_AI_WIDTH = 320;
     
     // 对弈模式按钮
     private JRadioButton playerVsAIRadio;
@@ -142,23 +144,31 @@ public class GameFrame extends JFrame {
         JPanel rightPanel = new JPanel(new BorderLayout());
         rightPanel.add(rightTabbedPane, BorderLayout.CENTER);
         rightPanel.setBorder(BorderFactory.createEmptyBorder(6,6,6,6));
-        rightPanel.setMinimumSize(new Dimension(260,400));
+        rightPanel.setPreferredSize(new Dimension(FIXED_AI_WIDTH, 400));
+        rightPanel.setMinimumSize(new Dimension(FIXED_AI_WIDTH, 400));
+        rightPanel.setMaximumSize(new Dimension(FIXED_AI_WIDTH, Integer.MAX_VALUE));
         
         
         // 创建主要内容面板（棋盘+右侧面板）
         final JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, boardPanel, rightPanel);
         splitPane.setContinuousLayout(true);
-        splitPane.setOneTouchExpandable(true);
-        splitPane.setDividerLocation(boardPanel.getPreferredSize().width + splitPane.getDividerSize());
+        splitPane.setResizeWeight(1.0);
+        splitPane.setOneTouchExpandable(false);
+        splitPane.setDividerSize(6);
+        splitPane.setDividerLocation(getWidth() - FIXED_AI_WIDTH);
+        splitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, evt -> {
+            int fixed = splitPane.getWidth() - FIXED_AI_WIDTH;
+            if ((int)evt.getNewValue() != fixed) {
+                splitPane.setDividerLocation(fixed);
+            }
+        });
         add(splitPane, BorderLayout.CENTER);
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
-                int divider = boardPanel.getPreferredSize().width + splitPane.getDividerSize();
-                splitPane.setDividerLocation(Math.min(divider, getWidth() - rightPanel.getMinimumSize().width));
-                revalidate();
-                repaint();
+                int w = splitPane.getWidth();
+                splitPane.setDividerLocation(Math.max(0, w - FIXED_AI_WIDTH));
             }
         });
 

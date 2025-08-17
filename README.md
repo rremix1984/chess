@@ -67,6 +67,12 @@ curl -L -o ~/.pikafish/pikafish.nnue \
 - **放宽安全校验**：在 `game-common/src/main/resources/config.properties` 中设置 `allow.unsafe.move=false` 可恢复严格规则。
 - **胜利/提示动画**：`OverlayLayer` 提供胜利横幅与烟花效果，默认启用，可在代码中按需关闭。
 
+### 前端参数
+
+- **分析窗固定宽**：`GameFrame` 中常量 `FIXED_AI_WIDTH`（默认 320px），用于锁定右侧 AI 分析区域宽度。
+- **冲击波动画**：`ImpactAnimator` 的 `blastAt` 方法可调节震动半径与幅度，默认 `radius=2.5` 格、`maxShakePx=4`。
+- **不安全走子提示**：`GameConfig` 中 `allow.unsafe.move` 默认 `true`，若开启将允许并提示可能暴露己方帅/将的走子。
+
 ## 项目结构
 
 ```
