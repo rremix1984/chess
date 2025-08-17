@@ -2321,7 +2321,7 @@ public class GameFrame extends JFrame {
             setVisible(false);
             
             // 创建网络房间界面
-            NetworkRoomFrame networkFrame = new NetworkRoomFrame();
+            UnifiedNetworkRoomFrame networkFrame = new UnifiedNetworkRoomFrame();
             networkFrame.setVisible(true);
             
             // 关闭当前游戏界面
