@@ -1,16 +1,17 @@
 package com.example.launcher;
 
 import com.example.chinesechess.network.*;
+import com.example.chinesechess.network.ConnectionState;
 import com.example.chinesechess.ui.GameFrame;
+import com.example.launcher.util.GameContext;
+import com.example.launcher.util.GameDisplay;
+import com.example.launcher.util.GameIconFactory;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.image.BufferedImage;
 import java.net.BindException;
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +42,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     private ChessGameServer localServer;
     private Thread serverThread;
     private String selectedGameType;
-    private Map<String, ImageIcon> gameIcons = new HashMap<>();
+    private Map<String, Icon> gameIcons = new HashMap<>();
     private Timer roomRefreshTimer;
 
     public GameCenterFrame() {
@@ -67,24 +68,20 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
 
         // Left game list
         JList<String> gameList = new JList<>(GAME_MAP.keySet().toArray(new String[0]));
-        gameIcons.put("中国象棋", createIcon("🏮"));
-        gameIcons.put("国际象棋", createIcon("♟️"));
-        gameIcons.put("五子棋", createIcon("⚫"));
-        gameIcons.put("围棋", createIcon("⭕"));
-        gameIcons.put("坦克大战", createIcon("🚗"));
-        gameIcons.put("大富翁", createIcon("💰"));
+        for (Map.Entry<String, String> entry : GAME_MAP.entrySet()) {
+            gameIcons.put(entry.getKey(), GameIconFactory.icon(entry.getValue(), 32));
+        }
         gameList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         gameList.setSelectedIndex(0);
         gameList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index,
                                                           boolean isSelected, boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus);
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 String key = value.toString();
                 label.setIcon(gameIcons.get(key));
-                label.setToolTipText(key);
-                label.setHorizontalAlignment(JLabel.CENTER);
-                label.setPreferredSize(new Dimension(48, 48));
+                label.setHorizontalAlignment(JLabel.LEFT);
+                label.setIconTextGap(8);
                 return label;
             }
         });
@@ -115,15 +112,6 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
 
         splitPane.setRightComponent(rightPanel);
         add(splitPane);
-    }
-
-    private ImageIcon createIcon(String emoji) {
-        BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = image.createGraphics();
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 28));
-        g2d.drawString(emoji, 0, 24);
-        g2d.dispose();
-        return new ImageIcon(image);
     }
 
     private void startRoomRefreshTimer() {
@@ -180,7 +168,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createTitledBorder("房间列表"));
 
-        String[] columnNames = {"房间ID", "房间名", "主机", "玩家数", "状态"};
+        String[] columnNames = {"房间ID", "房间名", "游戏", "人数", "主机"};
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -211,6 +199,14 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         joinRoomButton.addActionListener(e -> joinSelectedRoom());
         panel.add(joinRoomButton);
 
+        JButton singlePlayerButton = new JButton("单人游戏");
+        singlePlayerButton.addActionListener(e -> {
+            GameContext.setSinglePlayer(true);
+            startSelectedGame();
+            GameContext.setSinglePlayer(false);
+        });
+        panel.add(singlePlayerButton);
+
         return panel;
     }
 
@@ -226,14 +222,15 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     }
 
     private void connectToServer() {
-        if (networkClient.isConnected()) {
+        if (networkClient.getConnectionState() != ConnectionState.DISCONNECTED) {
             return;
         }
+        connectionStatusLabel.setText("连接中...");
         networkClient.connect("localhost", 8080, playerNameField.getText().trim());
     }
 
     private void disconnectFromServer() {
-        if (networkClient.isConnected()) {
+        if (networkClient.getConnectionState() == ConnectionState.CONNECTED) {
             networkClient.disconnect();
         }
     }
@@ -243,7 +240,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
             return;
         }
         connectionStatusLabel.setText("刷新房间列表...");
-        networkClient.requestRoomList(selectedGameType);
+        networkClient.requestRoomList();
     }
 
     private void showCreateRoomDialog() {
@@ -320,7 +317,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
 
     @Override
     public void onDisconnected(String reason) {
-        connectionStatusLabel.setText("已断开");
+        connectionStatusLabel.setText("未连接");
     }
 
     @Override
@@ -361,9 +358,9 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
                 Object[] row = {
                         room.getRoomId(),
                         room.getRoomName(),
-                        room.getHostName(),
+                        GameDisplay.name(room.getGameType()),
                         room.getCurrentPlayers() + "/" + room.getMaxPlayers(),
-                        room.getGameStatus()
+                        room.getHostName()
                 };
                 tableModel.addRow(row);
             }
@@ -427,8 +424,8 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         SwingUtilities.invokeLater(() -> {
             try {
                 Class<?> gameFrameClass = Class.forName("com.example.internationalchess.InternationalChessFrame");
-                Object frame = gameFrameClass.getDeclaredConstructor().newInstance();
-                gameFrameClass.getMethod("setVisible", boolean.class).invoke(frame, true);
+                JFrame frame = (JFrame) gameFrameClass.getDeclaredConstructor().newInstance();
+                showGameWindow(frame);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -439,8 +436,8 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         SwingUtilities.invokeLater(() -> {
             try {
                 Class<?> gameFrameClass = Class.forName("com.example.gomoku.GomokuFrame");
-                Object frame = gameFrameClass.getDeclaredConstructor().newInstance();
-                gameFrameClass.getMethod("setVisible", boolean.class).invoke(frame, true);
+                JFrame frame = (JFrame) gameFrameClass.getDeclaredConstructor().newInstance();
+                showGameWindow(frame);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -473,8 +470,8 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         SwingUtilities.invokeLater(() -> {
             try {
                 Class<?> gameFrameClass = Class.forName("com.example.monopoly.MonopolyFrame");
-                Object frame = gameFrameClass.getDeclaredConstructor().newInstance();
-                gameFrameClass.getMethod("setVisible", boolean.class).invoke(frame, true);
+                JFrame frame = (JFrame) gameFrameClass.getDeclaredConstructor().newInstance();
+                showGameWindow(frame);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -491,11 +488,34 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
             GameStateSyncRequestMessage syncReq = new GameStateSyncRequestMessage(
                     networkClient.getPlayerId(), roomId, "listener_ready");
             networkClient.sendNetworkMessage(syncReq);
+            gameFrame.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosed(java.awt.event.WindowEvent e) {
+                    networkClient.leaveRoomSafely();
+                    GameCenterFrame.this.setVisible(true);
+                    GameCenterFrame.this.toFront();
+                    refreshRoomList();
+                }
+            });
             gameFrame.setVisible(true);
-            dispose();
+            setVisible(false);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void showGameWindow(JFrame frame) {
+        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent e) {
+                GameCenterFrame.this.setVisible(true);
+                GameCenterFrame.this.toFront();
+                refreshRoomList();
+            }
+        });
+        GameCenterFrame.this.setVisible(false);
+        frame.setVisible(true);
     }
 }
 
