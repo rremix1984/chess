@@ -6,7 +6,9 @@ import com.example.internationalchess.core.GameState;
 import com.example.internationalchess.ai.InternationalChessAI;
 import com.example.internationalchess.ai.StockfishAIAdapter;
 import com.example.internationalchess.ui.StockfishLogPanel;
-import com.example.common.sound.SoundPlayer;
+import audio.SoundManager;
+import static audio.SoundManager.Event.*;
+import static audio.SoundManager.SoundProfile.*;
 
 import javax.swing.*;
 import java.awt.*;
@@ -591,8 +593,9 @@ public class InternationalBoardPanel extends JPanel {
         } else {
             // 尝试移动
             if (board.isValidMove(selectedRow, selectedCol, row, col)) {
+                String targetPiece = board.getPiece(row, col);
                 if (board.movePiece(selectedRow, selectedCol, row, col)) {
-                    SoundPlayer.getInstance().playSound("piece_drop");
+                    SoundManager.play(WOOD, targetPiece != null ? PIECE_CAPTURE : PIECE_DROP);
                     updateStatus("移动成功");
                     
                     // 检查游戏状态
@@ -603,11 +606,11 @@ public class InternationalBoardPanel extends JPanel {
                         SwingUtilities.invokeLater(this::makeAIMove);
                     }
                 } else {
-                    SoundPlayer.getInstance().playSound("invalid");
+                    SoundManager.play(WOOD, PIECE_DROP);
                     updateStatus("移动失败");
                 }
             } else {
-                SoundPlayer.getInstance().playSound("invalid");
+                SoundManager.play(WOOD, PIECE_DROP);
                 updateStatus("无效移动");
             }
             
@@ -797,7 +800,7 @@ public class InternationalBoardPanel extends JPanel {
         boolean isCapture = targetPiece != null;
         
         if (board.movePiece(fromRow, fromCol, toRow, toCol)) {
-            SoundPlayer.getInstance().playSound("piece_drop");
+            SoundManager.play(WOOD, isCapture ? PIECE_CAPTURE : PIECE_DROP);
             
             // 生成移动描述
             String moveDescription = generateMoveDescription(piece, fromRow, fromCol, toRow, toCol, isCapture, targetPiece);
@@ -926,12 +929,12 @@ public class InternationalBoardPanel extends JPanel {
             case WHITE_WIN:
             case WHITE_CHECKMATE:
                 updateStatus("🎉 白方获胜！");
-                SoundPlayer.getInstance().playSound("game_win");
+                SoundManager.play(WOOD, WIN);
                 break;
             case BLACK_WIN:
             case BLACK_CHECKMATE:
                 updateStatus("🎉 黑方获胜！");
-                SoundPlayer.getInstance().playSound("game_win");
+                SoundManager.play(WOOD, WIN);
                 break;
             case DRAW:
             case STALEMATE:

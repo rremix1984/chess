@@ -1,6 +1,9 @@
 package com.example.go;
 
 import com.example.common.utils.ExceptionHandler;
+import audio.SoundManager;
+import static audio.SoundManager.Event.*;
+import static audio.SoundManager.SoundProfile.*;
 
 import javax.swing.*;
 import java.awt.*;
@@ -190,9 +193,10 @@ public class GoBoardPanel extends JPanel {
         if (pos != null && game.isValidMove(pos.row, pos.col)) {
             if (game.makeMove(pos.row, pos.col)) {
                 lastMove = pos;
+                playMoveSound();
                 updateGameState();
                 repaint();
-                
+
                 // 如果启用AI且轮到AI，让AI走
                 if (aiEnabled && game.getCurrentPlayer() == aiPlayer && !game.isGameEnded()) {
                     SwingUtilities.invokeLater(this::makeAIMove);
@@ -314,6 +318,7 @@ public class GoBoardPanel extends JPanel {
                     if (aiMove != null) {
                         if (game.makeMove(aiMove.row, aiMove.col)) {
                             lastMove = aiMove;
+                            playMoveSound();
                             // 显示数字坐标
                             int displayRow = GoGame.BOARD_SIZE - aiMove.row;
                             int displayCol = aiMove.col + 1;
@@ -372,6 +377,21 @@ public class GoBoardPanel extends JPanel {
             }
         } else {
             lastMove = null;
+        }
+    }
+
+    /**
+     * 播放最近一步棋的音效，根据是否有提子决定落子或吃子音效。
+     */
+    private void playMoveSound() {
+        List<GoMove> history = game.getMoveHistory();
+        if (!history.isEmpty()) {
+            GoMove last = history.get(history.size() - 1);
+            if (!last.capturedStones.isEmpty()) {
+                SoundManager.play(STONE, PIECE_CAPTURE);
+            } else {
+                SoundManager.play(STONE, PIECE_DROP);
+            }
         }
     }
     
@@ -828,6 +848,7 @@ public class GoBoardPanel extends JPanel {
                     if (aiMove != null) {
                         if (game.makeMove(aiMove.row, aiMove.col)) {
                             lastMove = aiMove;
+                            playMoveSound();
                             // 使用数字坐标显示移动
                             int displayRow = GoGame.BOARD_SIZE - aiMove.row; // 19-1 (从上到下)
                             int displayCol = aiMove.col + 1; // 1-19 (从左到右)
