@@ -3,6 +3,7 @@ package com.example.chinesechess.core;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Collections;
+import com.example.common.config.GameConfig;
 
 public class Board {
     private final Piece[][] pieces = new Piece[10][9];
@@ -355,6 +356,10 @@ public class Board {
      * @return true如果移动安全，false否则
      */
     public boolean isMoveSafe(Position start, Position end, PieceColor playerColor) {
+        if (GameConfig.getInstance().isAllowUnsafeMove()) {
+            return true;
+        }
+
         // 保存原始状态
         Piece movingPiece = getPiece(start.getX(), start.getY());
         Piece capturedPiece = getPiece(end.getX(), end.getY());

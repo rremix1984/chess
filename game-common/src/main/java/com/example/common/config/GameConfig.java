@@ -16,6 +16,8 @@ import java.util.Properties;
 public class GameConfig {
     private static final GameConfig INSTANCE = new GameConfig();
     private final Properties properties = new Properties();
+    // 是否允许放宽安全校验（允许将军状态下落子等）
+    private final boolean allowUnsafeMove;
     
     // 窗口配置
     public static final String WINDOW_TITLE = "多游戏平台";
@@ -60,10 +62,19 @@ public class GameConfig {
     
     private GameConfig() {
         loadConfig();
+        this.allowUnsafeMove = Boolean.parseBoolean(
+            properties.getProperty("allow.unsafe.move", "true"));
     }
     
     public static GameConfig getInstance() {
         return INSTANCE;
+    }
+
+    /**
+     * 是否允许放宽安全校验（允许导致被将或被吃的走法）
+     */
+    public boolean isAllowUnsafeMove() {
+        return allowUnsafeMove;
     }
     
     private void loadConfig() {
