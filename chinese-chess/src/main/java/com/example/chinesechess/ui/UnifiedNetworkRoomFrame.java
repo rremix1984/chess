@@ -2,7 +2,6 @@ package com.example.chinesechess.ui;
 
 import com.example.chinesechess.network.NetworkClient;
 import com.example.chinesechess.network.RoomInfo;
-import com.example.chinesechess.network.RoomListRequestMessage;
 import com.example.chinesechess.network.GameStateSyncRequestMessage;
 import com.example.chinesechess.network.ChessGameServer;
 
@@ -281,8 +280,7 @@ public class UnifiedNetworkRoomFrame extends JFrame implements NetworkClient.Cli
         
         // 请求房间列表
         updateStatus("正在刷新房间列表...");
-        RoomListRequestMessage request = new RoomListRequestMessage(networkClient.getPlayerId());
-        networkClient.sendNetworkMessage(request);
+        networkClient.requestRoomList();
     }
     
     private void showCreateRoomDialog() {

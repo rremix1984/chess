@@ -138,14 +138,14 @@ public class ChessGameServer {
     /**
      * 创建房间
      */
-    public String createRoom(String hostPlayerId, String roomName, String password) {
+    public String createRoom(String hostPlayerId, String roomName, String password, String gameType) {
         ClientHandler host = clients.get(hostPlayerId);
         if (host == null) {
             return null;
         }
         
         String roomId = "room_" + roomIdCounter.getAndIncrement();
-        GameRoom room = new GameRoom(roomId, roomName, password, hostPlayerId, host.getPlayerName());
+        GameRoom room = new GameRoom(roomId, roomName, password, hostPlayerId, host.getPlayerName(), gameType);
         rooms.put(roomId, room);
         
         System.out.println("🏠 房间创建: " + roomId + " (" + roomName + ") by " + host.getPlayerName());
@@ -211,19 +211,22 @@ public class ChessGameServer {
     /**
      * 获取房间列表
      */
-    public List<RoomInfo> getRoomList() {
+    public List<RoomInfo> getRoomList(String gameType) {
         List<RoomInfo> roomList = new ArrayList<>();
         for (GameRoom room : rooms.values()) {
-            RoomInfo info = new RoomInfo(
-                room.getRoomId(),
-                room.getRoomName(),
-                room.getHostName(),
-                room.getPlayerCount(),
-                2, // 最大玩家数
-                false, // 没有密码
-                room.getGameState()
-            );
-            roomList.add(info);
+            if (gameType == null || gameType.isEmpty() || gameType.equals(room.getGameType())) {
+                RoomInfo info = new RoomInfo(
+                    room.getRoomId(),
+                    room.getRoomName(),
+                    room.getHostName(),
+                    room.getPlayerCount(),
+                    2, // 最大玩家数
+                    false, // 没有密码
+                    room.getGameState(),
+                    room.getGameType()
+                );
+                roomList.add(info);
+            }
         }
         return roomList;
     }
@@ -338,13 +341,15 @@ public class ChessGameServer {
         private String gameState;
         private String redPlayer;
         private String blackPlayer;
+        private final String gameType;
         
-        public GameRoom(String roomId, String roomName, String password, String hostId, String hostName) {
+        public GameRoom(String roomId, String roomName, String password, String hostId, String hostName, String gameType) {
             this.roomId = roomId;
             this.roomName = roomName;
             this.password = password != null ? password : "";
             this.hostId = hostId;
             this.hostName = hostName;
+            this.gameType = gameType;
             this.playerIds = new ArrayList<>();
             this.playerNames = new ArrayList<>();
             this.gameState = "WAITING";
@@ -398,6 +403,7 @@ public class ChessGameServer {
         public String getGameState() { return gameState; }
         public String getRedPlayer() { return redPlayer; }
         public String getBlackPlayer() { return blackPlayer; }
+        public String getGameType() { return gameType; }
         
         public void setGameState(String gameState) { this.gameState = gameState; }
         public void setRedPlayer(String redPlayer) { this.redPlayer = redPlayer; }

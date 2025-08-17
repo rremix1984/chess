@@ -135,7 +135,7 @@ public class ClientHandler implements Runnable {
      * 处理创建房间请求
      */
     private void handleCreateRoomRequest(CreateRoomRequestMessage request) {
-        String roomId = server.createRoom(playerId, request.getRoomName(), request.getPassword());
+        String roomId = server.createRoom(playerId, request.getRoomName(), request.getPassword(), request.getGameType());
         
         if (roomId != null) {
             CreateRoomResponseMessage response = new CreateRoomResponseMessage("server", roomId);
@@ -171,7 +171,7 @@ public class ClientHandler implements Runnable {
      * 处理房间列表请求
      */
     private void handleRoomListRequest(RoomListRequestMessage request) {
-        var roomList = server.getRoomList();
+        var roomList = server.getRoomList(request.getGameType());
         RoomListResponseMessage response = new RoomListResponseMessage(roomList);
         sendMessage(response);
         System.out.println("📋 发送房间列表给: " + playerName + " (共" + roomList.size() + "个房间)");

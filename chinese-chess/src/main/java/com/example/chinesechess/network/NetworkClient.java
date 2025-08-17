@@ -465,13 +465,17 @@ public class NetworkClient {
      * 创建房间
      */
     public void createRoom(String roomName, String password) {
+        createRoom(roomName, password, "chinese-chess");
+    }
+
+    public void createRoom(String roomName, String password, String gameType) {
         if (!isConnected || playerId == null) {
             notifyError("未连接到服务器");
             return;
         }
-        
+
         CreateRoomRequestMessage request = new CreateRoomRequestMessage(
-            playerId, roomName, password, 2); // 象棋游戏固定2人
+            playerId, roomName, password, 2, gameType);
         sendMessage(request);
     }
     
@@ -499,6 +503,20 @@ public class NetworkClient {
         
         LeaveRoomMessage message = new LeaveRoomMessage(playerId, null);
         sendMessage(message);
+    }
+
+    public void requestRoomList(String gameType) {
+        if (!isConnected || playerId == null) {
+            notifyError("未连接到服务器");
+            return;
+        }
+
+        RoomListRequestMessage request = new RoomListRequestMessage(playerId, gameType);
+        sendMessage(request);
+    }
+
+    public void requestRoomList() {
+        requestRoomList("chinese-chess");
     }
     
     /**
