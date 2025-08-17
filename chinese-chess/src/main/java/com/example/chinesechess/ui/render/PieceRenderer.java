@@ -285,7 +285,7 @@ public final class PieceRenderer {
     }
 
     private static BufferedImage toBuffered(Image img) {
-        if (img instanceof BufferedImage bi) return bi;
+        if (img instanceof BufferedImage) return (BufferedImage) img;
         BufferedImage out = new BufferedImage(img.getWidth(null), img.getHeight(null), BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = out.createGraphics();
         enableAA(g);
@@ -295,17 +295,28 @@ public final class PieceRenderer {
     }
 
     private static String toGlyph(PieceType t, Side s) {
-        return switch (t) {
-            case CHE -> "車";
-            case MA -> "馬";
-            case PAO -> "炮";
-            case SHUAI -> "帥";
-            case JIANG -> "將";
-            case SHI -> (s == Side.RED ? "仕" : "士");
-            case XIANG -> (s == Side.RED ? "相" : "象");
-            case BING -> "兵";
-            case ZU -> "卒";
-        };
+        switch (t) {
+            case CHE:
+                return "車";
+            case MA:
+                return "馬";
+            case PAO:
+                return "炮";
+            case SHUAI:
+                return "帥";
+            case JIANG:
+                return "將";
+            case SHI:
+                return s == Side.RED ? "仕" : "士";
+            case XIANG:
+                return s == Side.RED ? "相" : "象";
+            case BING:
+                return "兵";
+            case ZU:
+                return "卒";
+            default:
+                throw new IllegalArgumentException("Unknown piece type: " + t);
+        }
     }
 
     private static BufferedImage placeholder(PieceType type, Side side, int d) {

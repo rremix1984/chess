@@ -57,12 +57,23 @@ public final class SoundManager {
 
     // === synthesis ===
     private static byte[] synth(SoundProfile profile, Event event) {
-        int ms = switch (event) {
-            case PIECE_DROP -> 120;
-            case PIECE_CAPTURE -> 170;
-            case CHECK -> 220;
-            case WIN -> 300;
-        };
+        int ms;
+        switch (event) {
+            case PIECE_DROP:
+                ms = 120;
+                break;
+            case PIECE_CAPTURE:
+                ms = 170;
+                break;
+            case CHECK:
+                ms = 220;
+                break;
+            case WIN:
+                ms = 300;
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + event);
+        }
         float baseHz = (profile == SoundProfile.WOOD) ? 420f : 1500f;
         float hardness = (profile == SoundProfile.WOOD) ? 0.35f : 0.75f;
         float body = (profile == SoundProfile.WOOD) ? 0.55f : 0.25f;

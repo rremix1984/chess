@@ -2570,7 +2570,7 @@ public class BoardPanel extends JPanel {
 
         int centerX = MARGIN + col * CELL_SIZE + impactAnimator.getOffsetX(boardRow, boardCol);
         int centerY = MARGIN + row * CELL_SIZE + impactAnimator.getOffsetY(boardRow, boardCol);
-        int diameter = (int) (CELL_SIZE * 0.75);
+        int diameter = (int) (CELL_SIZE * 0.9);
 
         PieceRenderer.PieceType type = mapPieceType(piece);
         PieceRenderer.Side side = piece.getColor() == PieceColor.RED ? PieceRenderer.Side.RED : PieceRenderer.Side.BLACK;
@@ -5942,7 +5942,7 @@ public class BoardPanel extends JPanel {
         if (alpha < 1f) {
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
         }
-        int size = (int)(CELL_SIZE * 0.75 * scale);
+        int size = (int)(CELL_SIZE * 0.9 * scale);
         PieceRenderer.PieceType type = mapPieceType(piece);
         PieceRenderer.Side side = piece.getColor() == PieceColor.RED ? PieceRenderer.Side.RED : PieceRenderer.Side.BLACK;
         BufferedImage img = PieceRenderer.render(type, side, size, 1f);
