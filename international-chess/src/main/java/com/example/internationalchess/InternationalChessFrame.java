@@ -8,6 +8,7 @@ import com.example.internationalchess.ai.StockfishAI;
 import com.example.internationalchess.core.InternationalChessBoard;
 import com.example.internationalchess.core.PieceColor;
 import com.example.common.utils.OllamaModelManager;
+import com.example.common.game.GameContext;
 
 import javax.swing.*;
 import java.awt.*;
@@ -50,7 +51,7 @@ public class InternationalChessFrame extends JFrame {
     public InternationalChessFrame() {
         setTitle("♟️ 国际象棋 - AI对弈版");
         setSize(1000, 800);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null); // 居中显示
         setLayout(new BorderLayout());
 
@@ -451,8 +452,10 @@ public class InternationalChessFrame extends JFrame {
     }
     
     private void returnToSelection() {
-        dispose(); // 关闭当前窗口
-        System.exit(0); // 暂时直接退出，等待实现GameSelectionFrame
+        dispose();
+        if (!GameContext.isSinglePlayer()) {
+            System.exit(0);
+        }
     }
 
     /**
@@ -762,7 +765,9 @@ public class InternationalChessFrame extends JFrame {
             
             // 关闭窗口
             dispose();
-            System.exit(0);
+            if (!GameContext.isSinglePlayer()) {
+                System.exit(0);
+            }
         }
     }
     
