@@ -8,6 +8,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -79,9 +81,15 @@ public class GoFrame extends JFrame {
         
         setTitle("🏮 围棋对弈 - 专业版");
         setSize(1400, 1000);
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setLocationRelativeTo(null);
-        
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                returnToSelection();
+            }
+        });
+
         ExceptionHandler.logInfo("围棋游戏", "🚀 专业级围棋游戏启动完成");
     }
     
@@ -650,21 +658,18 @@ public class GoFrame extends JFrame {
         
         switch (aiType) {
             case "KataGo AI":
-                if (katagoAI != null) {
+                if (katagoAI == null) {
+                    katagoAI = new KataGoAI(difficulty);
+                }
+                if (katagoAI.initializeEngine()) {
                     System.out.println("✅ 使用KataGo AI引擎");
-                    // 创建专用的KataGo AI实例
-                    KataGoAI playerKataGoAI = new KataGoAI(difficulty);
-                    playerKataGoAI.initializeEngine();
-                    boardPanel.setKataGoAI(playerKataGoAI);
-                    // 使用KataGo AI作为主要AI
-                    boardPanel.setAIEnabled(true, aiPlayer, difficulty, true); // 最后一个参数表示Use KataGo
-                    return; // 提前返回，不执行下面的setAIEnabled
+                    boardPanel.setKataGoAI(katagoAI);
+                    boardPanel.setAIEnabled(true, aiPlayer, difficulty, true);
+                    return;
                 } else {
                     System.out.println("⚠️ KataGo不可用，回退到传统AI");
-                    GoAI fallbackAI = new GoAI(aiPlayer, difficulty);
-                    boardPanel.setGoAI(fallbackAI);
                 }
-                break;
+                // 如果KataGo不可用，继续使用传统AI
             case "传统AI":
                 System.out.println("⚙️ 使用传统AI");
                 GoAI traditionalAI = new GoAI(aiPlayer, difficulty);
@@ -678,7 +683,7 @@ public class GoFrame extends JFrame {
                 boardPanel.setGoAI(mixedAI);
                 break;
         }
-        
+
         boardPanel.setAIEnabled(true, aiPlayer, difficulty);
     }
     
@@ -703,7 +708,15 @@ public class GoFrame extends JFrame {
      */
     private void returnToSelection() {
         dispose();
-        // TODO: 实现返回主选择界面的逻辑
+        SwingUtilities.invokeLater(() -> {
+            try {
+                Class<?> selectionFrameClass = Class.forName("com.example.launcher.GameSelectionFrame");
+                JFrame selectionFrame = (JFrame) selectionFrameClass.getDeclaredConstructor().newInstance();
+                selectionFrame.setVisible(true);
+            } catch (Exception e) {
+                ExceptionHandler.logError("GoFrame", "返回主选择界面失败: " + e.getMessage());
+            }
+        });
     }
     
     /**
