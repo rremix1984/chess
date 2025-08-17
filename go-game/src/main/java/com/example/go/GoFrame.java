@@ -813,16 +813,23 @@ public class GoFrame extends JFrame {
                     chatPanel.setKataGoAI(katagoAI);
                 } else {
                     ExceptionHandler.logInfo("围棋游戏", "⚠️ KataGo引擎初始化失败，使用备用AI");
-                    // 初始化备用AI
+                    // 初始化备用AI并设置到棋盘
                     fallbackAI = new GoAI(1, difficulty); // 1代表WHITE
+                    boardPanel.setGoAI(fallbackAI);
+                    // 备用AI不支持聊天功能
+                    chatPanel.setKataGoAI(null);
+                    chatPanel.setEnabled(false);
                 }
             }));
-            
+
         } catch (Exception e) {
             ExceptionHandler.logError("围棋游戏", "AI初始化失败: " + e.getMessage());
-            // 使用备用AI
+            // 使用备用AI并设置到棋盘
             int difficulty = difficultyCombo.getSelectedIndex() + 1;
             fallbackAI = new GoAI(1, difficulty);
+            boardPanel.setGoAI(fallbackAI);
+            chatPanel.setKataGoAI(null);
+            chatPanel.setEnabled(false);
         }
     }
     

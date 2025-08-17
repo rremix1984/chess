@@ -4,6 +4,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
 /**
  * 坦克大战游戏主类
@@ -12,8 +14,14 @@ public class TankBattleGame {
     private JFrame mainFrame;
     private GamePanel gamePanel;
     private NetworkManager networkManager;
-    
+    private Runnable onExit;
+
     public TankBattleGame() {
+        this(null);
+    }
+
+    public TankBattleGame(Runnable onExit) {
+        this.onExit = onExit;
         initializeUI();
     }
     
@@ -68,7 +76,17 @@ public class TankBattleGame {
     
     private void initializeUI() {
         mainFrame = new JFrame("坦克大战 - Tank Battle");
-        mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        mainFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        mainFrame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                if (onExit != null) {
+                    onExit.run();
+                } else {
+                    System.exit(0);
+                }
+            }
+        });
         mainFrame.setSize(1000, 800);
         mainFrame.setResizable(false);
         mainFrame.setLocationRelativeTo(null);
@@ -94,7 +112,7 @@ public class TankBattleGame {
         newGameItem.addActionListener(e -> startSinglePlayerGame());
         hostGameItem.addActionListener(e -> showHostGameDialog());
         joinGameItem.addActionListener(e -> showJoinGameDialog());
-        exitItem.addActionListener(e -> System.exit(0));
+        exitItem.addActionListener(e -> mainFrame.dispose());
         
         gameMenu.add(newGameItem);
         gameMenu.addSeparator();
@@ -143,7 +161,7 @@ public class TankBattleGame {
         singlePlayerBtn.addActionListener(e -> startSinglePlayerGame());
         hostGameBtn.addActionListener(e -> showHostGameDialog());
         joinGameBtn.addActionListener(e -> showJoinGameDialog());
-        exitBtn.addActionListener(e -> System.exit(0));
+        exitBtn.addActionListener(e -> mainFrame.dispose());
         
         gbc.gridy = 1;
         menuPanel.add(singlePlayerBtn, gbc);
