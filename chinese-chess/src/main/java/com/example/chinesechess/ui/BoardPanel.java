@@ -16,6 +16,7 @@ import com.example.common.utils.ExceptionHandler;
 import com.example.common.utils.PerformanceMonitor;
 import com.example.common.utils.ResourceManager;
 import com.example.common.config.GameConfig;
+import com.example.chinesechess.config.ChineseChessConfig;
 import com.example.chinesechess.ui.render.PieceRenderer;
 
 import javax.swing.*;
@@ -46,8 +47,8 @@ import com.example.common.ui.overlay.OverlayLayer;
 public class BoardPanel extends JPanel {
 
     private final Board board;
-    private static final int CELL_SIZE = GameConfig.BOARD_CELL_SIZE;
-    private static final int MARGIN = GameConfig.BOARD_MARGIN;
+    private static final int CELL_SIZE = ChineseChessConfig.BOARD_CELL_SIZE;
+    private static final int MARGIN = ChineseChessConfig.BOARD_MARGIN;
     
     // 游戏状态
     private Piece selectedPiece = null;
@@ -1970,7 +1971,7 @@ public class BoardPanel extends JPanel {
                 PerformanceMonitor.startTimer("AI_calculation");
                 
                 // 添加思考延迟（可配置）
-                int thinkingDelay = GameConfig.getAIThinkingDelay();
+                int thinkingDelay = ChineseChessConfig.getAIThinkingDelay();
                 if (thinkingDelay > 0) {
                     Thread.sleep(thinkingDelay);
                 }
@@ -1992,7 +1993,7 @@ public class BoardPanel extends JPanel {
         }, ResourceManager.getExecutorService());
         
         // 设置超时处理
-        Timer timeoutTimer = new Timer(GameConfig.AI_CALCULATION_TIMEOUT_SECONDS * 1000, e -> {
+        Timer timeoutTimer = new Timer(ChineseChessConfig.AI_CALCULATION_TIMEOUT_SECONDS * 1000, e -> {
             if (isAIThinking) {
                 isAIThinking = false;
                 aiMoveTask.cancel(true); // 取消任务
@@ -5054,7 +5055,10 @@ public class BoardPanel extends JPanel {
                         // 记录移动标记
                         lastMoveStart = new Position(start.getX(), start.getY());
                         lastMoveEnd = new Position(end.getX(), end.getY());
-                        
+
+                        // 捕获目标位置上的棋子（如果有）
+                        Piece capturedPiece = board.getPiece(end.getX(), end.getY());
+
                         // 执行移动
                         board.movePiece(start, end);
 
@@ -6008,7 +6012,7 @@ public class BoardPanel extends JPanel {
         }
 
         private void startMove() {
-            int duration = Math.min(320, Math.max(220, GameConfig.MOVE_ANIMATION_DURATION));
+            int duration = Math.min(320, Math.max(220, ChineseChessConfig.MOVE_ANIMATION_DURATION));
             timer = new Timer(16, e -> {
                 moveProgress += 16.0 / duration;
                 if (moveProgress >= 1.0) {

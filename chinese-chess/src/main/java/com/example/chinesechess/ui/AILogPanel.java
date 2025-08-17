@@ -1,7 +1,7 @@
 package com.example.chinesechess.ui;
 
 import com.example.common.utils.ExceptionHandler;
-import com.example.common.config.GameConfig;
+import com.example.chinesechess.config.ChineseChessConfig;
 
 import javax.swing.*;
 import javax.swing.text.*;
@@ -30,13 +30,13 @@ public class AILogPanel extends JPanel {
     private void initializeUI() {
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createTitledBorder("🤖 AI决策日志"));
-        setPreferredSize(GameConfig.CONTROL_PANEL_SIZE);
+        setPreferredSize(ChineseChessConfig.CONTROL_PANEL_SIZE);
         
         // 创建日志显示区域
         logArea = new JTextPane();
         logArea.setEditable(false);
-        logArea.setFont(GameConfig.DEFAULT_FONT);
-        logArea.setBackground(GameConfig.CHAT_BACKGROUND_COLOR);
+        logArea.setFont(ChineseChessConfig.DEFAULT_FONT);
+        logArea.setBackground(ChineseChessConfig.CHAT_BACKGROUND_COLOR);
         
         document = logArea.getStyledDocument();
         
@@ -51,13 +51,13 @@ public class AILogPanel extends JPanel {
         
         JButton clearButton = new JButton("清空日志");
         clearButton.setPreferredSize(new Dimension(80, 25));
-        clearButton.setFont(GameConfig.DEFAULT_FONT);
+        clearButton.setFont(ChineseChessConfig.DEFAULT_FONT);
         clearButton.addActionListener(e -> clearLog());
         buttonPanel.add(clearButton);
         
         JButton exportButton = new JButton("导出日志");
         exportButton.setPreferredSize(new Dimension(80, 25));
-        exportButton.setFont(GameConfig.DEFAULT_FONT);
+        exportButton.setFont(ChineseChessConfig.DEFAULT_FONT);
         exportButton.addActionListener(e -> exportLog());
         buttonPanel.add(exportButton);
         
@@ -278,7 +278,7 @@ public class AILogPanel extends JPanel {
             addSystemLog("AI决策日志已启用");
             ExceptionHandler.logInfo("AI决策日志面板已启用", "日志面板");
         } else {
-            logArea.setBackground(GameConfig.CHAT_BACKGROUND_COLOR);
+            logArea.setBackground(ChineseChessConfig.CHAT_BACKGROUND_COLOR);
             clearLog();
             ExceptionHandler.logInfo("AI决策日志面板已禁用", "日志面板");
         }

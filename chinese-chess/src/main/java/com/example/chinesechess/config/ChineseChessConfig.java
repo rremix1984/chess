@@ -1,9 +1,9 @@
-package com.example.common.config;
+package com.example.chinesechess.config;
 
 /**
  * 游戏配置类，包含所有游戏相关的常量和配置
  */
-public class GameConfig {
+public class ChineseChessConfig {
     
     // 棋盘显示相关配置
     public static final int BOARD_CELL_SIZE = 60;  // 棋盘格子大小（像素）
