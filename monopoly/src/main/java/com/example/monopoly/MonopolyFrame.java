@@ -1,5 +1,6 @@
 package com.example.monopoly;
 
+import com.example.common.game.GameContext;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -278,8 +279,9 @@ public class MonopolyFrame extends JFrame {
     
     private void returnToGameSelection() {
         dispose();
-        // 直接退出程序，因为这是独立运行的大富翁游戏
-        System.exit(0);
+        if (!GameContext.isSinglePlayer()) {
+            System.exit(0);
+        }
     }
     
     /**
