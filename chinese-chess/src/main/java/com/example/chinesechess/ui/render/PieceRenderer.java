@@ -4,9 +4,14 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.BufferedImageOp;
+import java.awt.image.ConvolveOp;
+import java.awt.image.Kernel;
 import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Renders Chinese chess pieces with realistic wood style.
@@ -20,6 +25,7 @@ public final class PieceRenderer {
 
     private static final Map<String, BufferedImage> CACHE = new ConcurrentHashMap<>();
     private static Image WOOD_TEX;
+    private static final Logger LOG = Logger.getLogger(PieceRenderer.class.getName());
 
     static {
         // Optional wood texture loading
@@ -38,23 +44,32 @@ public final class PieceRenderer {
      */
     public static BufferedImage render(PieceType type, Side side, int diameterPx, float uiScale) {
         String key = type + "|" + side + "|" + diameterPx + "|" + uiScale + "|" + (WOOD_TEX != null);
-        return CACHE.computeIfAbsent(key, k -> drawOne(type, side, diameterPx, uiScale));
+        return CACHE.computeIfAbsent(key, k -> {
+            try {
+                return drawOne(type, side, diameterPx, uiScale);
+            } catch (Exception ex) {
+                LOG.log(Level.WARNING, "Failed to render piece " + k, ex);
+                return placeholder(diameterPx);
+            }
+        });
     }
 
     private static BufferedImage drawOne(PieceType type, Side side, int d, float uiScale) {
-        int margin = Math.max(2, Math.round(d * 0.04f));
-        BufferedImage img = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
+        int scaledD = Math.max(1, Math.round(d * uiScale));
+        int margin = Math.max(2, Math.round(scaledD * 0.04f));
+        BufferedImage img = new BufferedImage(scaledD, scaledD, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-        int cx = d / 2;
-        int cy = d / 2;
-        int rOuter = d / 2 - margin;
-        int rimW = Math.max(3, Math.round(d * 0.08f));
+        int cx = scaledD / 2;
+        int cy = scaledD / 2;
+        int rOuter = scaledD / 2 - margin;
+        int rimW = Math.max(3, Math.round(scaledD * 0.08f));
         int rInner = rOuter - rimW;
 
         // 1) drop shadow
-        paintDropShadow(g, cx, cy, rOuter, d);
+        paintDropShadow(g, cx, cy, rOuter, scaledD);
 
         // 2) rim
         paintRim(g, cx, cy, rOuter, rimW);
@@ -70,17 +85,35 @@ public final class PieceRenderer {
         paintGlyph(g, text, side, cx, cy, rInner);
 
         g.dispose();
+
+        if (uiScale != 1f) {
+            BufferedImage scaled = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2 = scaled.createGraphics();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.drawImage(img, 0, 0, d, d, null);
+            g2.dispose();
+            return scaled;
+        }
         return img;
     }
 
     private static void paintDropShadow(Graphics2D g, int cx, int cy, int r, int d) {
-        Composite old = g.getComposite();
-        float alpha = 0.28f;
         int w = Math.round(r * 1.4f);
         int h = Math.round(r * 0.35f);
-        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
-        g.setColor(new Color(0, 0, 0, 180));
-        g.fillOval(cx - w / 2, cy + r / 2, w, h);
+        int offsetY = Math.round(r * 0.5f);
+        int blur = Math.max(1, Math.round(d / 60f));
+
+        BufferedImage shadow = new BufferedImage(w + blur * 2, h + blur * 2, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D sg = shadow.createGraphics();
+        sg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        sg.setColor(new Color(0, 0, 0, 180));
+        sg.fillOval(blur, blur, w, h);
+        sg.dispose();
+
+        BufferedImage blurred = applyGaussianBlur(shadow, blur);
+        Composite old = g.getComposite();
+        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
+        g.drawImage(blurred, cx - w / 2 - blur, cy + offsetY - blur, null);
         g.setComposite(old);
     }
 
@@ -135,6 +168,15 @@ public final class PieceRenderer {
                     new Color[]{new Color(255, 255, 255, 40), new Color(0, 0, 0, 30)});
             g.setPaint(soft);
             g.fill(face);
+            // subtle wood grain lines
+            g.setColor(new Color(150, 120, 90, 40));
+            Stroke oldS = g.getStroke();
+            g.setStroke(new BasicStroke(Math.max(1f, rInner / 40f)));
+            for (int i = -rInner; i < rInner; i += Math.max(3, rInner / 8)) {
+                int y = cy + i;
+                g.drawLine(cx - rInner, y, cx + rInner, y);
+            }
+            g.setStroke(oldS);
         }
     }
 
@@ -194,5 +236,47 @@ public final class PieceRenderer {
         g2.drawImage(img, 0, 0, null);
         g2.dispose();
         return bi;
+    }
+
+    /**
+     * Applies a simple Gaussian blur to the given image.
+     */
+    private static BufferedImage applyGaussianBlur(BufferedImage img, int radius) {
+        if (radius <= 0) return img;
+        int size = radius * 2 + 1;
+        float sigma = radius / 3f;
+        float[] data = new float[size * size];
+        float sum = 0f;
+        int idx = 0;
+        for (int y = -radius; y <= radius; y++) {
+            for (int x = -radius; x <= radius; x++) {
+                float value = (float) Math.exp(-(x * x + y * y) / (2 * sigma * sigma));
+                data[idx++] = value;
+                sum += value;
+            }
+        }
+        for (int i = 0; i < data.length; i++) {
+            data[i] /= sum;
+        }
+        Kernel kernel = new Kernel(size, size, data);
+        BufferedImageOp op = new ConvolveOp(kernel, ConvolveOp.EDGE_NO_OP, null);
+        BufferedImage dst = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        op.filter(img, dst);
+        return dst;
+    }
+
+    /**
+     * Generates a simple placeholder piece when rendering fails.
+     */
+    private static BufferedImage placeholder(int d) {
+        BufferedImage img = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setColor(new Color(220, 220, 220));
+        g.fillOval(0, 0, d, d);
+        g.setColor(Color.GRAY);
+        g.drawOval(0, 0, d - 1, d - 1);
+        g.dispose();
+        return img;
     }
 }
