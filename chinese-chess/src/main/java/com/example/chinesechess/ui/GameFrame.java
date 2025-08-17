@@ -21,6 +21,8 @@ import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.util.List;
 
+import com.example.chinesechess.ChineseChessMain;
+
 /**
  * 中国象棋游戏主界面
  */
@@ -265,7 +267,10 @@ public class GameFrame extends JFrame {
         // 返回按钮
         JButton backButton = new JButton("返回大厅");
         styleButton(backButton);
-        backButton.addActionListener(e -> dispose());
+        backButton.addActionListener(e -> {
+            SwingUtilities.invokeLater(() -> ChineseChessMain.main(new String[0]));
+            dispose();
+        });
         leftPanel.add(backButton);
 
         // 玩家颜色选择
