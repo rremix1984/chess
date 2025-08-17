@@ -27,6 +27,13 @@ public final class PieceRenderer {
     private static Image WOOD_TEX;
     private static final Logger LOG = Logger.getLogger(PieceRenderer.class.getName());
 
+    // base colours for wood texture and glyphs
+    private static final Color WOOD_LIGHT = new Color(0xE6C8A0);
+    private static final Color WOOD_MID   = new Color(0xD5B58B);
+    private static final Color WOOD_DARK  = new Color(0x9C7A54);
+    private static final Color RED_TEXT   = new Color(0xD83A3A);
+    private static final Color BLACK_TEXT = new Color(0x222222);
+
     static {
         // Optional wood texture loading
         try {
@@ -56,7 +63,7 @@ public final class PieceRenderer {
 
     private static BufferedImage drawOne(PieceType type, Side side, int d, float uiScale) {
         int scaledD = Math.max(1, Math.round(d * uiScale));
-        int margin = Math.max(2, Math.round(scaledD * 0.04f));
+        int margin = Math.round(scaledD * 0.04f);
         BufferedImage img = new BufferedImage(scaledD, scaledD, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -65,7 +72,7 @@ public final class PieceRenderer {
         int cx = scaledD / 2;
         int cy = scaledD / 2;
         int rOuter = scaledD / 2 - margin;
-        int rimW = Math.max(3, Math.round(scaledD * 0.08f));
+        int rimW = Math.round(Math.max(3f, scaledD * 0.08f));
         int rInner = rOuter - rimW;
 
         // 1) drop shadow
@@ -118,22 +125,17 @@ public final class PieceRenderer {
     }
 
     private static void paintRim(Graphics2D g, int cx, int cy, int rOuter, int rimW) {
-        float[] dist = {0f, 0.5f, 1f};
-        Color[] cols = {
-                new Color(110, 85, 60),
-                new Color(150, 120, 90),
-                new Color(190, 160, 120)
-        };
+        int rInnerEdge = rOuter - rimW;
+        float innerRatio = rInnerEdge / (float) rOuter;
         RadialGradientPaint rg = new RadialGradientPaint(
                 new Point2D.Float(cx, cy),
                 rOuter,
-                dist, cols,
-                MultipleGradientPaint.CycleMethod.NO_CYCLE);
+                new float[]{0f, innerRatio, 1f},
+                new Color[]{WOOD_LIGHT, WOOD_MID, WOOD_DARK});
         Shape ring = new Arc2D.Double(cx - rOuter, cy - rOuter, rOuter * 2, rOuter * 2, 0, 360, Arc2D.CHORD);
         g.setPaint(rg);
         g.fill(ring);
 
-        int rInnerEdge = rOuter - rimW;
         Composite old = g.getComposite();
         g.setComposite(AlphaComposite.Clear);
         g.fill(new Ellipse2D.Double(cx - rInnerEdge, cy - rInnerEdge, rInnerEdge * 2, rInnerEdge * 2));
@@ -159,7 +161,7 @@ public final class PieceRenderer {
             LinearGradientPaint lg = new LinearGradientPaint(
                     cx - rInner, cy - rInner, cx + rInner, cy + rInner,
                     new float[]{0f, 0.5f, 1f},
-                    new Color[]{new Color(205, 170, 125), new Color(185, 150, 105), new Color(215, 180, 135)});
+                    new Color[]{WOOD_LIGHT, WOOD_MID, WOOD_LIGHT});
             g.setPaint(lg);
             g.fill(face);
             RadialGradientPaint soft = new RadialGradientPaint(
@@ -169,7 +171,7 @@ public final class PieceRenderer {
             g.setPaint(soft);
             g.fill(face);
             // subtle wood grain lines
-            g.setColor(new Color(150, 120, 90, 40));
+            g.setColor(new Color(WOOD_DARK.getRed(), WOOD_DARK.getGreen(), WOOD_DARK.getBlue(), 40));
             Stroke oldS = g.getStroke();
             g.setStroke(new BasicStroke(Math.max(1f, rInner / 40f)));
             for (int i = -rInner; i < rInner; i += Math.max(3, rInner / 8)) {
@@ -206,9 +208,9 @@ public final class PieceRenderer {
     }
 
     private static void paintGlyph(Graphics2D g, String text, Side side, int cx, int cy, int rInner) {
-        Color main = (side == Side.RED) ? new Color(216, 58, 58) : new Color(34, 34, 34);
+        Color main = (side == Side.RED) ? RED_TEXT : BLACK_TEXT;
 
-        int fontSize = Math.max((int) (rInner * 1.2), 24);
+        int fontSize = Math.round(rInner * 1.2f);
         Font font = g.getFont().deriveFont(Font.BOLD, fontSize);
         g.setFont(font);
         FontMetrics fm = g.getFontMetrics();
