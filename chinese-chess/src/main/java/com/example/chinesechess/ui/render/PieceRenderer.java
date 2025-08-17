@@ -194,8 +194,13 @@ public final class PieceRenderer {
                             new Color(255, 255, 255, 0)});
         Shape face = new Ellipse2D.Float(cx - rInner, cy - rInner, rInner * 2f, rInner * 2f);
         Paint old = g.getPaint();
+        Shape clipBak = g.getClip();
+
+        g.setClip(face);
         g.setPaint(gloss);
         g.fill(face);
+
+        g.setClip(clipBak);
         g.setPaint(old);
     }
 
