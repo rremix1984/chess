@@ -27,12 +27,14 @@ public final class PieceRenderer {
     private static Image WOOD_TEX;
     private static final Logger LOG = Logger.getLogger(PieceRenderer.class.getName());
 
-    // base colours for wood texture and glyphs
-    private static final Color WOOD_LIGHT = new Color(0xE6C8A0);
-    private static final Color WOOD_MID   = new Color(0xD5B58B);
-    private static final Color WOOD_DARK  = new Color(0x9C7A54);
-    private static final Color RED_TEXT   = new Color(0xD83A3A);
-    private static final Color BLACK_TEXT = new Color(0x222222);
+    // ===== 色板 =====
+    private static final Color WOOD_DEEP   = new Color(0x8F6B4B);
+    private static final Color WOOD_MID    = new Color(0xB99367);
+    private static final Color WOOD_LIGHT  = new Color(0xD7B487);
+    private static final Color FACE_L0     = new Color(0xEAD1AD);
+    private static final Color FACE_L1     = new Color(0xD9B98F);
+    private static final Color RED_GLYPH   = new Color(0xD83A3A);
+    private static final Color BLACK_GLYPH = new Color(0x222222);
 
     static {
         // Optional wood texture loading
@@ -45,6 +47,12 @@ public final class PieceRenderer {
     }
 
     private PieceRenderer() {}
+
+    // 高 DPI 抗锯齿统一开启
+    private static void enableAA(Graphics2D g) {
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    }
 
     /**
      * Returns cached image or renders a new one when missing.
@@ -63,11 +71,10 @@ public final class PieceRenderer {
 
     private static BufferedImage drawOne(PieceType type, Side side, int d, float uiScale) {
         int scaledD = Math.max(1, Math.round(d * uiScale));
-        int margin = Math.round(scaledD * 0.04f);
+        int margin = Math.max(2, Math.round(scaledD * 0.04f));
         BufferedImage img = new BufferedImage(scaledD, scaledD, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        enableAA(g);
 
         int cx = scaledD / 2;
         int cy = scaledD / 2;
@@ -96,7 +103,7 @@ public final class PieceRenderer {
         if (uiScale != 1f) {
             BufferedImage scaled = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2 = scaled.createGraphics();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            enableAA(g2);
             g2.drawImage(img, 0, 0, d, d, null);
             g2.dispose();
             return scaled;
@@ -104,93 +111,77 @@ public final class PieceRenderer {
         return img;
     }
 
-    private static void paintDropShadow(Graphics2D g, int cx, int cy, int r, int d) {
-        int w = Math.round(r * 1.4f);
-        int h = Math.round(r * 0.35f);
-        int offsetY = Math.round(r * 0.5f);
-        int blur = Math.max(1, Math.round(d / 60f));
-
-        BufferedImage shadow = new BufferedImage(w + blur * 2, h + blur * 2, BufferedImage.TYPE_INT_ARGB);
+    // 半透明椭圆 + 模糊，位置略低；让棋子“贴地”
+    private static void paintDropShadow(Graphics2D g, int cx, int cy, int rOuter, int d) {
+        int w = Math.round(rOuter * 1.4f);
+        int h = Math.round(rOuter * 0.35f);
+        int y = cy + rOuter / 2;
+        BufferedImage shadow = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
         Graphics2D sg = shadow.createGraphics();
-        sg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        enableAA(sg);
         sg.setColor(new Color(0, 0, 0, 180));
-        sg.fillOval(blur, blur, w, h);
+        sg.fillOval(cx - w / 2, y, w, h);
         sg.dispose();
-
-        BufferedImage blurred = applyGaussianBlur(shadow, blur);
-        Composite old = g.getComposite();
-        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
-        g.drawImage(blurred, cx - w / 2 - blur, cy + offsetY - blur, null);
-        g.setComposite(old);
+        float radius = Math.max(2, d / 60f);
+        g.drawImage(blur(shadow, radius), 0, 0, null);
     }
 
+    // 外深内浅的径向渐变，再挖空形成环
     private static void paintRim(Graphics2D g, int cx, int cy, int rOuter, int rimW) {
-        int rInnerEdge = rOuter - rimW;
-        float innerRatio = rInnerEdge / (float) rOuter;
-        RadialGradientPaint rg = new RadialGradientPaint(
-                new Point2D.Float(cx, cy),
-                rOuter,
-                new float[]{0f, innerRatio, 1f},
-                new Color[]{WOOD_LIGHT, WOOD_MID, WOOD_DARK});
-        Shape ring = new Arc2D.Double(cx - rOuter, cy - rOuter, rOuter * 2, rOuter * 2, 0, 360, Arc2D.CHORD);
+        float[] dist = {0f, 0.5f, 1f};
+        Color[] cols = {WOOD_DEEP, WOOD_MID, WOOD_LIGHT};
+        RadialGradientPaint rg = new RadialGradientPaint(new Point2D.Float(cx, cy), rOuter, dist, cols);
+        Shape outer = new Ellipse2D.Float(cx - rOuter, cy - rOuter, rOuter * 2f, rOuter * 2f);
+        Composite bak = g.getComposite();
         g.setPaint(rg);
-        g.fill(ring);
-
-        Composite old = g.getComposite();
+        g.fill(outer);
+        int rInnerEdge = rOuter - rimW;
         g.setComposite(AlphaComposite.Clear);
-        g.fill(new Ellipse2D.Double(cx - rInnerEdge, cy - rInnerEdge, rInnerEdge * 2, rInnerEdge * 2));
-        g.setComposite(old);
+        g.fill(new Ellipse2D.Float(cx - rInnerEdge, cy - rInnerEdge, rInnerEdge * 2f, rInnerEdge * 2f));
+        g.setComposite(bak);
     }
 
+    // 内盘：木纹贴图优先；无贴图时程序化木纹 + 暗角
     private static void paintFace(Graphics2D g, int cx, int cy, int rInner) {
-        Shape face = new Ellipse2D.Double(cx - rInner, cy - rInner, rInner * 2, rInner * 2);
+        Shape face = new Ellipse2D.Float(cx - rInner, cy - rInner, rInner * 2f, rInner * 2f);
+        Paint bak = g.getPaint();
         if (WOOD_TEX != null) {
             TexturePaint tp = new TexturePaint(toBuffered(WOOD_TEX),
-                    new Rectangle(cx - rInner, cy - rInner, Math.max(8, rInner), Math.max(8, rInner)));
+                    new Rectangle(cx - rInner, cy - rInner, Math.max(12, rInner), Math.max(12, rInner)));
             g.setPaint(tp);
             g.fill(face);
-            Paint old = g.getPaint();
-            RadialGradientPaint vignette = new RadialGradientPaint(
-                    new Point2D.Float(cx, cy), rInner,
-                    new float[]{0f, 1f},
-                    new Color[]{new Color(255, 255, 255, 0), new Color(0, 0, 0, 40)});
-            g.setPaint(vignette);
-            g.fill(face);
-            g.setPaint(old);
         } else {
             LinearGradientPaint lg = new LinearGradientPaint(
                     cx - rInner, cy - rInner, cx + rInner, cy + rInner,
                     new float[]{0f, 0.5f, 1f},
-                    new Color[]{WOOD_LIGHT, WOOD_MID, WOOD_LIGHT});
+                    new Color[]{FACE_L0, FACE_L1, FACE_L0});
             g.setPaint(lg);
             g.fill(face);
-            RadialGradientPaint soft = new RadialGradientPaint(
-                    new Point2D.Float(cx, cy), rInner,
-                    new float[]{0f, 1f},
-                    new Color[]{new Color(255, 255, 255, 40), new Color(0, 0, 0, 30)});
-            g.setPaint(soft);
-            g.fill(face);
-            // subtle wood grain lines
-            g.setColor(new Color(WOOD_DARK.getRed(), WOOD_DARK.getGreen(), WOOD_DARK.getBlue(), 40));
-            Stroke oldS = g.getStroke();
-            g.setStroke(new BasicStroke(Math.max(1f, rInner / 40f)));
-            for (int i = -rInner; i < rInner; i += Math.max(3, rInner / 8)) {
-                int y = cy + i;
-                g.drawLine(cx - rInner, y, cx + rInner, y);
-            }
-            g.setStroke(oldS);
+            drawFineWoodLines(g, cx, cy, rInner, face);
+            overlayNoise(g, cx, cy, rInner, face);
         }
+        RadialGradientPaint vignette = new RadialGradientPaint(
+                new Point2D.Float(cx, cy), rInner,
+                new float[]{0f, 1f},
+                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 40)});
+        g.setPaint(vignette);
+        g.fill(face);
+        g.setPaint(bak);
     }
 
+    // 顶部柔和高光：中心偏左上，透明度随半径衰减
     private static void paintSpecular(Graphics2D g, int cx, int cy, int rInner) {
-        int ox = (int) (rInner * 0.35);
-        int oy = (int) (rInner * 0.35);
+        int ox = Math.round(rInner * 0.35f);
+        int oy = Math.round(rInner * 0.35f);
         RadialGradientPaint gloss = new RadialGradientPaint(
-                new Point2D.Float(cx - ox, cy - oy), (float) (rInner * 0.9),
+                new Point2D.Float(cx - ox, cy - oy), rInner * 0.9f,
                 new float[]{0f, 0.6f, 1f},
-                new Color[]{new Color(255, 255, 255, 130), new Color(255, 255, 255, 30), new Color(255, 255, 255, 0)});
+                new Color[]{new Color(255, 255, 255, 115), new Color(255, 255, 255, 35), new Color(255, 255, 255, 0)});
+        Shape face = new Ellipse2D.Float(cx - rInner, cy - rInner, rInner * 2f, rInner * 2f);
+        Paint bak = g.getPaint();
         g.setPaint(gloss);
-        g.fill(new Ellipse2D.Double(cx - rInner, cy - rInner, rInner * 2, rInner * 2));
+        g.fill(face);
+        g.setPaint(bak);
     }
 
     private static String toGlyph(PieceType t, Side s) {
@@ -208,7 +199,7 @@ public final class PieceRenderer {
     }
 
     private static void paintGlyph(Graphics2D g, String text, Side side, int cx, int cy, int rInner) {
-        Color main = (side == Side.RED) ? RED_TEXT : BLACK_TEXT;
+        Color main = (side == Side.RED) ? RED_GLYPH : BLACK_GLYPH;
 
         int fontSize = Math.round(rInner * 1.2f);
         Font font = g.getFont().deriveFont(Font.BOLD, fontSize);
@@ -240,18 +231,52 @@ public final class PieceRenderer {
         return bi;
     }
 
-    /**
-     * Applies a simple Gaussian blur to the given image.
-     */
-    private static BufferedImage applyGaussianBlur(BufferedImage img, int radius) {
-        if (radius <= 0) return img;
-        int size = radius * 2 + 1;
-        float sigma = radius / 3f;
+    // === 小工具：程序化木纹线 + 噪声 + 简易模糊 ===
+    private static void drawFineWoodLines(Graphics2D g, int cx, int cy, int rInner, Shape clip) {
+        Stroke bakS = g.getStroke();
+        Shape bakClip = g.getClip();
+        g.setClip(clip);
+        g.setStroke(new BasicStroke(1f));
+        int top = cy - rInner, bottom = cy + rInner;
+        int left = cx - rInner, right = cx + rInner;
+        int step = Math.max(3, rInner / 8);
+        for (int y = top + step / 2; y < bottom; y += step) {
+            g.setColor(new Color(120, 90, 60, 18));
+            g.drawLine(left, y, right, y);
+        }
+        g.setClip(bakClip);
+        g.setStroke(bakS);
+    }
+
+    private static void overlayNoise(Graphics2D g, int cx, int cy, int rInner, Shape clip) {
+        int size = rInner * 2;
+        BufferedImage noise = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        java.util.Random rand = new java.util.Random();
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                int gray = 120 + rand.nextInt(40);
+                int alpha = 8 + rand.nextInt(11); // 8-18
+                int rgb = (alpha << 24) | (gray << 16) | (gray << 8) | gray;
+                noise.setRGB(x, y, rgb);
+            }
+        }
+        noise = blur(noise, 1f);
+        Shape bak = g.getClip();
+        g.setClip(clip);
+        g.drawImage(noise, cx - rInner, cy - rInner, null);
+        g.setClip(bak);
+    }
+
+    /** 非严格的快速模糊（高斯核） */
+    private static BufferedImage blur(BufferedImage img, float radius) {
+        int r = Math.max(1, Math.round(radius));
+        int size = r * 2 + 1;
+        float sigma = r / 3f;
         float[] data = new float[size * size];
         float sum = 0f;
         int idx = 0;
-        for (int y = -radius; y <= radius; y++) {
-            for (int x = -radius; x <= radius; x++) {
+        for (int y = -r; y <= r; y++) {
+            for (int x = -r; x <= r; x++) {
                 float value = (float) Math.exp(-(x * x + y * y) / (2 * sigma * sigma));
                 data[idx++] = value;
                 sum += value;
@@ -261,7 +286,7 @@ public final class PieceRenderer {
             data[i] /= sum;
         }
         Kernel kernel = new Kernel(size, size, data);
-        BufferedImageOp op = new ConvolveOp(kernel, ConvolveOp.EDGE_NO_OP, null);
+        BufferedImageOp op = new ConvolveOp(kernel, ConvolveOp.EDGE_ZERO_FILL, null);
         BufferedImage dst = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
         op.filter(img, dst);
         return dst;
