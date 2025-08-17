@@ -10,7 +10,9 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
 import java.net.BindException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +41,8 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     private ChessGameServer localServer;
     private Thread serverThread;
     private String selectedGameType;
+    private Map<String, ImageIcon> gameIcons = new HashMap<>();
+    private Timer roomRefreshTimer;
 
     public GameCenterFrame() {
         setTitle("游戏中心");
@@ -54,6 +58,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         initUI();
         setupEventHandlers();
         autoStartServerWithDetection();
+        startRoomRefreshTimer();
     }
 
     private void initUI() {
@@ -62,8 +67,27 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
 
         // Left game list
         JList<String> gameList = new JList<>(GAME_MAP.keySet().toArray(new String[0]));
+        gameIcons.put("中国象棋", createIcon("🏮"));
+        gameIcons.put("国际象棋", createIcon("♟️"));
+        gameIcons.put("五子棋", createIcon("⚫"));
+        gameIcons.put("围棋", createIcon("⭕"));
+        gameIcons.put("坦克大战", createIcon("🚗"));
+        gameIcons.put("大富翁", createIcon("💰"));
         gameList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         gameList.setSelectedIndex(0);
+        gameList.setCellRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                          boolean isSelected, boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus);
+                String key = value.toString();
+                label.setIcon(gameIcons.get(key));
+                label.setToolTipText(key);
+                label.setHorizontalAlignment(JLabel.CENTER);
+                label.setPreferredSize(new Dimension(48, 48));
+                return label;
+            }
+        });
         gameList.addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {
@@ -91,6 +115,24 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
 
         splitPane.setRightComponent(rightPanel);
         add(splitPane);
+    }
+
+    private ImageIcon createIcon(String emoji) {
+        BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = image.createGraphics();
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 28));
+        g2d.drawString(emoji, 0, 24);
+        g2d.dispose();
+        return new ImageIcon(image);
+    }
+
+    private void startRoomRefreshTimer() {
+        roomRefreshTimer = new Timer(5000, e -> {
+            if (networkClient.isConnected()) {
+                refreshRoomList();
+            }
+        });
+        roomRefreshTimer.start();
     }
 
     private JPanel createConnectionPanel() {
@@ -347,7 +389,6 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
     }
 
     private void startSelectedGame() {
-        dispose();
         switch (selectedGameType) {
             case "international-chess":
                 startInternationalChess();
