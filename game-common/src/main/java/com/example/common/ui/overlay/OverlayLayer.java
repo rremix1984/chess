@@ -145,14 +145,14 @@ public class OverlayLayer extends JComponent {
                 int x = (getWidth() - bounds.width) / 2 - bounds.x;
                 int y = bounds.height + 10;
 
-                AffineTransform originalTransform = g2d.getTransform();
+                AffineTransform bannerTransform = g2d.getTransform();
                 g2d.translate(x, y);
                 g2d.setStroke(new BasicStroke(8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 g2d.setColor(Color.WHITE);
                 g2d.draw(shape);
                 g2d.setColor(new Color(0xC00000));
                 g2d.fill(shape);
-                g2d.setTransform(originalTransform);
+                g2d.setTransform(bannerTransform);
             } else {
                 g2d.setFont(getFont().deriveFont(Font.BOLD, 64f));
                 FontMetrics fm = g2d.getFontMetrics();
