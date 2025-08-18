@@ -2,6 +2,7 @@ package com.example.go;
 
 import com.example.common.utils.ExceptionHandler;
 import audio.SoundManager;
+import audio.Sfx;
 import static audio.SoundManager.Event.*;
 import static audio.SoundManager.SoundProfile.*;
 
@@ -51,6 +52,7 @@ public class GoBoardPanel extends JPanel {
     private double animProgress;
     private Timer dropTimer;
     private int animPlayer;
+    private boolean playedSfx;
     
     // 回调接口
     public interface GameStateCallback {
@@ -65,6 +67,7 @@ public class GoBoardPanel extends JPanel {
     
     public GoBoardPanel() {
         this.game = new GoGame();
+        Sfx.init();
         setPreferredSize(new Dimension(
             BOARD_SIZE * CELL_SIZE + 2 * MARGIN,
             BOARD_SIZE * CELL_SIZE + 2 * MARGIN + 50
@@ -162,16 +165,7 @@ public class GoBoardPanel extends JPanel {
      * 悔棋
      */
     public void undoMove() {
-        if (game.undoMove()) {
-            // 如果启用了AI，可能需要再悔一步（悔掉AI的移动）
-            if (aiEnabled && !game.getMoveHistory().isEmpty()) {
-                List<GoMove> history = game.getMoveHistory();
-                GoMove lastMove = history.get(history.size() - 1);
-                if (lastMove.player == aiPlayer) {
-                    game.undoMove();
-                }
-            }
-            
+        if (game.undoOneTurn()) {
             updateLastMove();
             updateGameState();
             repaint();
@@ -390,16 +384,15 @@ public class GoBoardPanel extends JPanel {
     }
 
     /**
-     * 播放最近一步棋的音效，根据是否有提子决定落子或吃子音效。
+     * 播放最近一步棋的音效，包含分层落子声和提子音效。
      */
     private void playMoveSound() {
         List<GoMove> history = game.getMoveHistory();
         if (!history.isEmpty()) {
             GoMove last = history.get(history.size() - 1);
+            Sfx.playStoneOnWood(0.7f);
             if (!last.capturedStones.isEmpty()) {
                 SoundManager.play(STONE, PIECE_CAPTURE);
-            } else {
-                SoundManager.play(STONE, PIECE_DROP);
             }
         }
     }
@@ -415,6 +408,7 @@ public class GoBoardPanel extends JPanel {
         animDuration = 1000;
         animStartTime = System.currentTimeMillis();
         animProgress = 0;
+        playedSfx = false;
 
         if (dropTimer != null && dropTimer.isRunning()) {
             dropTimer.stop();
@@ -423,9 +417,12 @@ public class GoBoardPanel extends JPanel {
         dropTimer = new Timer(15, e -> {
             long elapsed = System.currentTimeMillis() - animStartTime;
             animProgress = Math.min(1.0, elapsed / (double) animDuration);
+            if (!playedSfx && animProgress >= 0.98) {
+                playMoveSound();
+                playedSfx = true;
+            }
             if (animProgress >= 1.0) {
                 dropTimer.stop();
-                playMoveSound();
                 animatingMove = null;
             }
             repaint();
