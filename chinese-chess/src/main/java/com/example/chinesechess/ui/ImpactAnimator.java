@@ -2,6 +2,9 @@ package com.example.chinesechess.ui;
 
 import javax.swing.Timer;
 import java.util.Random;
+import java.awt.Rectangle;
+import java.util.function.Consumer;
+import com.example.chinesechess.config.ChineseChessConfig;
 
 /**
  * 负责在落子冲击时让周围棋子产生抖动效果。
@@ -11,9 +14,10 @@ public class ImpactAnimator {
     private final double[][] offsetY = new double[10][9];
     private Timer timer;
     private final Random random = new Random();
-    private final Runnable repaintCallback;
+    private final Consumer<Rectangle> repaintCallback;
+    private Rectangle repaintArea;
 
-    public ImpactAnimator(Runnable repaintCallback) {
+    public ImpactAnimator(Consumer<Rectangle> repaintCallback) {
         this.repaintCallback = repaintCallback;
     }
 
@@ -37,6 +41,18 @@ public class ImpactAnimator {
                 }
             }
         }
+        int cell = ChineseChessConfig.BOARD_CELL_SIZE;
+        int margin = ChineseChessConfig.BOARD_MARGIN;
+        int rCells = (int) Math.ceil(radiusCells);
+        int minRow = Math.max(0, centerRow - rCells - 1);
+        int maxRow = Math.min(9, centerRow + rCells + 1);
+        int minCol = Math.max(0, centerCol - rCells - 1);
+        int maxCol = Math.min(8, centerCol + rCells + 1);
+        int x = margin + minCol * cell - (int) maxShakePx - 2;
+        int y = margin + minRow * cell - (int) maxShakePx - 2;
+        int w = (maxCol - minCol + 1) * cell + (int) maxShakePx * 2 + 4;
+        int h = (maxRow - minRow + 1) * cell + (int) maxShakePx * 2 + 4;
+        repaintArea = new Rectangle(x, y, w, h);
         if (timer != null) {
             timer.stop();
         }
@@ -49,7 +65,7 @@ public class ImpactAnimator {
                     offsetY[r][c] *= 0.8;
                 }
             }
-            repaintCallback.run();
+            repaintCallback.accept(repaintArea);
             if (--counter[0] <= 0) {
                 timer.stop();
             }
