@@ -103,8 +103,8 @@ public final class PieceRenderer {
         paintRim(g, cx, cy, rOuter, rimW);
         // 3) 内盘 + 木纹/回退
         paintFace(g, cx, cy, rInner);
-        // 4) 错位深色内圈
-        paintInnerRimOffset(g, cx, cy, rInner, d);
+        // 4) 居中深色内圈
+        paintInnerRim(g, cx, cy, rInner, d);
         // 5) 内盘暗角
         paintVignette(g, cx, cy, rInner);
         // 6) 顶部柔和高光
@@ -206,20 +206,16 @@ public final class PieceRenderer {
         g.setPaint(old);
     }
 
-    // 错位深色内圈：圆心向右下偏移制造厚度错觉
-    private static void paintInnerRimOffset(Graphics2D g, int cx, int cy, int rInner, int d) {
-        int offset = Math.max(2, Math.round(d * 0.04f)); // 错位量
+    // 深色内圈：圆心与棋子圆心一致，确保文字围绕中心
+    private static void paintInnerRim(Graphics2D g, int cx, int cy, int rInner, int d) {
         int ringR = Math.max(1, Math.round(d * 0.02f));  // 圆环粗细
-
-        int ox = cx + offset;
-        int oy = cy + offset;
 
         Stroke bak = g.getStroke();
         Paint old = g.getPaint();
 
         g.setStroke(new BasicStroke(ringR, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.setPaint(new Color(0x7A, 0x5A, 0x3B));
-        g.draw(new Ellipse2D.Float(ox - rInner, oy - rInner, rInner * 2f, rInner * 2f));
+        g.draw(new Ellipse2D.Float(cx - rInner, cy - rInner, rInner * 2f, rInner * 2f));
 
         g.setStroke(bak);
         g.setPaint(old);
