@@ -45,6 +45,8 @@ public class GomokuBoardPanel extends JPanel {
     private static final int MARGIN = 25; // 棋盘边距
     private static final int CELL_SIZE = 40; // 格子大小
     private static final int PIECE_SIZE = 34; // 棋子大小
+    // 根据网格尺寸计算棋盘像素尺寸（不含边距）
+    private static final int BOARD_PIXEL_SIZE = CELL_SIZE * (GomokuBoard.BOARD_SIZE - 1);
 
     // 落子动画
     private int animRow = -1;
@@ -60,9 +62,8 @@ public class GomokuBoardPanel extends JPanel {
      */
     public GomokuBoardPanel() {
         board = new GomokuBoard();
-        setPreferredSize(new Dimension(
-                MARGIN * 2 + CELL_SIZE * (GomokuBoard.BOARD_SIZE - 1),
-                MARGIN * 2 + CELL_SIZE * (GomokuBoard.BOARD_SIZE - 1)));
+        int size = MARGIN * 2 + BOARD_PIXEL_SIZE;
+        setPreferredSize(new Dimension(size, size));
         setBackground(new Color(249, 214, 91)); // 浅黄色背景，模拟木质棋盘
         Sfx.init();
         
@@ -295,26 +296,23 @@ public class GomokuBoardPanel extends JPanel {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        
+        int boardSize = BOARD_PIXEL_SIZE;
+
         // 绘制坐标标签
         drawCoordinates(g2d);
-        
+
         // 绘制棋盘网格
         g2d.setColor(Color.BLACK);
         g2d.setStroke(new BasicStroke(1.0f));
-        
+
         // 绘制横线
         for (int row = 0; row < GomokuBoard.BOARD_SIZE; row++) {
-            g2d.drawLine(
-                    MARGIN, MARGIN + row * CELL_SIZE,
-                    MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE, MARGIN + row * CELL_SIZE);
+            g2d.drawLine(MARGIN, MARGIN + row * CELL_SIZE, MARGIN + boardSize, MARGIN + row * CELL_SIZE);
         }
-        
+
         // 绘制竖线
         for (int col = 0; col < GomokuBoard.BOARD_SIZE; col++) {
-            g2d.drawLine(
-                    MARGIN + col * CELL_SIZE, MARGIN,
-                    MARGIN + col * CELL_SIZE, MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE);
+            g2d.drawLine(MARGIN + col * CELL_SIZE, MARGIN, MARGIN + col * CELL_SIZE, MARGIN + boardSize);
         }
         
         // 绘制天元和星位
@@ -367,33 +365,33 @@ public class GomokuBoardPanel extends JPanel {
         g2d.setColor(new Color(80, 80, 80));
         g2d.setFont(new Font("Arial", Font.BOLD, 12));
         FontMetrics fm = g2d.getFontMetrics();
-        
+        int ascent = fm.getAscent();
+        int descent = fm.getDescent();
+        int boardSize = BOARD_PIXEL_SIZE;
+
         // 绘制列坐标（A-O）
         for (int col = 0; col < GomokuBoard.BOARD_SIZE; col++) {
             String label = String.valueOf((char)('A' + col));
             int x = MARGIN + col * CELL_SIZE;
             int stringWidth = fm.stringWidth(label);
-            
-            // 上方坐标
-            g2d.drawString(label, x - stringWidth / 2, MARGIN - 10);
-            // 下方坐标（紧贴棋盘边缘，确保不被遮挡）
-            g2d.drawString(label, x - stringWidth / 2,
-                    MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 10);
+
+            // 上方坐标，紧贴最外侧网格线
+            g2d.drawString(label, x - stringWidth / 2, MARGIN - descent);
+            // 下方坐标，紧贴最外侧网格线
+            g2d.drawString(label, x - stringWidth / 2, MARGIN + boardSize + ascent);
         }
-        
+
         // 绘制行坐标（1-15）
         for (int row = 0; row < GomokuBoard.BOARD_SIZE; row++) {
             String label = String.valueOf(row + 1);
             int y = MARGIN + row * CELL_SIZE;
             int stringWidth = fm.stringWidth(label);
-            int stringHeight = fm.getAscent();
-            
-            // 左侧坐标
-            g2d.drawString(label, MARGIN - stringWidth - 10, y + stringHeight / 2);
-            // 右侧坐标
-            g2d.drawString(label,
-                    MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 10,
-                    y + stringHeight / 2);
+            int centerY = y + (ascent - descent) / 2;
+
+            // 左侧坐标，紧贴最外侧网格线
+            g2d.drawString(label, MARGIN - stringWidth, centerY);
+            // 右侧坐标，紧贴最外侧网格线
+            g2d.drawString(label, MARGIN + boardSize, centerY);
         }
     }
     
