@@ -46,6 +46,7 @@ public class GoBoardPanel extends JPanel {
     private GoPosition animatingMove;
     private int animStartX;
     private int animStartY;
+
     private int animCtrlX;
     private int animCtrlY;
     private int animEndX;
@@ -416,6 +417,7 @@ public class GoBoardPanel extends JPanel {
         animPlayer = player;
         animEndX = MARGIN + col * CELL_SIZE;
         animEndY = MARGIN + row * CELL_SIZE;
+
         animStartX = -CELL_SIZE * 2;
         animStartY = -CELL_SIZE * 2;
         animCtrlX = animEndX;
@@ -593,6 +595,7 @@ public class GoBoardPanel extends JPanel {
 
         // 绘制动画棋子
         if (animatingMove != null && dropTimer != null && dropTimer.isRunning()) {
+
             double p = animProgress;
             double t = easeInOutCubic(p);
             double x = quadraticBezier(animStartX, animCtrlX, animEndX, t);
