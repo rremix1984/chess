@@ -418,10 +418,10 @@ public class GoBoardPanel extends JPanel {
         animEndX = MARGIN + col * CELL_SIZE;
         animEndY = MARGIN + row * CELL_SIZE;
 
-        animStartX = -CELL_SIZE * 2;
-        animStartY = -CELL_SIZE * 2;
-        animCtrlX = animEndX;
-        animCtrlY = animStartY;
+        animStartX = animEndX;
+        animStartY = -CELL_SIZE * 3;
+        animCtrlX = animEndX - CELL_SIZE;
+        animCtrlY = animEndY - CELL_SIZE * 3;
         animDuration = 1000;
         animStartTime = System.currentTimeMillis();
         animProgress = 0;
