@@ -4,6 +4,7 @@ import com.example.gomoku.core.GameState;
 import com.example.gomoku.core.GomokuBoard;
 import com.example.gomoku.ChatPanel;
 import audio.SoundManager;
+import audio.Sfx;
 import static audio.SoundManager.Event.*;
 import static audio.SoundManager.SoundProfile.*;
 import com.example.gomoku.ai.GomokuZeroAI;
@@ -62,6 +63,7 @@ public class GomokuBoardPanel extends JPanel {
                 MARGIN * 2 + CELL_SIZE * (GomokuBoard.BOARD_SIZE - 1),
                 MARGIN * 2 + CELL_SIZE * (GomokuBoard.BOARD_SIZE - 1)));
         setBackground(new Color(249, 214, 91)); // 浅黄色背景，模拟木质棋盘
+        Sfx.init();
         
         // 添加鼠标事件监听
         addMouseListener(new MouseAdapter() {
@@ -98,8 +100,8 @@ public class GomokuBoardPanel extends JPanel {
                 // 记录移动历史（用于悔棋）
                 moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
 
-                // 播放落子音效
-                SoundManager.play(STONE, PIECE_DROP);
+                // 播放落子音效（与围棋一致）
+                Sfx.playStoneOnWood(0.7f);
 
                 // 动画与状态更新
                 startDropAnimation(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK);
@@ -174,7 +176,8 @@ public class GomokuBoardPanel extends JPanel {
             moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
 
             // 播放落子音效
-            SoundManager.play(STONE, PIECE_DROP);
+            // 播放落子音效（与围棋一致）
+            Sfx.playStoneOnWood(0.7f);
 
             // 动画与状态更新
             startDropAnimation(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK);
