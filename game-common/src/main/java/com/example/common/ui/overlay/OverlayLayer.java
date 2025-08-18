@@ -2,6 +2,7 @@ package com.example.common.ui.overlay;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.geom.AffineTransform;
 import java.awt.font.GlyphVector;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -132,7 +133,7 @@ public class OverlayLayer extends JComponent {
 
         // 绘制横幅
         if (bannerText != null && bannerAlpha > 0f) {
-            Composite old = g2d.getComposite();
+        Composite oldComposite = g2d.getComposite();
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, bannerAlpha));
             if (bannerStyle == Style.ALERT_BRUSH) {
                 Font base = getFont().deriveFont(Font.BOLD, 72f);
@@ -157,20 +158,20 @@ public class OverlayLayer extends JComponent {
                 g2d.setColor(Color.RED);
                 g2d.drawString(bannerText, x, y);
             }
-            g2d.setComposite(old);
+            g2d.setComposite(oldComposite);
         }
 
         // 绘制冲击波环
         for (Ring r : rings) {
             float alpha = 1f - r.age / 200f;
             if (alpha <= 0f) continue;
-            Composite old = g2d.getComposite();
+        Composite oldComposite = g2d.getComposite();
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
             int radius = (int)(r.age * 0.4);
             g2d.setColor(new Color(255, 0, 0));
             g2d.setStroke(new BasicStroke(3f));
             g2d.drawOval(r.x - radius, r.y - radius, radius * 2, radius * 2);
-            g2d.setComposite(old);
+            g2d.setComposite(oldComposite);
         }
         g2d.setTransform(old);
     }
