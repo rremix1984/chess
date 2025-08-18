@@ -41,7 +41,8 @@ public class GomokuBoardPanel extends JPanel {
     private java.util.List<GomokuMoveRecord> moveHistory = new java.util.ArrayList<>();
 
     // 棋盘绘制相关常量
-    private static final int MARGIN = 30; // 棋盘边距
+    // 调整边距使棋盘更紧凑，同时保证坐标完整显示
+    private static final int MARGIN = 25; // 棋盘边距
     private static final int CELL_SIZE = 40; // 格子大小
     private static final int PIECE_SIZE = 34; // 棋子大小
 
@@ -374,9 +375,10 @@ public class GomokuBoardPanel extends JPanel {
             int stringWidth = fm.stringWidth(label);
             
             // 上方坐标
-            g2d.drawString(label, x - stringWidth / 2, MARGIN - 8);
-            // 下方坐标
-            g2d.drawString(label, x - stringWidth / 2, MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 20);
+            g2d.drawString(label, x - stringWidth / 2, MARGIN - 10);
+            // 下方坐标（紧贴棋盘边缘，确保不被遮挡）
+            g2d.drawString(label, x - stringWidth / 2,
+                    MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 10);
         }
         
         // 绘制行坐标（1-15）
@@ -387,9 +389,11 @@ public class GomokuBoardPanel extends JPanel {
             int stringHeight = fm.getAscent();
             
             // 左侧坐标
-            g2d.drawString(label, MARGIN - stringWidth - 8, y + stringHeight / 2);
+            g2d.drawString(label, MARGIN - stringWidth - 10, y + stringHeight / 2);
             // 右侧坐标
-            g2d.drawString(label, MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 8, y + stringHeight / 2);
+            g2d.drawString(label,
+                    MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 10,
+                    y + stringHeight / 2);
         }
     }
     
