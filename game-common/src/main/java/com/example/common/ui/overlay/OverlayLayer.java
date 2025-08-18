@@ -4,7 +4,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.font.GlyphVector;
-import java.awt.geom.AffineTransform;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -25,7 +24,7 @@ public class OverlayLayer extends JComponent {
     private final List<Ring> rings = new ArrayList<>();
     private Timer particleTimer;
     private final Random random = new Random();
-    private double viewScale = 1.0;
+    private AffineTransform viewTx = new AffineTransform();
 
     /** 显示横幅文字 */
     public void showBanner(String text, Style style, int durationMs) {
@@ -118,13 +117,16 @@ public class OverlayLayer extends JComponent {
         }
     }
 
+    public void setViewTransform(AffineTransform tx) {
+        this.viewTx = new AffineTransform(tx);
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
-        // Save the incoming transform so we can restore it before returning.
         AffineTransform originalTransform = g2d.getTransform();
-        g2d.scale(viewScale, viewScale);
+        g2d.transform(viewTx);
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         // 绘制粒子
@@ -196,6 +198,6 @@ public class OverlayLayer extends JComponent {
     private Timer impactTimer;
 
     public void setViewScale(double viewScale) {
-        this.viewScale = viewScale;
+        this.viewTx = AffineTransform.getScaleInstance(viewScale, viewScale);
     }
 }
