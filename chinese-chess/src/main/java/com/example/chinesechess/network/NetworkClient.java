@@ -118,11 +118,6 @@ public class NetworkClient {
                 startHeartbeat();
 
                 System.out.println("✅ 服务器连接成功");
-                SwingUtilities.invokeLater(() -> {
-                    if (eventListener != null) {
-                        eventListener.onConnected();
-                    }
-                });
                 
             } catch (IOException e) {
                 String error = "连接服务器失败: " + e.getMessage();
@@ -252,6 +247,9 @@ public class NetworkClient {
         if (response.isSuccess()) {
             this.playerId = response.getPlayerId();
             System.out.println("✅ 连接认证成功，玩家ID: " + playerId);
+            if (eventListener != null) {
+                SwingUtilities.invokeLater(() -> eventListener.onConnected());
+            }
         } else {
             String error = "连接认证失败: " + response.getErrorMessage();
             System.err.println("❌ " + error);
