@@ -84,6 +84,15 @@ public final class GameIconFactory {
                     g2.drawRect(0, 0, size - 1, size - 1);
                     g2.drawString("5", size / 3, size / 2);
                     break;
+                case "flight-chess":
+                    g2.setColor(Color.CYAN.darker());
+                    int bodyW = size / 6;
+                    int center = size / 2;
+                    g2.fillRect(center - bodyW / 2, 0, bodyW, size); // fuselage
+                    g2.fillRect(0, center - bodyW / 2, size, bodyW); // wings
+                    g2.setColor(Color.CYAN);
+                    g2.fillOval(center - bodyW, center - bodyW, bodyW * 2, bodyW * 2); // cockpit
+                    break;
                 default:
                     g2.setColor(Color.GRAY);
                     g2.fillRect(0, 0, size, size);
