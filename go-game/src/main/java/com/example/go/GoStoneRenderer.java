@@ -57,7 +57,6 @@ public class GoStoneRenderer {
         Color mid = white ? new Color(0xF0F0F0) : new Color(0x333333);
         Color edge = white ? new Color(0xC8C8C8) : new Color(0x111111);
         Shape stone = new Ellipse2D.Float(cx - r, cy - r, 2f * r, 2f * r);
-
         RadialGradientPaint body = new RadialGradientPaint(
                 new Point2D.Float(hx, hy), r,
                 new float[]{0f, 0.6f, 1f},
