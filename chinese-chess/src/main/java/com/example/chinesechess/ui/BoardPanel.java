@@ -28,6 +28,7 @@ import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.geom.Point2D;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.NoninvertibleTransformException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -50,6 +51,9 @@ public class BoardPanel extends JPanel {
     private static final int CELL_SIZE = ChineseChessConfig.BOARD_CELL_SIZE;
     private static final int MARGIN = ChineseChessConfig.BOARD_MARGIN;
     private double viewScale = 1.0;
+    private double viewOffsetX = 0.0;
+    private double viewOffsetY = 0.0;
+    private AffineTransform viewTx = new AffineTransform();
     
     // 游戏状态
     private Piece selectedPiece = null;
@@ -181,7 +185,7 @@ public class BoardPanel extends JPanel {
         // 叠加层，用于显示横幅和烟花等效果
         setLayout(null);
         overlayLayer = new OverlayLayer();
-        overlayLayer.setViewScale(viewScale);
+        overlayLayer.setViewTransform(viewTx);
         overlayLayer.setOpaque(false);
         overlayLayer.setBounds(0, 0, boardSize.width, boardSize.height);
         add(overlayLayer);
@@ -205,13 +209,14 @@ public class BoardPanel extends JPanel {
 
     public void setViewScale(double viewScale) {
         this.viewScale = viewScale;
-        overlayLayer.setViewScale(viewScale);
+        viewTx = AffineTransform.getScaleInstance(viewScale, viewScale);
+        overlayLayer.setViewTransform(viewTx);
         repaint();
     }
 
     private void repaintScaled(int x, int y, int w, int h) {
-        int sx = (int) Math.floor(x * viewScale);
-        int sy = (int) Math.floor(y * viewScale);
+        int sx = (int) Math.floor(viewOffsetX + x * viewScale);
+        int sy = (int) Math.floor(viewOffsetY + y * viewScale);
         int sw = (int) Math.ceil(w * viewScale);
         int sh = (int) Math.ceil(h * viewScale);
         repaint(sx, sy, sw, sh);
@@ -548,13 +553,31 @@ public class BoardPanel extends JPanel {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
         AffineTransform old = g2d.getTransform();
-        g2d.scale(viewScale, viewScale);
+
+        int pw = getWidth();
+        int ph = getHeight();
+        int pad = Math.round(Math.min(pw, ph) * 0.04f);
+        Dimension base = calculateBoardSize();
+        double scaleX = (pw - 2 * pad) / (double) base.width;
+        double scaleY = (ph - 2 * pad) / (double) base.height;
+        viewScale = Math.min(scaleX, scaleY);
+        double boardW = base.width * viewScale;
+        double boardH = base.height * viewScale;
+        viewOffsetX = (pw - boardW) / 2.0;
+        viewOffsetY = (ph - boardH) / 2.0;
+        viewTx = new AffineTransform();
+        viewTx.translate(viewOffsetX, viewOffsetY);
+        viewTx.scale(viewScale, viewScale);
+        overlayLayer.setViewTransform(viewTx);
+        g2d.transform(viewTx);
+
         drawBoard(g2d);
         drawValidMoves(g2d);
         drawPieces(g2d);
         drawCurrentAnimation(g2d);
         drawSelection(g2d);
         drawAISuggestion(g2d); // 绘制AI建议标记
+
         g2d.setTransform(old);
     }
     
@@ -628,9 +651,9 @@ public class BoardPanel extends JPanel {
             return;
         }
         
-        // 将鼠标坐标转换为显示坐标
-        int scaledX = (int) (mouseX / viewScale);
-        int scaledY = (int) (mouseY / viewScale);
+        Point2D logicalPt = toLogical(new Point(mouseX, mouseY));
+        int scaledX = (int) Math.round(logicalPt.getX());
+        int scaledY = (int) Math.round(logicalPt.getY());
         int displayCol = (scaledX - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
         int displayRow = (scaledY - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
         
@@ -3220,9 +3243,9 @@ public class BoardPanel extends JPanel {
      * 处理残局设置模式下的右键点击
      */
     private void handleEndgameSetupRightClick(int mouseX, int mouseY) {
-        // 将鼠标坐标转换为显示坐标
-        int scaledX = (int) (mouseX / viewScale);
-        int scaledY = (int) (mouseY / viewScale);
+        Point2D logicalPt = toLogical(new Point(mouseX, mouseY));
+        int scaledX = (int) Math.round(logicalPt.getX());
+        int scaledY = (int) Math.round(logicalPt.getY());
         int displayCol = (scaledX - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
         int displayRow = (scaledY - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
         
@@ -3248,6 +3271,14 @@ public class BoardPanel extends JPanel {
             currentEndgameCol = col;
             selectedPieceIndex = 0; // 重置选择索引
             pieceSelectionMenu.show(this, mouseX, mouseY);
+        }
+    }
+
+    private Point2D toLogical(Point screenPt) {
+        try {
+            return viewTx.createInverse().transform(screenPt, null);
+        } catch (NoninvertibleTransformException e) {
+            return new Point2D.Double();
         }
     }
     
