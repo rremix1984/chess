@@ -582,9 +582,9 @@ public class GoBoardPanel extends JPanel {
         if (animatingMove != null && dropTimer != null && dropTimer.isRunning()) {
             int x = MARGIN + animatingMove.col * CELL_SIZE;
             double p = animProgress;
-            double yProgress = easeOutBounce(p);
-            int y = (int) (animStartY + (animEndY - animStartY) * yProgress);
-            double scale = 0.6 + 0.4 * (1 - Math.pow(1 - p, 3));
+            double eased = easeOut(p);
+            int y = (int) (animStartY + (animEndY - animStartY) * eased);
+            double scale = 0.6 + 0.4 * eased;
             drawStone(g2d, x, y, animPlayer, scale);
         }
     }
@@ -598,19 +598,8 @@ public class GoBoardPanel extends JPanel {
         GoStoneRenderer.draw(g2d, x, y, diameter, player == GoGame.WHITE);
     }
 
-    private double easeOutBounce(double t) {
-        if (t < (1 / 2.75)) {
-            return 7.5625 * t * t;
-        } else if (t < (2 / 2.75)) {
-            t -= (1.5 / 2.75);
-            return 7.5625 * t * t + 0.75;
-        } else if (t < (2.5 / 2.75)) {
-            t -= (2.25 / 2.75);
-            return 7.5625 * t * t + 0.9375;
-        } else {
-            t -= (2.625 / 2.75);
-            return 7.5625 * t * t + 0.984375;
-        }
+    private double easeOut(double t) {
+        return 1 - Math.pow(1 - t, 3);
     }
 
     /**
