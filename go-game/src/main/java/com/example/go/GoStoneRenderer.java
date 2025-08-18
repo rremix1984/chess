@@ -7,31 +7,24 @@ import java.awt.image.ConvolveOp;
 import java.awt.image.Kernel;
 
 /**
- * Renders a Go stone with wood texture, soft shadow, rim and specular highlight.
+ * Renders a glossy Go stone with soft shadow.
  */
 public class GoStoneRenderer {
     private GoStoneRenderer() {}
 
     public static void draw(Graphics2D g, int cx, int cy, int diameter, boolean white) {
-        int rOuter = diameter / 2;
-        int rimW = Math.max(3, Math.round(diameter * 0.10f));
-        int rInner = rOuter - rimW;
+        int r = diameter / 2;
         try {
             BufferedImage img = new BufferedImage(diameter, diameter, BufferedImage.TYPE_INT_ARGB);
             Graphics2D gg = img.createGraphics();
             enableAA(gg);
-            paintDropShadow(gg, rOuter, rOuter, rOuter, diameter);
-            paintRim(gg, rOuter, rOuter, rOuter, rimW);
-            paintFace(gg, rOuter, rOuter, rInner);
-            paintSpecular(gg, rOuter, rOuter, rInner);
-            paintGlyph(gg, white ? "白" : "黑", white, rOuter, rOuter, rInner);
+            paintShadow(gg, r, r, r, diameter);
+            paintStone(gg, r, r, r, white);
             gg.dispose();
-            g.drawImage(img, cx - rOuter, cy - rOuter, null);
+            g.drawImage(img, cx - r, cy - r, null);
         } catch (Exception e) {
             g.setColor(white ? Color.WHITE : Color.BLACK);
-            g.fillOval(cx - rOuter, cy - rOuter, diameter, diameter);
-            g.setColor(Color.BLACK);
-            g.drawOval(cx - rOuter, cy - rOuter, diameter, diameter);
+            g.fillOval(cx - r, cy - r, diameter, diameter);
         }
     }
 
@@ -41,102 +34,38 @@ public class GoStoneRenderer {
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
     }
 
-    private static void paintDropShadow(Graphics2D g, int cx, int cy, int rOuter, int d) {
-        int w = Math.round(rOuter * 1.4f);
-        int h = Math.round(rOuter * 0.35f);
-        int y = cy + rOuter / 2;
-
+    private static void paintShadow(Graphics2D g, int cx, int cy, int r, int d) {
+        int w = Math.round(r * 1.4f);
+        int h = Math.round(r * 0.35f);
+        int y = cy + r / 2;
         BufferedImage shadow = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
         Graphics2D sg = shadow.createGraphics();
         enableAA(sg);
         sg.setColor(new Color(0, 0, 0, 180));
         sg.fill(new Ellipse2D.Float(cx - w / 2f, y, w, h));
         sg.dispose();
-
         BufferedImage blurred = gaussianBlur(shadow, Math.max(2f, d / 60f));
         g.drawImage(blurred, 0, 0, null);
     }
 
-    private static void paintRim(Graphics2D g, int cx, int cy, int rOuter, int rimW) {
-        float[] dist = {0f, 0.6f, 1f};
-        Color[] cols = {new Color(0x8F6B4B), new Color(0xB99367), new Color(0xD7B487)};
-        RadialGradientPaint rg = new RadialGradientPaint(new Point2D.Float(cx, cy), rOuter, dist, cols);
-        Shape outer = new Ellipse2D.Float(cx - rOuter, cy - rOuter, 2f * rOuter, 2f * rOuter);
-        Paint old = g.getPaint();
-        Composite bak = g.getComposite();
-        g.setPaint(rg);
-        g.fill(outer);
-        int rInnerEdge = rOuter - rimW;
-        g.setComposite(AlphaComposite.Clear);
-        g.fill(new Ellipse2D.Float(cx - rInnerEdge, cy - rInnerEdge, 2f * rInnerEdge, 2f * rInnerEdge));
-        g.setComposite(bak);
-        g.setPaint(old);
-    }
-
-    private static void paintFace(Graphics2D g, int cx, int cy, int rInner) {
-        Shape face = new Ellipse2D.Float(cx - rInner, cy - rInner, 2f * rInner, 2f * rInner);
-        LinearGradientPaint lg = new LinearGradientPaint(
-                cx - rInner, cy - rInner, cx + rInner, cy + rInner,
-                new float[]{0f, 0.5f, 1f},
-                new Color[]{new Color(0xEAD1AD), new Color(0xD9B98F), new Color(0xEAD1AD)});
-        Paint old = g.getPaint();
-        g.setPaint(lg);
-        g.fill(face);
-        drawFineWoodLines(g, cx, cy, rInner, face);
-        RadialGradientPaint vignette = new RadialGradientPaint(
-                new Point2D.Float(cx, cy), rInner,
-                new float[]{0f, 1f},
-                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 45)});
-        g.setPaint(vignette);
-        g.fill(face);
-        g.setPaint(old);
-    }
-
-    private static void drawFineWoodLines(Graphics2D g, int cx, int cy, int rInner, Shape clip) {
-        Shape oldClip = g.getClip();
-        g.setClip(clip);
-        g.setColor(new Color(0, 0, 0, 15));
-        for (int i = -rInner; i <= rInner; i += 4) {
-            g.drawLine(cx - rInner, cy + i, cx + rInner, cy + i);
-        }
-        g.setClip(oldClip);
-    }
-
-    private static void paintSpecular(Graphics2D g, int cx, int cy, int rInner) {
-        int ox = Math.round(rInner * 0.35f);
-        int oy = Math.round(rInner * 0.35f);
-        RadialGradientPaint gloss = new RadialGradientPaint(
-                new Point2D.Float(cx - ox, cy - oy), rInner * 0.9f,
+    private static void paintStone(Graphics2D g, int cx, int cy, int r, boolean white) {
+        float hx = cx - r * 0.35f;
+        float hy = cy - r * 0.35f;
+        Color mid = white ? new Color(0xF0F0F0) : new Color(0x222222);
+        Color edge = white ? new Color(0xC8C8C8) : Color.BLACK;
+        RadialGradientPaint body = new RadialGradientPaint(
+                new Point2D.Float(hx, hy), r,
                 new float[]{0f, 0.6f, 1f},
-                new Color[]{new Color(255, 255, 255, 115), new Color(255, 255, 255, 35), new Color(255, 255, 255, 0)});
-        Shape face = new Ellipse2D.Float(cx - rInner, cy - rInner, 2f * rInner, 2f * rInner);
-        Shape clip = g.getClip();
-        Paint old = g.getPaint();
-        g.setClip(face);
-        g.setPaint(gloss);
-        g.fill(face);
-        g.setClip(clip);
-        g.setPaint(old);
-    }
-
-    private static void paintGlyph(Graphics2D g, String text, boolean red, int cx, int cy, int rInner) {
-        Color main = red ? new Color(0xD83A3A) : new Color(0x222222);
-        int fontSize = Math.max(22, Math.round(rInner * 1.15f));
-        g.setFont(g.getFont().deriveFont(Font.BOLD, fontSize));
-        FontMetrics fm = g.getFontMetrics();
-        int tx = cx - fm.stringWidth(text) / 2;
-        int ty = cy + (fm.getAscent() - fm.getDescent()) / 2;
-        g.setColor(new Color(0, 0, 0, 120));
-        g.drawString(text, tx + 2, ty + 2);
-        g.setColor(Color.WHITE);
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                if (dx == 0 && dy == 0) continue;
-                g.drawString(text, tx + dx, ty + dy);
-            }
-        }
-        g.setColor(main);
-        g.drawString(text, tx, ty);
+                new Color[]{Color.WHITE, mid, edge});
+        Shape stone = new Ellipse2D.Float(cx - r, cy - r, 2f * r, 2f * r);
+        g.setPaint(body);
+        g.fill(stone);
+        RadialGradientPaint spec = new RadialGradientPaint(
+                new Point2D.Float(hx, hy), r * 0.6f,
+                new float[]{0f, 1f},
+                new Color[]{new Color(255, 255, 255, 180), new Color(255, 255, 255, 0)});
+        g.setPaint(spec);
+        g.fill(stone);
     }
 
     private static BufferedImage gaussianBlur(BufferedImage img, float radius) {
