@@ -44,7 +44,7 @@ public class GoBoardPanel extends JPanel {
 
     private GoPoint screenToPoint(int x, int y) {
         int size = game.getSize();
-        int margin = 20;
+        int margin = 10;
         int cell = (Math.min(getWidth(), getHeight()) - 2 * margin) / (size - 1);
         int bx = Math.round((x - margin) / (float) cell) + 1;
         int by = Math.round((y - margin) / (float) cell) + 1;
@@ -62,7 +62,7 @@ public class GoBoardPanel extends JPanel {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         int size = game.getSize();
-        int margin = 20;
+        int margin = 10;
         int cell = (Math.min(getWidth(), getHeight()) - 2 * margin) / (size - 1);
         int boardSize = cell * (size - 1);
         int originX = margin;
@@ -76,17 +76,31 @@ public class GoBoardPanel extends JPanel {
             g.drawLine(x, originY, x, originY + boardSize);
         }
 
-        // draw stones
+        // draw stones with simple 3D shading and shadow
         for (int x = 1; x <= size; x++) {
             for (int y = 1; y <= size; y++) {
                 GoColor c = game.get(x, y);
                 if (c != null) {
                     int sx = originX + (x - 1) * cell;
                     int sy = originY + (y - 1) * cell;
-                    g.setColor(c == GoColor.BLACK ? Color.BLACK : Color.WHITE);
-                    g.fillOval(sx - cell / 2, sy - cell / 2, cell, cell);
+                    int ox = sx - cell / 2;
+                    int oy = sy - cell / 2;
+
+                    // shadow
+                    g.setColor(new Color(0, 0, 0, 60));
+                    g.fillOval(ox + 2, oy + 2, cell, cell);
+
+                    // gradient for stone body
+                    RadialGradientPaint rg = (c == GoColor.BLACK)
+                            ? new RadialGradientPaint(new java.awt.geom.Point2D.Float(ox + cell / 3f, oy + cell / 3f), cell / 2f,
+                            new float[]{0f, 1f}, new Color[]{new Color(80, 80, 80), Color.BLACK})
+                            : new RadialGradientPaint(new java.awt.geom.Point2D.Float(ox + cell / 3f, oy + cell / 3f), cell / 2f,
+                            new float[]{0f, 1f}, new Color[]{Color.WHITE, new Color(200, 200, 200)});
+                    g.setPaint(rg);
+                    g.fillOval(ox, oy, cell, cell);
+
                     g.setColor(Color.BLACK);
-                    g.drawOval(sx - cell / 2, sy - cell / 2, cell, cell);
+                    g.drawOval(ox, oy, cell, cell);
                 }
             }
         }

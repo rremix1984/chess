@@ -121,12 +121,13 @@ public final class PieceRenderer {
     private static void paintDropShadow(Graphics2D g, int cx, int cy, int rOuter, int d) {
         int w = Math.round(rOuter * 1.4f);
         int h = Math.round(rOuter * 0.35f);
-        int y = cy + rOuter / 2;
+        int x = Math.round(cx - w / 2f + w * 0.1f);
+        int y = Math.round(cy + rOuter / 2f + h * 0.1f);
 
         BufferedImage shadow = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
         Graphics2D sg = shadow.createGraphics(); enableAA(sg);
         sg.setColor(new Color(0, 0, 0, 180));
-        sg.fill(new Ellipse2D.Float(cx - w / 2f, y, w, h));
+        sg.fill(new Ellipse2D.Float(x, y, w, h));
         sg.dispose();
 
         BufferedImage blurred = gaussianBlur(shadow, Math.max(2f, d / 60f));
