@@ -5932,7 +5932,7 @@ public class BoardPanel extends JPanel {
         int endCol = getDisplayCol(end.getY());
         int centerX = MARGIN + endCol * CELL_SIZE;
         int centerY = MARGIN + endRow * CELL_SIZE;
-        dropAnimation = new PieceDropAnimation(piece, centerX, centerY, 600);
+        dropAnimation = new PieceDropAnimation(piece, centerX, centerY, 400);
         dropAnimation.start();
     }
 
@@ -5992,7 +5992,7 @@ public class BoardPanel extends JPanel {
 
         void start() {
             startTime = System.currentTimeMillis();
-            timer = new Timer(16, e -> {
+            timer = new Timer(12, e -> {
                 long elapsed = System.currentTimeMillis() - startTime;
                 progress = Math.min(1f, elapsed / (float) duration);
                 if (progress >= 1f) {
@@ -6010,16 +6010,6 @@ public class BoardPanel extends JPanel {
             // 圆心保持不变，仅通过缩放模拟透视效果
             float sizeFactor = 1f + (1f - eased) * 0.5f; // 从 1.5 缩小至 1.0
             int size = (int) (CELL_SIZE * 0.9 * sizeFactor);
-
-            // 阴影始终偏移到棋子右下方，并随棋子尺寸缩放
-            int offsetX = 5;
-            int offsetY = 5;
-            Composite old = g2d.getComposite();
-            g2d.setColor(new Color(0, 0, 0, 100));
-            g2d.fillOval(centerX + offsetX - size / 2,
-                         centerY + offsetY - size / 2,
-                         size, size);
-            g2d.setComposite(old);
 
             drawPieceAt(g2d, piece, centerX, centerY, sizeFactor, 1f);
         }
@@ -6083,9 +6073,9 @@ public class BoardPanel extends JPanel {
         }
 
         private void startMove() {
-            int duration = Math.min(320, Math.max(220, ChineseChessConfig.MOVE_ANIMATION_DURATION));
-            timer = new Timer(16, e -> {
-                moveProgress += 16.0 / duration;
+            int duration = Math.min(240, Math.max(160, ChineseChessConfig.MOVE_ANIMATION_DURATION));
+            timer = new Timer(12, e -> {
+                moveProgress += 12.0 / duration;
                 if (moveProgress >= 1.0) {
                     moveProgress = 1.0;
                     timer.stop();
@@ -6101,8 +6091,8 @@ public class BoardPanel extends JPanel {
             impactAnimator.blastAt(endRow, endCol, 2.5, 4, 160);
             SoundManager.play(WOOD, capturedPiece != null ? PIECE_CAPTURE : PIECE_DROP);
             bounceProgress = 0.0;
-            timer = new Timer(16, e -> {
-                bounceProgress += 16.0 / 60.0;
+            timer = new Timer(12, e -> {
+                bounceProgress += 12.0 / 60.0;
                 scale = 1.06 - 0.06 * easeOutCubic(Math.min(1.0, bounceProgress));
                 if (bounceProgress >= 1.0) {
                     timer.stop();
@@ -6124,17 +6114,8 @@ public class BoardPanel extends JPanel {
                 drawPieceAt(g2d, capturedPiece, capturedX, capturedY, 1.0, capturedAlpha);
             }
             double t = moveProgress;
-            double hNorm = 4 * t * (1 - t);
-            int groundX = (int)(startX + (endX - startX) * t);
-            int groundY = (int)(startY + (endY - startY) * t);
             int x = (int)((1 - t) * (1 - t) * startX + 2 * (1 - t) * t * ctrlX + t * t * endX);
             int y = (int)((1 - t) * (1 - t) * startY + 2 * (1 - t) * t * ctrlY + t * t * endY);
-            int shadowW = (int)(CELL_SIZE * 0.7 * (1 - 0.3 * hNorm));
-            int shadowH = shadowW / 2;
-            Composite old = g2d.getComposite();
-            g2d.setColor(new Color(0, 0, 0, (int)(80 * (1 - hNorm))));
-            g2d.fillOval(groundX - shadowW/2, groundY - shadowH/2 + CELL_SIZE/4, shadowW, shadowH);
-            g2d.setComposite(old);
             drawPieceAt(g2d, piece, x, y, scale, 1f);
         }
     }

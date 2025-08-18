@@ -21,8 +21,6 @@ import java.awt.TexturePaint;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
-import java.awt.image.ConvolveOp;
-import java.awt.image.Kernel;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -103,8 +101,8 @@ public final class PieceRenderer {
         paintRim(g, cx, cy, rOuter, rimW);
         // 3) 内盘 + 木纹/回退
         paintFace(g, cx, cy, rInner);
-        // 4) 错位深色内圈
-        paintInnerRimOffset(g, cx, cy, rInner, d);
+        // 4) 居中深色内圈
+        paintInnerRim(g, cx, cy, rInner, d);
         // 5) 内盘暗角
         paintVignette(g, cx, cy, rInner);
         // 6) 顶部柔和高光
@@ -119,32 +117,10 @@ public final class PieceRenderer {
     // ====== 各绘制步骤 ======
 
     private static void paintDropShadow(Graphics2D g, int cx, int cy, int rOuter, int d) {
-        int w = Math.round(rOuter * 1.4f);
-        int h = Math.round(rOuter * 0.35f);
-        float offset = d * 0.05f;
-        int x = Math.round(cx - w / 2f + offset);
-        int y = Math.round(cy - h / 2f + rOuter * 0.6f + offset);
-
-        BufferedImage shadow = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D sg = shadow.createGraphics(); enableAA(sg);
-        int alpha = Math.min(200, 80 + d / 2);
-        RadialGradientPaint rg = new RadialGradientPaint(
-                new Point2D.Float(w / 2f, h / 2f), Math.max(w, h) / 2f,
-                new float[]{0f, 1f}, new Color[]{new Color(0, 0, 0, alpha), new Color(0, 0, 0, 0)});
-        sg.setPaint(rg);
-        sg.fill(new Ellipse2D.Float(0, 0, w, h));
-        sg.dispose();
-
-        BufferedImage blurred = gaussianBlur(shadow, Math.max(2f, d / 60f));
-        g.drawImage(blurred, x, y, null);
-
-        // 额外的月牙形阴影以增强立体感
-        g.setColor(new Color(0, 0, 0, 60));
-        int crescentW = Math.round(rOuter * 1.2f);
-        int crescentH = Math.round(rOuter * 0.6f);
-        int crescentX = cx - crescentW / 2;
-        int crescentY = cy + rOuter - crescentH / 2;
-        g.fillArc(crescentX, crescentY, crescentW, crescentH, 0, 180);
+        int shadowOffsetX = 5;
+        int shadowOffsetY = 5;
+        g.setColor(new Color(169, 169, 169, 100));
+        g.fillOval(cx - rOuter + shadowOffsetX, cy - rOuter + shadowOffsetY, rOuter * 2, rOuter * 2);
     }
 
     private static void paintRim(Graphics2D g, int cx, int cy, int rOuter, int rimW) {
@@ -206,20 +182,16 @@ public final class PieceRenderer {
         g.setPaint(old);
     }
 
-    // 错位深色内圈：圆心向右下偏移制造厚度错觉
-    private static void paintInnerRimOffset(Graphics2D g, int cx, int cy, int rInner, int d) {
-        int offset = Math.max(2, Math.round(d * 0.04f)); // 错位量
+    // 深色内圈：圆心与棋子圆心一致，确保文字围绕中心
+    private static void paintInnerRim(Graphics2D g, int cx, int cy, int rInner, int d) {
         int ringR = Math.max(1, Math.round(d * 0.02f));  // 圆环粗细
-
-        int ox = cx + offset;
-        int oy = cy + offset;
 
         Stroke bak = g.getStroke();
         Paint old = g.getPaint();
 
         g.setStroke(new BasicStroke(ringR, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.setPaint(new Color(0x7A, 0x5A, 0x3B));
-        g.draw(new Ellipse2D.Float(ox - rInner, oy - rInner, rInner * 2f, rInner * 2f));
+        g.draw(new Ellipse2D.Float(cx - rInner, cy - rInner, rInner * 2f, rInner * 2f));
 
         g.setStroke(bak);
         g.setPaint(old);
@@ -291,38 +263,6 @@ public final class PieceRenderer {
         }
         g.setClip(oldClip);
         g.setStroke(bak);
-    }
-
-    /** 高斯模糊：分离卷积实现（横向 + 纵向） */
-    private static BufferedImage gaussianBlur(BufferedImage src, float radius) {
-        if (radius < 1f) return src;
-
-        int size = (int) Math.ceil(radius * 3) * 2 + 1; // 6σ+1
-        float[] kernelData = new float[size];
-        float sigma = radius;
-        float sum = 0f;
-        int mid = size / 2;
-
-        for (int i = 0; i < size; i++) {
-            float x = i - mid;
-            kernelData[i] = (float) Math.exp(-(x * x) / (2 * sigma * sigma));
-            sum += kernelData[i];
-        }
-        for (int i = 0; i < size; i++) kernelData[i] /= sum;
-
-        Kernel kernelH = new Kernel(size, 1, kernelData);
-        ConvolveOp opH = new ConvolveOp(kernelH, ConvolveOp.EDGE_NO_OP, null);
-
-        BufferedImage tmp = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        opH.filter(src, tmp);
-
-        Kernel kernelV = new Kernel(1, size, kernelData);
-        ConvolveOp opV = new ConvolveOp(kernelV, ConvolveOp.EDGE_NO_OP, null);
-
-        BufferedImage dst = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        opV.filter(tmp, dst);
-
-        return dst;
     }
 
     private static BufferedImage toBuffered(Image img) {
