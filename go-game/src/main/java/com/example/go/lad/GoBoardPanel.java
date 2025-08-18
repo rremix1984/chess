@@ -123,7 +123,24 @@ public class GoBoardPanel extends JPanel {
                     }
                     int sx = originX + (x - 1) * cell;
                     int sy = originY + (y - 1) * cell;
-                    drawStone(g2, sx, sy, c, cell);
+                    int ox = sx - cell / 2;
+                    int oy = sy - cell / 2;
+
+                    // shadow
+                    g2.setColor(new Color(0, 0, 0, 60));
+                    g2.fillOval(ox + 2, oy + 2, cell, cell);
+
+                    // gradient for stone body
+                    RadialGradientPaint rg = (c == GoColor.BLACK)
+                            ? new RadialGradientPaint(new java.awt.geom.Point2D.Float(ox + cell / 3f, oy + cell / 3f), cell / 2f,
+                            new float[]{0f, 1f}, new Color[]{new Color(80, 80, 80), Color.BLACK})
+                            : new RadialGradientPaint(new java.awt.geom.Point2D.Float(ox + cell / 3f, oy + cell / 3f), cell / 2f,
+                            new float[]{0f, 1f}, new Color[]{Color.WHITE, new Color(200, 200, 200)});
+                    g2.setPaint(rg);
+                    g2.fillOval(ox, oy, cell, cell);
+
+                    g2.setColor(Color.BLACK);
+                    g2.drawOval(ox, oy, cell, cell);
                 }
             }
         }
