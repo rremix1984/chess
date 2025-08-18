@@ -6011,13 +6011,14 @@ public class BoardPanel extends JPanel {
             float sizeFactor = 1f + (1f - eased) * 0.5f; // 从 1.5 缩小至 1.0
             int size = (int) (CELL_SIZE * 0.9 * sizeFactor);
 
-            // 阴影始终偏移到棋子右下方，并随棋子尺寸缩放
-            int offsetX = 5;
-            int offsetY = 5;
+            // 阴影始终偏移到棋子右下方，并随棋子尺寸缩放与位移变化
+            int maxOffset = (int) (CELL_SIZE * 0.3); // 远处时较大的偏移
+            int minOffset = 5;                       // 落地后的最小偏移
+            int offset = (int) (minOffset + (1f - eased) * (maxOffset - minOffset));
             Composite old = g2d.getComposite();
             g2d.setColor(new Color(0, 0, 0, 100));
-            g2d.fillOval(centerX + offsetX - size / 2,
-                         centerY + offsetY - size / 2,
+            g2d.fillOval(centerX + offset - size / 2,
+                         centerY + offset - size / 2,
                          size, size);
             g2d.setComposite(old);
 
