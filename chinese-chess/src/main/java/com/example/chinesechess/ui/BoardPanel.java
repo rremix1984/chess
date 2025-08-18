@@ -5930,11 +5930,9 @@ public class BoardPanel extends JPanel {
     public void startDropAnimation(Piece piece, Position end) {
         int endRow = getDisplayRow(end.getX());
         int endCol = getDisplayCol(end.getY());
-        int endX = MARGIN + endCol * CELL_SIZE;
-        int endY = MARGIN + endRow * CELL_SIZE;
-        int startX = endX;
-        int startY = getHeight() + CELL_SIZE;
-        dropAnimation = new PieceDropAnimation(piece, startX, startY, endX, endY, 600);
+        int centerX = MARGIN + endCol * CELL_SIZE;
+        int centerY = MARGIN + endRow * CELL_SIZE;
+        dropAnimation = new PieceDropAnimation(piece, centerX, centerY, 600);
         dropAnimation.start();
     }
 
@@ -5979,18 +5977,16 @@ public class BoardPanel extends JPanel {
     /** 棋子飞入动画类 */
     private class PieceDropAnimation {
         private final Piece piece;
-        private final int startX, startY, endX, endY;
+        private final int centerX, centerY;
         private final int duration;
         private Timer timer;
         private long startTime;
         private float progress;
 
-        PieceDropAnimation(Piece piece, int startX, int startY, int endX, int endY, int duration) {
+        PieceDropAnimation(Piece piece, int centerX, int centerY, int duration) {
             this.piece = piece;
-            this.startX = startX;
-            this.startY = startY;
-            this.endX = endX;
-            this.endY = endY;
+            this.centerX = centerX;
+            this.centerY = centerY;
             this.duration = duration;
         }
 
@@ -6010,16 +6006,26 @@ public class BoardPanel extends JPanel {
 
         void draw(Graphics2D g2d) {
             float eased = (float) easeOutCubic(progress);
-            int currentX = (int) (startX + (endX - startX) * eased);
-            int currentY = (int) (startY + (endY - startY) * eased);
-            float sizeFactor = 1f + (1f - eased) * 0.5f;
+
+            // 圆心不变，只改变棋子尺寸
+            float sizeFactor = 1.5f - 0.5f * eased;
             int size = (int) (CELL_SIZE * 0.9 * sizeFactor);
-            int offsetX = 5, offsetY = 5;
+
+            // 阴影位置与大小随时间偏移
+            float shadowProgress = eased;
+            int shadowOffsetX = (int) (8 * shadowProgress);
+            int shadowOffsetY = (int) (8 * shadowProgress);
+            int shadowWidth = (int) (size * (0.9 + 0.1 * shadowProgress));
+            int shadowHeight = (int) (shadowWidth * 0.6);
+
             Composite old = g2d.getComposite();
             g2d.setColor(new Color(0, 0, 0, 100));
-            g2d.fillOval(currentX + offsetX - size / 2, currentY + offsetY - size / 2, size, size);
+            g2d.fillOval(centerX + shadowOffsetX - shadowWidth / 2,
+                         centerY + shadowOffsetY - shadowHeight / 2,
+                         shadowWidth, shadowHeight);
             g2d.setComposite(old);
-            drawPieceAt(g2d, piece, currentX, currentY, sizeFactor, 1f);
+
+            drawPieceAt(g2d, piece, centerX, centerY, sizeFactor, 1f);
         }
 
         private void finish() {
