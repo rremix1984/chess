@@ -10,19 +10,29 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.*;
 import java.util.List;
 
 /**
  * 围棋棋盘UI面板
  */
 public class GoBoardPanel extends JPanel {
-    private static final int BOARD_SIZE = 19;
-    private static final int CELL_SIZE = 30;
-    // 调整棋盘边距，确保坐标完整且界面紧凑
-    private static final int MARGIN = 25;
-    private static final int STONE_RADIUS = 12;
-    // 根据网格尺寸计算棋盘像素尺寸（不含边距）
-    private static final int BOARD_PIXEL_SIZE = (BOARD_SIZE - 1) * CELL_SIZE;
+    /**
+     * 半径、星位等均使用逻辑单位（格距=1）。
+     * 绘制时通过 viewTx 将其转换为屏幕坐标。
+     */
+    private static final double R_STONE = 0.45;   // 棋子半径
+    private static final double R_MARK = 0.12;    // 标记半径
+    private static final double R_STAR = 0.07;    // 星位半径
+    private static final float GRID_STROKE_WIDTH = 0.04f;
+
+    /** 当前棋盘大小（路数），默认从 GoGame 读取 */
+    private int boardSize = GoGame.BOARD_SIZE;
+
+    // 视图变换：逻辑坐标 -> 屏幕坐标
+    private AffineTransform viewTx = new AffineTransform();
+    private double cell = 30; // 当前单元格像素大小
+    private double pad = 25;  // 实际像素边距
     
     private GoGame game;
     private GoAI ai;
@@ -71,9 +81,8 @@ public class GoBoardPanel extends JPanel {
     public GoBoardPanel() {
         this.game = new GoGame();
         Sfx.init();
-        // 根据棋盘尺寸和边距设置面板大小，避免周围空白
-        int size = MARGIN * 2 + BOARD_PIXEL_SIZE;
-        setPreferredSize(new Dimension(size, size));
+        // 默认大小，仅作为初始值，实际绘制时会自动缩放填充父容器
+        setPreferredSize(new Dimension(600, 600));
         setBackground(new Color(220, 179, 92)); // 棋盘颜色
         
         addMouseListener(new MouseAdapter() {
@@ -359,11 +368,17 @@ public class GoBoardPanel extends JPanel {
      * 从屏幕坐标获取棋盘位置
      */
     private GoPosition getPositionFromCoordinates(int x, int y) {
-        int col = (x - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
-        int row = (y - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
-        
-        if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
-            return new GoPosition(row, col);
+        try {
+            Point2D boardPt = viewTx.createInverse().transform(new Point2D.Double(x, y), null);
+            int col = (int) Math.round(boardPt.getX());
+            int row = (int) Math.round(boardPt.getY());
+            if (row >= 0 && row < boardSize && col >= 0 && col < boardSize) {
+                if (Math.abs(boardPt.getX() - col) <= R_STONE && Math.abs(boardPt.getY() - row) <= R_STONE) {
+                    return new GoPosition(row, col);
+                }
+            }
+        } catch (Exception ex) {
+            // ignore
         }
         return null;
     }
@@ -407,8 +422,8 @@ public class GoBoardPanel extends JPanel {
     private void startDropAnimation(int row, int col, int player) {
         animatingMove = new GoPosition(row, col);
         animPlayer = player;
-        animEndX = MARGIN + col * CELL_SIZE;
-        animEndY = MARGIN + row * CELL_SIZE;
+        animEndX = col;
+        animEndY = row;
         animDuration = 1000;
         animStartTime = System.currentTimeMillis();
         animProgress = 0;
@@ -493,109 +508,114 @@ public class GoBoardPanel extends JPanel {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        Graphics2D g2d = (Graphics2D) g.create();
-        
-        // 启用抗锯齿
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        
-        drawBoard(g2d);
-        drawStones(g2d);
-        drawCoordinates(g2d);
-        
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        int pw = getWidth();
+        int ph = getHeight();
+        int size = boardSize;
+        pad = Math.min(pw, ph) * 0.04;
+        cell = Math.floor(Math.min((pw - 2 * pad) / (size - 1.0), (ph - 2 * pad) / (size - 1.0)));
+        double ox = (pw - cell * (size - 1)) / 2.0;
+        double oy = (ph - cell * (size - 1)) / 2.0;
+        viewTx = AffineTransform.getTranslateInstance(ox, oy);
+        viewTx.scale(cell, cell);
+
+        // 棋盘及网格在逻辑坐标系中绘制
+        Graphics2D boardG = (Graphics2D) g2.create();
+        boardG.transform(viewTx);
+        drawBoard(boardG);
+        boardG.dispose();
+
+        // 棋子及标记在屏幕坐标系中绘制（需要转换坐标）
+        drawStones(g2);
+        if (showCoordinates) {
+            drawCoordinates(g2);
+        }
         if (lastMove != null) {
-            drawLastMoveMarker(g2d);
+            drawLastMoveMarker(g2);
         }
-        
         if (suggestedMove != null) {
-            drawSuggestedMoveMarker(g2d);
+            drawSuggestedMoveMarker(g2);
         }
-        
-        g2d.dispose();
+
+        g2.dispose();
     }
     
     /**
      * 绘制棋盘
      */
-    private void drawBoard(Graphics2D g2d) {
-        // 绘制棋盘背景
-        g2d.setColor(new Color(220, 179, 92));
-        g2d.fillRect(MARGIN, MARGIN, BOARD_PIXEL_SIZE, BOARD_PIXEL_SIZE);
+    private void drawBoard(Graphics2D g2) {
+        // 棋盘背景
+        g2.setColor(new Color(220, 179, 92));
+        g2.fill(new Rectangle2D.Double(0, 0, boardSize - 1, boardSize - 1));
 
-        // 绘制棋盘线条
-        g2d.setColor(Color.BLACK);
-        g2d.setStroke(new BasicStroke(1.0f));
-
-        // 绘制横线
-        for (int i = 0; i < BOARD_SIZE; i++) {
-            int y = MARGIN + i * CELL_SIZE;
-            g2d.drawLine(MARGIN, y, MARGIN + BOARD_PIXEL_SIZE, y);
+        // 网格线
+        g2.setColor(Color.BLACK);
+        g2.setStroke(new BasicStroke(GRID_STROKE_WIDTH, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        for (int i = 0; i < boardSize; i++) {
+            g2.draw(new Line2D.Double(0, i, boardSize - 1, i));
+            g2.draw(new Line2D.Double(i, 0, i, boardSize - 1));
         }
 
-        // 绘制竖线
-        for (int i = 0; i < BOARD_SIZE; i++) {
-            int x = MARGIN + i * CELL_SIZE;
-            g2d.drawLine(x, MARGIN, x, MARGIN + BOARD_PIXEL_SIZE);
-        }
-        
-        // 绘制星位点
-        drawStarPoints(g2d);
+        // 星位
+        drawStarPoints(g2);
     }
-    
+
     /**
      * 绘制星位点
      */
-    private void drawStarPoints(Graphics2D g2d) {
-        g2d.setColor(Color.BLACK);
-        int[] starPositions = {3, 9, 15}; // 19路棋盘的星位
-        
-        for (int row : starPositions) {
-            for (int col : starPositions) {
-                int x = MARGIN + col * CELL_SIZE;
-                int y = MARGIN + row * CELL_SIZE;
-                g2d.fillOval(x - 3, y - 3, 6, 6);
-            }
+    private void drawStarPoints(Graphics2D g2) {
+        g2.setColor(Color.BLACK);
+        double d = R_STAR * 2;
+        if (boardSize == 19) {
+            int[] p = {3, 9, 15};
+            for (int r : p) for (int c : p)
+                g2.fill(new Ellipse2D.Double(c - R_STAR, r - R_STAR, d, d));
+        } else if (boardSize == 13) {
+            int[] p = {3, 6, 9};
+            for (int r : p) for (int c : p)
+                g2.fill(new Ellipse2D.Double(c - R_STAR, r - R_STAR, d, d));
+        } else if (boardSize == 9) {
+            int[] p = {2, 6};
+            for (int r : p) for (int c : p)
+                g2.fill(new Ellipse2D.Double(c - R_STAR, r - R_STAR, d, d));
+            g2.fill(new Ellipse2D.Double(4 - R_STAR, 4 - R_STAR, d, d));
         }
-        
-        // 天元
-        int centerX = MARGIN + 9 * CELL_SIZE;
-        int centerY = MARGIN + 9 * CELL_SIZE;
-        g2d.fillOval(centerX - 3, centerY - 3, 6, 6);
     }
     
     /**
      * 绘制棋子
      */
-    private void drawStones(Graphics2D g2d) {
+    private void drawStones(Graphics2D g2) {
         int[][] board = game.getBoard();
+        int size = boardSize;
+        int diameter = (int) Math.round(R_STONE * 2 * cell);
 
-        for (int row = 0; row < BOARD_SIZE; row++) {
-            for (int col = 0; col < BOARD_SIZE; col++) {
+        for (int row = 0; row < size; row++) {
+            for (int col = 0; col < size; col++) {
                 if (board[row][col] != GoGame.EMPTY) {
                     if (animatingMove != null && dropTimer != null && dropTimer.isRunning()
                             && animatingMove.row == row && animatingMove.col == col) {
                         continue; // 正在动画的棋子稍后绘制
                     }
-                    int x = MARGIN + col * CELL_SIZE;
-                    int y = MARGIN + row * CELL_SIZE;
-                    drawStone(g2d, x, y, board[row][col]);
+                    Point2D p = viewTx.transform(new Point2D.Double(col, row), null);
+                    GoStoneRenderer.draw(g2, (int) Math.round(p.getX()), (int) Math.round(p.getY()), diameter,
+                            board[row][col] == GoGame.WHITE);
                 }
             }
         }
 
-        // 绘制动画棋子
+        // 动画棋子
         if (animatingMove != null && dropTimer != null && dropTimer.isRunning()) {
             double t = easeOutCubic(animProgress);
-            double scale = 1.5 - 0.5 * t; // 从1.5缩小到1.0
-            int diameter = Math.max(2, Math.round((float) (STONE_RADIUS * 2 * scale)));
-            // 阴影与棋子本体
-            GoStoneRenderer.drawShadow(g2d, animEndX, animEndY, diameter, (float) t);
-            GoStoneRenderer.drawWithoutShadow(g2d, animEndX, animEndY, diameter, animPlayer == GoGame.WHITE);
+            double scale = 1.5 - 0.5 * t;
+            int d = (int) Math.max(2, Math.round(R_STONE * 2 * cell * scale));
+            Point2D p = viewTx.transform(new Point2D.Double(animEndX, animEndY), null);
+            GoStoneRenderer.drawShadow(g2, (int) Math.round(p.getX()), (int) Math.round(p.getY()), d, (float) t);
+            GoStoneRenderer.drawWithoutShadow(g2, (int) Math.round(p.getX()), (int) Math.round(p.getY()), d,
+                    animPlayer == GoGame.WHITE);
         }
-    }
-
-    private void drawStone(Graphics2D g2d, int x, int y, int player) {
-        int diameter = STONE_RADIUS * 2;
-        GoStoneRenderer.draw(g2d, x, y, diameter, player == GoGame.WHITE);
     }
 
     private double easeOutCubic(double t) {
@@ -605,81 +625,62 @@ public class GoBoardPanel extends JPanel {
     /**
      * 绘制坐标
      */
-    private void drawCoordinates(Graphics2D g2d) {
-        if (!showCoordinates) return;
-        
-        g2d.setColor(Color.BLACK);
-        g2d.setFont(new Font("微软雅黑", Font.BOLD, 14));
-        FontMetrics fm = g2d.getFontMetrics();
-        int ascent = fm.getAscent();
-        int descent = fm.getDescent();
-        int boardSize = BOARD_PIXEL_SIZE;
+    private void drawCoordinates(Graphics2D g2) {
+        int size = boardSize;
+        int fontSize = (int) Math.max(10, Math.round(cell * 0.6));
+        g2.setFont(new Font("SansSerif", Font.BOLD, fontSize));
+        g2.setColor(Color.BLACK);
+        FontMetrics fm = g2.getFontMetrics();
 
-        // 绘制列坐标 (1-19) - 横坐标，在上方和下方都显示
-        for (int i = 0; i < BOARD_SIZE; i++) {
-            String label = String.valueOf(i + 1); // 1-19
-            int x = MARGIN + i * CELL_SIZE;
-            int labelWidth = fm.stringWidth(label);
+        for (int i = 0; i < size; i++) {
+            String colLabel = String.valueOf(i + 1);
+            int w = fm.stringWidth(colLabel);
+            Point2D top = viewTx.transform(new Point2D.Double(i, -0.5), null);
+            Point2D bottom = viewTx.transform(new Point2D.Double(i, size - 1 + 0.5), null);
+            g2.drawString(colLabel, (int) Math.round(top.getX() - w / 2.0),
+                    (int) Math.round(top.getY() - fm.getDescent()));
+            g2.drawString(colLabel, (int) Math.round(bottom.getX() - w / 2.0),
+                    (int) Math.round(bottom.getY() + fm.getAscent()));
 
-            // 上方显示坐标，紧贴最外侧网格线
-            g2d.drawString(label, x - labelWidth / 2, MARGIN - descent);
-
-            // 下方显示坐标，紧贴最外侧网格线
-            g2d.drawString(label, x - labelWidth / 2, MARGIN + boardSize + ascent);
-        }
-
-        // 绘制行坐标 (1-19) - 纵坐标，在左侧和右侧都显示
-        for (int i = 0; i < BOARD_SIZE; i++) {
-            String label = String.valueOf(BOARD_SIZE - i); // 19-1 (从上到下)
-            int y = MARGIN + i * CELL_SIZE;
-            int labelWidth = fm.stringWidth(label);
-            int centerY = y + (ascent - descent) / 2;
-
-            // 左侧显示坐标，紧贴最外侧网格线
-            g2d.drawString(label, MARGIN - labelWidth, centerY);
-
-            // 右侧显示坐标，紧贴最外侧网格线
-            g2d.drawString(label, MARGIN + boardSize, centerY);
+            String rowLabel = String.valueOf(size - i);
+            int wr = fm.stringWidth(rowLabel);
+            Point2D left = viewTx.transform(new Point2D.Double(-0.5, i), null);
+            Point2D right = viewTx.transform(new Point2D.Double(size - 1 + 0.5, i), null);
+            int y = (int) Math.round(left.getY() + fm.getAscent() / 2.0 - fm.getDescent() / 2.0);
+            g2.drawString(rowLabel, (int) Math.round(left.getX() - wr), y);
+            g2.drawString(rowLabel, (int) Math.round(right.getX()), y);
         }
     }
     
     /**
      * 绘制最后一步移动标记
      */
-    private void drawLastMoveMarker(Graphics2D g2d) {
+    private void drawLastMoveMarker(Graphics2D g2) {
         if (lastMove == null) return;
-        
-        int x = MARGIN + lastMove.col * CELL_SIZE;
-        int y = MARGIN + lastMove.row * CELL_SIZE;
-        
-        g2d.setColor(Color.RED);
-        g2d.setStroke(new BasicStroke(2.0f));
-        g2d.drawOval(x - STONE_RADIUS - 2, y - STONE_RADIUS - 2, 
-                   (STONE_RADIUS + 2) * 2, (STONE_RADIUS + 2) * 2);
+        Point2D p = viewTx.transform(new Point2D.Double(lastMove.col, lastMove.row), null);
+        int r = (int) Math.round(R_MARK * cell);
+        g2.setColor(Color.RED);
+        g2.fillOval((int) Math.round(p.getX()) - r, (int) Math.round(p.getY()) - r, r * 2, r * 2);
     }
     
     /**
      * 绘制推荐落子位置的虚线标记
      */
-    private void drawSuggestedMoveMarker(Graphics2D g2d) {
+    private void drawSuggestedMoveMarker(Graphics2D g2) {
         if (suggestedMove == null) return;
-        
-        int x = MARGIN + suggestedMove.col * CELL_SIZE;
-        int y = MARGIN + suggestedMove.row * CELL_SIZE;
-        
-        // 设置虚线样式
-        g2d.setColor(new Color(0, 150, 255)); // 蓝色
-        float[] dashPattern = {5.0f, 5.0f}; // 虚线模式：5像素实线，5像素空白
-        g2d.setStroke(new BasicStroke(3.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, dashPattern, 0));
-        
-        // 绘制虚线圆圈
-        g2d.drawOval(x - STONE_RADIUS - 3, y - STONE_RADIUS - 3, 
-                   (STONE_RADIUS + 3) * 2, (STONE_RADIUS + 3) * 2);
-        
-        // 绘制十字标记
-        g2d.setStroke(new BasicStroke(2.0f));
-        g2d.drawLine(x - 8, y, x + 8, y); // 横线
-        g2d.drawLine(x, y - 8, x, y + 8); // 竖线
+        Point2D p = viewTx.transform(new Point2D.Double(suggestedMove.col, suggestedMove.row), null);
+        int r = (int) Math.round(R_STONE * cell);
+        float stroke = (float) (0.03 * cell);
+        g2.setColor(new Color(0, 150, 255));
+        float[] dash = {stroke * 1.5f, stroke * 1.5f};
+        g2.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, dash, 0));
+        g2.drawOval((int) Math.round(p.getX()) - r, (int) Math.round(p.getY()) - r, r * 2, r * 2);
+        g2.setStroke(new BasicStroke(stroke / 2));
+        int mark = (int) Math.round(R_MARK * cell);
+        g2.drawLine((int) Math.round(p.getX()) - mark, (int) Math.round(p.getY()),
+                (int) Math.round(p.getX()) + mark, (int) Math.round(p.getY()));
+        g2.drawLine((int) Math.round(p.getX()), (int) Math.round(p.getY()) - mark,
+                (int) Math.round(p.getX()), (int) Math.round(p.getY()) + mark);
     }
     
     // Getter方法
