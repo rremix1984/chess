@@ -560,8 +560,19 @@ public class InternationalBoardPanel extends JPanel {
     
     private void drawSelection(Graphics2D g2d) {
         if (selectedRow >= 0 && selectedCol >= 0) {
+            int x = selectedCol * CELL_SIZE;
+            int y = selectedRow * CELL_SIZE;
+            int centerX = x + CELL_SIZE / 2;
+            int centerY = y + CELL_SIZE / 2;
+
+            // 根据棋子尺寸计算环半径（略大于棋子底座）
+            int ringRadius = (int) (CELL_SIZE * 0.7 / 2) + 6;
+
+            Stroke oldStroke = g2d.getStroke();
             g2d.setColor(SELECTED_COLOR);
-            g2d.fillRect(selectedCol * CELL_SIZE, selectedRow * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            g2d.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2d.drawOval(centerX - ringRadius, centerY - ringRadius, ringRadius * 2, ringRadius * 2);
+            g2d.setStroke(oldStroke);
         }
     }
     
