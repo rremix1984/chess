@@ -1622,38 +1622,7 @@ public class BoardPanel extends JPanel {
      * 绘制移动标记
      */
     private void drawMoveMarkers(Graphics g) {
-        if (lastMoveStart != null && lastMoveEnd != null) {
-            Graphics2D g2d = (Graphics2D) g;
-            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            
-            // 转换为显示坐标
-            int startDisplayRow = getDisplayRow(lastMoveStart.getX());
-            int startDisplayCol = getDisplayCol(lastMoveStart.getY());
-            int endDisplayRow = getDisplayRow(lastMoveEnd.getX());
-            int endDisplayCol = getDisplayCol(lastMoveEnd.getY());
-            
-            // 计算屏幕坐标
-            int startX = MARGIN + startDisplayCol * CELL_SIZE;
-            int startY = MARGIN + startDisplayRow * CELL_SIZE;
-            int endX = MARGIN + endDisplayCol * CELL_SIZE;
-            int endY = MARGIN + endDisplayRow * CELL_SIZE;
-            
-            // 绘制起始位置标记（虚线圆圈）
-            g2d.setColor(new Color(255, 165, 0, 180)); // 橙色
-            float[] dashPattern = {5.0f, 5.0f}; // 虚线模式
-            g2d.setStroke(new BasicStroke(3.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, dashPattern, 0));
-            g2d.drawOval(startX - 18, startY - 18, 36, 36);
-            
-            // 绘制结束位置标记（实线圆圈）
-            g2d.setColor(new Color(255, 0, 0, 200)); // 红色
-            g2d.setStroke(new BasicStroke(4.0f));
-            g2d.drawOval(endX - 20, endY - 20, 40, 40);
-            
-            // 添加内圈强调效果
-            g2d.setColor(new Color(255, 0, 0, 100));
-            g2d.setStroke(new BasicStroke(2.0f));
-            g2d.drawOval(endX - 15, endY - 15, 30, 30);
-        }
+        // 移除落子后的圆圈效果，保持界面清爽
     }
     
     /**
@@ -5979,8 +5948,6 @@ public class BoardPanel extends JPanel {
         private final Piece piece;
         private final int centerX, centerY;
         private final int duration;
-        private Timer timer;
-        private long startTime;
         private float progress;
 
         PieceDropAnimation(Piece piece, int centerX, int centerY, int duration) {
@@ -5991,32 +5958,33 @@ public class BoardPanel extends JPanel {
         }
 
         void start() {
-            startTime = System.currentTimeMillis();
-            timer = new Timer(12, e -> {
-                long elapsed = System.currentTimeMillis() - startTime;
-                progress = Math.min(1f, elapsed / (float) duration);
-                if (progress >= 1f) {
-                    timer.stop();
-                    finish();
+            long startTime = System.currentTimeMillis();
+            new Thread(() -> {
+                while (true) {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    progress = Math.min(1f, elapsed / (float) duration);
+                    int size = (int) (CELL_SIZE * 1.4); // repaint region
+                    SwingUtilities.invokeLater(() -> repaint(centerX - size / 2, centerY - size / 2, size, size));
+                    if (progress >= 1f) {
+                        SwingUtilities.invokeLater(this::finish);
+                        break;
+                    }
+                    try {
+                        Thread.sleep(12);
+                    } catch (InterruptedException ignored) {}
                 }
-                repaint();
-            });
-            timer.start();
+            }).start();
         }
 
         void draw(Graphics2D g2d) {
             float eased = (float) easeOutCubic(progress);
-
-            // 圆心保持不变，仅通过缩放模拟透视效果
             float sizeFactor = 1f + (1f - eased) * 0.5f; // 从 1.5 缩小至 1.0
-            int size = (int) (CELL_SIZE * 0.9 * sizeFactor);
-
             drawPieceAt(g2d, piece, centerX, centerY, sizeFactor, 1f);
         }
 
         private void finish() {
             dropAnimation = null;
-            repaint();
+            repaint(centerX - CELL_SIZE, centerY - CELL_SIZE, CELL_SIZE * 2, CELL_SIZE * 2);
         }
     }
 
@@ -6028,7 +5996,6 @@ public class BoardPanel extends JPanel {
         int ctrlX, ctrlY;
         double moveProgress = 0.0;
         double bounceProgress = 0.0;
-        Timer timer;
         Piece capturedPiece;
         int capturedX, capturedY;
         float capturedAlpha = 1f;
@@ -6060,53 +6027,69 @@ public class BoardPanel extends JPanel {
 
         private void startFade() {
             int fadeDuration = 120;
-            timer = new Timer(40, e -> {
-                capturedAlpha -= 40f / fadeDuration;
-                if (capturedAlpha <= 0f) {
-                    capturedAlpha = 0f;
-                    timer.stop();
-                    startMove();
+            new Thread(() -> {
+                while (capturedAlpha > 0f) {
+                    capturedAlpha -= 40f / fadeDuration;
+                    int size = CELL_SIZE;
+                    SwingUtilities.invokeLater(() -> repaint(capturedX - size / 2, capturedY - size / 2, size, size));
+                    try {
+                        Thread.sleep(40);
+                    } catch (InterruptedException ignored) {}
                 }
-                repaint();
-            });
-            timer.start();
+                capturedAlpha = 0f;
+                startMove();
+            }).start();
         }
 
         private void startMove() {
             int duration = Math.min(240, Math.max(160, ChineseChessConfig.MOVE_ANIMATION_DURATION));
-            timer = new Timer(12, e -> {
-                moveProgress += 12.0 / duration;
-                if (moveProgress >= 1.0) {
-                    moveProgress = 1.0;
-                    timer.stop();
-                    startBounce();
+            long startTime = System.currentTimeMillis();
+            int minX = Math.min(startX, endX) - CELL_SIZE;
+            int minY = Math.min(startY, endY) - CELL_SIZE;
+            int width = Math.abs(startX - endX) + CELL_SIZE * 2;
+            int height = Math.abs(startY - endY) + CELL_SIZE * 2;
+            new Thread(() -> {
+                while (true) {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    moveProgress = Math.min(1.0, elapsed / (double) duration);
+                    SwingUtilities.invokeLater(() -> repaint(minX, minY, width, height));
+                    if (moveProgress >= 1.0) {
+                        startBounce();
+                        break;
+                    }
+                    try {
+                        Thread.sleep(12);
+                    } catch (InterruptedException ignored) {}
                 }
-                repaint();
-            });
-            timer.start();
+            }).start();
         }
 
         private void startBounce() {
-            overlayLayer.playImpactRing(endX, endY);
             impactAnimator.blastAt(endRow, endCol, 2.5, 4, 160);
             SoundManager.play(WOOD, capturedPiece != null ? PIECE_CAPTURE : PIECE_DROP);
-            bounceProgress = 0.0;
-            timer = new Timer(12, e -> {
-                bounceProgress += 12.0 / 60.0;
-                scale = 1.06 - 0.06 * easeOutCubic(Math.min(1.0, bounceProgress));
-                if (bounceProgress >= 1.0) {
-                    timer.stop();
-                    finish();
+            long startTime = System.currentTimeMillis();
+            new Thread(() -> {
+                while (true) {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    bounceProgress = Math.min(1.0, elapsed / 60.0);
+                    scale = 1.06 - 0.06 * easeOutCubic(bounceProgress);
+                    int size = CELL_SIZE * 2;
+                    SwingUtilities.invokeLater(() -> repaint(endX - CELL_SIZE, endY - CELL_SIZE, size, size));
+                    if (bounceProgress >= 1.0) {
+                        finish();
+                        break;
+                    }
+                    try {
+                        Thread.sleep(12);
+                    } catch (InterruptedException ignored) {}
                 }
-                repaint();
-            });
-            timer.start();
+            }).start();
         }
 
         private void finish() {
             scale = 1.0;
             currentAnimation = null;
-            repaint();
+            repaint(endX - CELL_SIZE, endY - CELL_SIZE, CELL_SIZE * 2, CELL_SIZE * 2);
         }
 
         void draw(Graphics2D g2d) {
