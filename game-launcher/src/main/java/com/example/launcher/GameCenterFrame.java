@@ -6,6 +6,7 @@ import com.example.chinesechess.ui.GameFrame;
 import com.example.common.game.GameContext;
 import com.example.launcher.util.GameDisplay;
 import com.example.launcher.util.GameIconFactory;
+import com.example.go.lad.LifeAndDeathFrame;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
@@ -31,6 +32,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         map.put("国际象棋", "international-chess");
         map.put("五子棋", "gomoku");
         map.put("围棋", "go-game");
+        map.put("围棋死活", "go-life-and-death");
         map.put("坦克大战", "tank-battle-game");
         map.put("大富翁", "monopoly");
         GAME_MAP = Collections.unmodifiableMap(map);
@@ -97,6 +99,10 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
             public void valueChanged(ListSelectionEvent e) {
                 if (!e.getValueIsAdjusting()) {
                     String selected = gameList.getSelectedValue();
+                    if ("围棋死活".equals(selected)) {
+                        SwingUtilities.invokeLater(() -> new LifeAndDeathFrame().setVisible(true));
+                        return;
+                    }
                     selectedGameType = GAME_MAP.get(selected);
                     refreshRoomList();
                 }
