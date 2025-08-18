@@ -19,6 +19,12 @@
       <groupId>com.example</groupId>
       <artifactId>game-common</artifactId>
     </dependency>
+
+    <!-- Go module for shared rendering -->
+    <dependency>
+      <groupId>com.example</groupId>
+      <artifactId>go-game</artifactId>
+    </dependency>
     
     <!-- JavaFX -->
     <dependency>
