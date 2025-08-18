@@ -24,6 +24,7 @@ public class OverlayLayer extends JComponent {
     private final List<Ring> rings = new ArrayList<>();
     private Timer particleTimer;
     private final Random random = new Random();
+    private double viewScale = 1.0;
 
     /** 显示横幅文字 */
     public void showBanner(String text, Style style, int durationMs) {
@@ -120,6 +121,8 @@ public class OverlayLayer extends JComponent {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
+        AffineTransform old = g2d.getTransform();
+        g2d.scale(viewScale, viewScale);
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         // 绘制粒子
@@ -171,6 +174,7 @@ public class OverlayLayer extends JComponent {
             g2d.drawOval(r.x - radius, r.y - radius, radius * 2, radius * 2);
             g2d.setComposite(old);
         }
+        g2d.setTransform(old);
     }
 
     private static class Particle {
@@ -186,4 +190,8 @@ public class OverlayLayer extends JComponent {
     }
 
     private Timer impactTimer;
+
+    public void setViewScale(double viewScale) {
+        this.viewScale = viewScale;
+    }
 }

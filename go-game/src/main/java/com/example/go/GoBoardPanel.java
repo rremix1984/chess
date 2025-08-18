@@ -21,6 +21,8 @@ public class GoBoardPanel extends JPanel {
     // 调整棋盘边距，确保坐标完整且界面紧凑
     private static final int MARGIN = 25;
     private static final int STONE_RADIUS = 12;
+    // 根据网格尺寸计算棋盘像素尺寸（不含边距）
+    private static final int BOARD_PIXEL_SIZE = (BOARD_SIZE - 1) * CELL_SIZE;
     
     private GoGame game;
     private GoAI ai;
@@ -70,10 +72,8 @@ public class GoBoardPanel extends JPanel {
         this.game = new GoGame();
         Sfx.init();
         // 根据棋盘尺寸和边距设置面板大小，避免周围空白
-        setPreferredSize(new Dimension(
-            MARGIN * 2 + (BOARD_SIZE - 1) * CELL_SIZE,
-            MARGIN * 2 + (BOARD_SIZE - 1) * CELL_SIZE
-        ));
+        int size = MARGIN * 2 + BOARD_PIXEL_SIZE;
+        setPreferredSize(new Dimension(size, size));
         setBackground(new Color(220, 179, 92)); // 棋盘颜色
         
         addMouseListener(new MouseAdapter() {
@@ -392,8 +392,10 @@ public class GoBoardPanel extends JPanel {
         List<GoMove> history = game.getMoveHistory();
         if (!history.isEmpty()) {
             GoMove last = history.get(history.size() - 1);
-            Sfx.playStoneOnWood(0.7f);
-            if (!last.capturedStones.isEmpty()) {
+            int captures = last.capturedStones.size();
+            float power = 0.7f + Math.min(0.3f, captures * 0.1f);
+            Sfx.playStoneOnWood(power);
+            if (captures > 0) {
                 SoundManager.play(STONE, PIECE_CAPTURE);
             }
         }
@@ -517,24 +519,22 @@ public class GoBoardPanel extends JPanel {
     private void drawBoard(Graphics2D g2d) {
         // 绘制棋盘背景
         g2d.setColor(new Color(220, 179, 92));
-        g2d.fillRect(MARGIN - 15, MARGIN - 15,
-                    (BOARD_SIZE - 1) * CELL_SIZE + 30,
-                    (BOARD_SIZE - 1) * CELL_SIZE + 30);
-        
+        g2d.fillRect(MARGIN, MARGIN, BOARD_PIXEL_SIZE, BOARD_PIXEL_SIZE);
+
         // 绘制棋盘线条
         g2d.setColor(Color.BLACK);
         g2d.setStroke(new BasicStroke(1.0f));
-        
+
         // 绘制横线
         for (int i = 0; i < BOARD_SIZE; i++) {
             int y = MARGIN + i * CELL_SIZE;
-            g2d.drawLine(MARGIN, y, MARGIN + (BOARD_SIZE - 1) * CELL_SIZE, y);
+            g2d.drawLine(MARGIN, y, MARGIN + BOARD_PIXEL_SIZE, y);
         }
-        
+
         // 绘制竖线
         for (int i = 0; i < BOARD_SIZE; i++) {
             int x = MARGIN + i * CELL_SIZE;
-            g2d.drawLine(x, MARGIN, x, MARGIN + (BOARD_SIZE - 1) * CELL_SIZE);
+            g2d.drawLine(x, MARGIN, x, MARGIN + BOARD_PIXEL_SIZE);
         }
         
         // 绘制星位点
@@ -611,32 +611,35 @@ public class GoBoardPanel extends JPanel {
         g2d.setColor(Color.BLACK);
         g2d.setFont(new Font("微软雅黑", Font.BOLD, 14));
         FontMetrics fm = g2d.getFontMetrics();
-        
+        int ascent = fm.getAscent();
+        int descent = fm.getDescent();
+        int boardSize = BOARD_PIXEL_SIZE;
+
         // 绘制列坐标 (1-19) - 横坐标，在上方和下方都显示
         for (int i = 0; i < BOARD_SIZE; i++) {
             String label = String.valueOf(i + 1); // 1-19
             int x = MARGIN + i * CELL_SIZE;
             int labelWidth = fm.stringWidth(label);
-            
-            // 上方显示坐标
-            g2d.drawString(label, x - labelWidth / 2, MARGIN - 10);
-            
-            // 下方显示坐标，紧贴棋盘以减少空白
-            g2d.drawString(label, x - labelWidth / 2,
-                          MARGIN + (BOARD_SIZE - 1) * CELL_SIZE + 10);
+
+            // 上方显示坐标，紧贴最外侧网格线
+            g2d.drawString(label, x - labelWidth / 2, MARGIN - descent);
+
+            // 下方显示坐标，紧贴最外侧网格线
+            g2d.drawString(label, x - labelWidth / 2, MARGIN + boardSize + ascent);
         }
-        
+
         // 绘制行坐标 (1-19) - 纵坐标，在左侧和右侧都显示
         for (int i = 0; i < BOARD_SIZE; i++) {
             String label = String.valueOf(BOARD_SIZE - i); // 19-1 (从上到下)
             int y = MARGIN + i * CELL_SIZE;
             int labelWidth = fm.stringWidth(label);
-            
-            // 左侧显示坐标
-            g2d.drawString(label, MARGIN - labelWidth - 10, y + 4);
-            
-            // 右侧显示坐标，紧贴棋盘边缘
-            g2d.drawString(label, MARGIN + (BOARD_SIZE - 1) * CELL_SIZE + 10, y + 4);
+            int centerY = y + (ascent - descent) / 2;
+
+            // 左侧显示坐标，紧贴最外侧网格线
+            g2d.drawString(label, MARGIN - labelWidth, centerY);
+
+            // 右侧显示坐标，紧贴最外侧网格线
+            g2d.drawString(label, MARGIN + boardSize, centerY);
         }
     }
     

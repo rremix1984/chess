@@ -49,6 +49,7 @@ public class BoardPanel extends JPanel {
     private final Board board;
     private static final int CELL_SIZE = ChineseChessConfig.BOARD_CELL_SIZE;
     private static final int MARGIN = ChineseChessConfig.BOARD_MARGIN;
+    private double viewScale = 1.0;
     
     // 游戏状态
     private Piece selectedPiece = null;
@@ -180,11 +181,12 @@ public class BoardPanel extends JPanel {
         // 叠加层，用于显示横幅和烟花等效果
         setLayout(null);
         overlayLayer = new OverlayLayer();
+        overlayLayer.setViewScale(viewScale);
         overlayLayer.setOpaque(false);
         overlayLayer.setBounds(0, 0, boardSize.width, boardSize.height);
         add(overlayLayer);
 
-        impactAnimator = new ImpactAnimator(this::repaint);
+        impactAnimator = new ImpactAnimator(rect -> repaintScaled(rect.x, rect.y, rect.width, rect.height));
 
         addMouseListener(new MouseAdapter() {
             @Override
@@ -199,6 +201,20 @@ public class BoardPanel extends JPanel {
                 }
             }
         });
+    }
+
+    public void setViewScale(double viewScale) {
+        this.viewScale = viewScale;
+        overlayLayer.setViewScale(viewScale);
+        repaint();
+    }
+
+    private void repaintScaled(int x, int y, int w, int h) {
+        int sx = (int) Math.floor(x * viewScale);
+        int sy = (int) Math.floor(y * viewScale);
+        int sw = (int) Math.ceil(w * viewScale);
+        int sh = (int) Math.ceil(h * viewScale);
+        repaint(sx, sy, sw, sh);
     }
 
     public void enableAI(PieceColor humanColor, int difficulty, boolean useLLM, String modelName) {
@@ -530,12 +546,16 @@ public class BoardPanel extends JPanel {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        drawBoard(g);
-        drawValidMoves(g);
-        drawPieces(g);
-        drawCurrentAnimation((Graphics2D) g);
-        drawSelection(g);
-        drawAISuggestion(g); // 绘制AI建议标记
+        Graphics2D g2d = (Graphics2D) g;
+        AffineTransform old = g2d.getTransform();
+        g2d.scale(viewScale, viewScale);
+        drawBoard(g2d);
+        drawValidMoves(g2d);
+        drawPieces(g2d);
+        drawCurrentAnimation(g2d);
+        drawSelection(g2d);
+        drawAISuggestion(g2d); // 绘制AI建议标记
+        g2d.setTransform(old);
     }
     
 
@@ -609,11 +629,14 @@ public class BoardPanel extends JPanel {
         }
         
         // 将鼠标坐标转换为显示坐标
-        int displayCol = (mouseX - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
-        int displayRow = (mouseY - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
+        int scaledX = (int) (mouseX / viewScale);
+        int scaledY = (int) (mouseY / viewScale);
+        int displayCol = (scaledX - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
+        int displayRow = (scaledY - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
         
         System.out.println("🔍 坐标转换详情:");
         System.out.println("   - 鼠标坐标: (" + mouseX + "," + mouseY + ")");
+        System.out.println("   - 缩放后坐标: (" + scaledX + "," + scaledY + ")");
         System.out.println("   - 显示坐标: (" + displayRow + "," + displayCol + ")");
         System.out.println("   - MARGIN: " + MARGIN + ", CELL_SIZE: " + CELL_SIZE);
         
@@ -3198,8 +3221,10 @@ public class BoardPanel extends JPanel {
      */
     private void handleEndgameSetupRightClick(int mouseX, int mouseY) {
         // 将鼠标坐标转换为显示坐标
-        int displayCol = (mouseX - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
-        int displayRow = (mouseY - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
+        int scaledX = (int) (mouseX / viewScale);
+        int scaledY = (int) (mouseY / viewScale);
+        int displayCol = (scaledX - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
+        int displayRow = (scaledY - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
         
         // 检查显示坐标是否在棋盘范围内
         if (displayRow < 0 || displayRow >= 10 || displayCol < 0 || displayCol >= 9) {
@@ -5901,7 +5926,7 @@ public class BoardPanel extends JPanel {
         int endCol = getDisplayCol(end.getY());
         int centerX = MARGIN + endCol * CELL_SIZE;
         int centerY = MARGIN + endRow * CELL_SIZE;
-        dropAnimation = new PieceDropAnimation(piece, centerX, centerY, 400);
+        dropAnimation = new PieceDropAnimation(piece, centerX, centerY, (int) (400 * viewScale));
         dropAnimation.start();
     }
 
@@ -5964,13 +5989,13 @@ public class BoardPanel extends JPanel {
                     long elapsed = System.currentTimeMillis() - startTime;
                     progress = Math.min(1f, elapsed / (float) duration);
                     int size = (int) (CELL_SIZE * 1.4); // repaint region
-                    SwingUtilities.invokeLater(() -> repaint(centerX - size / 2, centerY - size / 2, size, size));
+                    SwingUtilities.invokeLater(() -> repaintScaled(centerX - size / 2, centerY - size / 2, size, size));
                     if (progress >= 1f) {
                         SwingUtilities.invokeLater(this::finish);
                         break;
                     }
                     try {
-                        Thread.sleep(12);
+                        Thread.sleep((long) (12 * viewScale));
                     } catch (InterruptedException ignored) {}
                 }
             }).start();
@@ -5984,7 +6009,7 @@ public class BoardPanel extends JPanel {
 
         private void finish() {
             dropAnimation = null;
-            repaint(centerX - CELL_SIZE, centerY - CELL_SIZE, CELL_SIZE * 2, CELL_SIZE * 2);
+            repaintScaled(centerX - CELL_SIZE, centerY - CELL_SIZE, CELL_SIZE * 2, CELL_SIZE * 2);
         }
     }
 
@@ -6026,14 +6051,14 @@ public class BoardPanel extends JPanel {
         }
 
         private void startFade() {
-            int fadeDuration = 120;
+            int fadeDuration = (int) (120 * viewScale);
             new Thread(() -> {
                 while (capturedAlpha > 0f) {
                     capturedAlpha -= 40f / fadeDuration;
                     int size = CELL_SIZE;
-                    SwingUtilities.invokeLater(() -> repaint(capturedX - size / 2, capturedY - size / 2, size, size));
+                    SwingUtilities.invokeLater(() -> repaintScaled(capturedX - size / 2, capturedY - size / 2, size, size));
                     try {
-                        Thread.sleep(40);
+                        Thread.sleep((long) (40 * viewScale));
                     } catch (InterruptedException ignored) {}
                 }
                 capturedAlpha = 0f;
@@ -6042,7 +6067,7 @@ public class BoardPanel extends JPanel {
         }
 
         private void startMove() {
-            int duration = Math.min(240, Math.max(160, ChineseChessConfig.MOVE_ANIMATION_DURATION));
+            int duration = (int) (Math.min(240, Math.max(160, ChineseChessConfig.MOVE_ANIMATION_DURATION)) * viewScale);
             long startTime = System.currentTimeMillis();
             int minX = Math.min(startX, endX) - CELL_SIZE;
             int minY = Math.min(startY, endY) - CELL_SIZE;
@@ -6052,35 +6077,35 @@ public class BoardPanel extends JPanel {
                 while (true) {
                     long elapsed = System.currentTimeMillis() - startTime;
                     moveProgress = Math.min(1.0, elapsed / (double) duration);
-                    SwingUtilities.invokeLater(() -> repaint(minX, minY, width, height));
+                    SwingUtilities.invokeLater(() -> repaintScaled(minX, minY, width, height));
                     if (moveProgress >= 1.0) {
                         startBounce();
                         break;
                     }
                     try {
-                        Thread.sleep(12);
+                        Thread.sleep((long) (12 * viewScale));
                     } catch (InterruptedException ignored) {}
                 }
             }).start();
         }
 
         private void startBounce() {
-            impactAnimator.blastAt(endRow, endCol, 2.5, 4, 160);
+            impactAnimator.blastAt(endRow, endCol, 2.5, 4 * viewScale, (int) (160 * viewScale));
             SoundManager.play(WOOD, capturedPiece != null ? PIECE_CAPTURE : PIECE_DROP);
             long startTime = System.currentTimeMillis();
             new Thread(() -> {
                 while (true) {
                     long elapsed = System.currentTimeMillis() - startTime;
-                    bounceProgress = Math.min(1.0, elapsed / 60.0);
+                    bounceProgress = Math.min(1.0, elapsed / (60.0 * viewScale));
                     scale = 1.06 - 0.06 * easeOutCubic(bounceProgress);
                     int size = CELL_SIZE * 2;
-                    SwingUtilities.invokeLater(() -> repaint(endX - CELL_SIZE, endY - CELL_SIZE, size, size));
+                    SwingUtilities.invokeLater(() -> repaintScaled(endX - CELL_SIZE, endY - CELL_SIZE, size, size));
                     if (bounceProgress >= 1.0) {
                         finish();
                         break;
                     }
                     try {
-                        Thread.sleep(12);
+                        Thread.sleep((long) (12 * viewScale));
                     } catch (InterruptedException ignored) {}
                 }
             }).start();
@@ -6089,7 +6114,7 @@ public class BoardPanel extends JPanel {
         private void finish() {
             scale = 1.0;
             currentAnimation = null;
-            repaint(endX - CELL_SIZE, endY - CELL_SIZE, CELL_SIZE * 2, CELL_SIZE * 2);
+            repaintScaled(endX - CELL_SIZE, endY - CELL_SIZE, CELL_SIZE * 2, CELL_SIZE * 2);
         }
 
         void draw(Graphics2D g2d) {
