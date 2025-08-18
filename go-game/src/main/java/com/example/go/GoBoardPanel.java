@@ -588,13 +588,8 @@ public class GoBoardPanel extends JPanel {
             double t = easeOutCubic(animProgress);
             double scale = 1.5 - 0.5 * t; // 从1.5缩小到1.0
             int diameter = Math.max(2, Math.round((float) (STONE_RADIUS * 2 * scale)));
-            int offset = (int) (5 * (1 - t));
-
-            // 阴影
-            g2d.setColor(new Color(0, 0, 0, 100));
-            g2d.fillOval(animEndX + offset - diameter / 2, animEndY + offset - diameter / 2, diameter, diameter);
-
-            // 棋子本体
+            // 阴影与棋子本体
+            GoStoneRenderer.drawShadow(g2d, animEndX, animEndY, diameter, (float) t);
             GoStoneRenderer.drawWithoutShadow(g2d, animEndX, animEndY, diameter, animPlayer == GoGame.WHITE);
         }
     }
