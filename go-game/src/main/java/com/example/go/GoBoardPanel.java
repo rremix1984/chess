@@ -44,11 +44,6 @@ public class GoBoardPanel extends JPanel {
 
     // 落子动画状态
     private GoPosition animatingMove;
-    private int animStartX;
-    private int animStartY;
-
-    private int animCtrlX;
-    private int animCtrlY;
     private int animEndX;
     private int animEndY;
     private long animStartTime;
@@ -417,11 +412,6 @@ public class GoBoardPanel extends JPanel {
         animPlayer = player;
         animEndX = MARGIN + col * CELL_SIZE;
         animEndY = MARGIN + row * CELL_SIZE;
-
-        animStartX = animEndX;
-        animStartY = -CELL_SIZE * 3;
-        animCtrlX = animEndX - CELL_SIZE;
-        animCtrlY = animEndY - CELL_SIZE * 3;
         animDuration = 1000;
         animStartTime = System.currentTimeMillis();
         animProgress = 0;
@@ -595,32 +585,27 @@ public class GoBoardPanel extends JPanel {
 
         // 绘制动画棋子
         if (animatingMove != null && dropTimer != null && dropTimer.isRunning()) {
+            double t = easeOutCubic(animProgress);
+            double scale = 1.5 - 0.5 * t; // 从1.5缩小到1.0
+            int diameter = Math.max(2, Math.round((float) (STONE_RADIUS * 2 * scale)));
+            int offset = (int) (5 * (1 - t));
 
-            double p = animProgress;
-            double t = easeInOutCubic(p);
-            double x = quadraticBezier(animStartX, animCtrlX, animEndX, t);
-            double y = quadraticBezier(animStartY, animCtrlY, animEndY, t);
-            double scale = 0.6 + 0.4 * t;
-            drawStone(g2d, (int) x, (int) y, animPlayer, scale);
+            // 阴影
+            g2d.setColor(new Color(0, 0, 0, 100));
+            g2d.fillOval(animEndX + offset - diameter / 2, animEndY + offset - diameter / 2, diameter, diameter);
+
+            // 棋子本体
+            GoStoneRenderer.drawWithoutShadow(g2d, animEndX, animEndY, diameter, animPlayer == GoGame.WHITE);
         }
     }
 
     private void drawStone(Graphics2D g2d, int x, int y, int player) {
-        drawStone(g2d, x, y, player, 1.0);
-    }
-
-    private void drawStone(Graphics2D g2d, int x, int y, int player, double scale) {
-        int diameter = Math.max(2, Math.round((float) (STONE_RADIUS * 2 * scale)));
+        int diameter = STONE_RADIUS * 2;
         GoStoneRenderer.draw(g2d, x, y, diameter, player == GoGame.WHITE);
     }
 
-    private double quadraticBezier(double p0, double p1, double p2, double t) {
-        double u = 1 - t;
-        return u * u * p0 + 2 * u * t * p1 + t * t * p2;
-    }
-
-    private double easeInOutCubic(double t) {
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    private double easeOutCubic(double t) {
+        return 1 - Math.pow(1 - t, 3);
     }
 
     /**

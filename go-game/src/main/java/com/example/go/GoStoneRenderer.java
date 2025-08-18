@@ -28,6 +28,25 @@ public class GoStoneRenderer {
         }
     }
 
+    /**
+     * Draws a stone without the built-in shadow. Useful when the caller wants to
+     * control shadow rendering separately (e.g. during animations).
+     */
+    public static void drawWithoutShadow(Graphics2D g, int cx, int cy, int diameter, boolean white) {
+        int r = diameter / 2;
+        try {
+            BufferedImage img = new BufferedImage(diameter, diameter, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D gg = img.createGraphics();
+            enableAA(gg);
+            paintStone(gg, r, r, r, white);
+            gg.dispose();
+            g.drawImage(img, cx - r, cy - r, null);
+        } catch (Exception e) {
+            g.setColor(white ? Color.WHITE : Color.BLACK);
+            g.fillOval(cx - r, cy - r, diameter, diameter);
+        }
+    }
+
     private static void enableAA(Graphics2D g) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
