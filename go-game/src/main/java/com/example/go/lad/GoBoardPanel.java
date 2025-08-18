@@ -61,6 +61,7 @@ public class GoBoardPanel extends JPanel {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
         int size = game.getSize();
         int margin = 10;
         int cell = (Math.min(getWidth(), getHeight()) - 2 * margin) / (size - 1);
@@ -68,12 +69,12 @@ public class GoBoardPanel extends JPanel {
         int originX = margin;
         int originY = margin;
 
-        g.setColor(Color.BLACK);
+        g2.setColor(Color.BLACK);
         for (int i = 0; i < size; i++) {
             int x = originX + i * cell;
             int y = originY + i * cell;
-            g.drawLine(originX, y, originX + boardSize, y);
-            g.drawLine(x, originY, x, originY + boardSize);
+            g2.drawLine(originX, y, originX + boardSize, y);
+            g2.drawLine(x, originY, x, originY + boardSize);
         }
 
         // draw stones with simple 3D shading and shadow
@@ -87,8 +88,8 @@ public class GoBoardPanel extends JPanel {
                     int oy = sy - cell / 2;
 
                     // shadow
-                    g.setColor(new Color(0, 0, 0, 60));
-                    g.fillOval(ox + 2, oy + 2, cell, cell);
+                    g2.setColor(new Color(0, 0, 0, 60));
+                    g2.fillOval(ox + 2, oy + 2, cell, cell);
 
                     // gradient for stone body
                     RadialGradientPaint rg = (c == GoColor.BLACK)
@@ -96,11 +97,11 @@ public class GoBoardPanel extends JPanel {
                             new float[]{0f, 1f}, new Color[]{new Color(80, 80, 80), Color.BLACK})
                             : new RadialGradientPaint(new java.awt.geom.Point2D.Float(ox + cell / 3f, oy + cell / 3f), cell / 2f,
                             new float[]{0f, 1f}, new Color[]{Color.WHITE, new Color(200, 200, 200)});
-                    g.setPaint(rg);
-                    g.fillOval(ox, oy, cell, cell);
+                    g2.setPaint(rg);
+                    g2.fillOval(ox, oy, cell, cell);
 
-                    g.setColor(Color.BLACK);
-                    g.drawOval(ox, oy, cell, cell);
+                    g2.setColor(Color.BLACK);
+                    g2.drawOval(ox, oy, cell, cell);
                 }
             }
         }
@@ -108,8 +109,8 @@ public class GoBoardPanel extends JPanel {
         if (lastMove != null) {
             int sx = originX + (lastMove.x - 1) * cell;
             int sy = originY + (lastMove.y - 1) * cell;
-            g.setColor(Color.RED);
-            g.drawRect(sx - cell / 2, sy - cell / 2, cell, cell);
+            g2.setColor(Color.RED);
+            g2.drawRect(sx - cell / 2, sy - cell / 2, cell, cell);
         }
     }
 }
