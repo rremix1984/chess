@@ -6011,13 +6011,6 @@ public class BoardPanel extends JPanel {
             float sizeFactor = 1f + (1f - eased) * 0.5f; // 从 1.5 缩小至 1.0
             int size = (int) (CELL_SIZE * 0.9 * sizeFactor);
 
-            // 右下方月牙形阴影，随着棋子落下逐渐缩小
-            int shadowSize = (int) (CELL_SIZE * 0.8 * (1f - eased));
-            Composite old = g2d.getComposite();
-            g2d.setColor(new Color(0, 0, 0, 100));
-            g2d.fillArc(centerX + 10, centerY + 10, shadowSize, shadowSize, 0, 180);
-            g2d.setComposite(old);
-
             drawPieceAt(g2d, piece, centerX, centerY, sizeFactor, 1f);
         }
 
@@ -6121,16 +6114,8 @@ public class BoardPanel extends JPanel {
                 drawPieceAt(g2d, capturedPiece, capturedX, capturedY, 1.0, capturedAlpha);
             }
             double t = moveProgress;
-            double hNorm = 4 * t * (1 - t);
-            int groundX = (int)(startX + (endX - startX) * t);
-            int groundY = (int)(startY + (endY - startY) * t);
             int x = (int)((1 - t) * (1 - t) * startX + 2 * (1 - t) * t * ctrlX + t * t * endX);
             int y = (int)((1 - t) * (1 - t) * startY + 2 * (1 - t) * t * ctrlY + t * t * endY);
-            int shadowSize = (int)(CELL_SIZE * 0.7 * (1 - 0.3 * hNorm));
-            Composite old = g2d.getComposite();
-            g2d.setColor(new Color(0, 0, 0, (int)(80 * (1 - hNorm))));
-            g2d.fillArc(groundX + 6, groundY + 6, shadowSize, shadowSize, 0, 180);
-            g2d.setComposite(old);
             drawPieceAt(g2d, piece, x, y, scale, 1f);
         }
     }
