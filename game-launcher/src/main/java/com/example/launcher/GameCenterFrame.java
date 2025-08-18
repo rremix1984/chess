@@ -35,6 +35,7 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         map.put("围棋死活", "go-life-and-death");
         map.put("坦克大战", "tank-battle-game");
         map.put("大富翁", "monopoly");
+        map.put("飞行棋", "flight-chess");
         GAME_MAP = Collections.unmodifiableMap(map);
     }
 
@@ -442,6 +443,9 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
             case "monopoly":
                 startMonopoly();
                 break;
+            case "flight-chess":
+                startAeroplaneChess();
+                break;
             case "chinese-chess":
             default:
                 startChineseChess();
@@ -523,6 +527,18 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
         SwingUtilities.invokeLater(() -> {
             try {
                 Class<?> gameFrameClass = Class.forName("com.example.monopoly.MonopolyFrame");
+                JFrame frame = (JFrame) gameFrameClass.getDeclaredConstructor().newInstance();
+                showGameWindow(frame);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private void startAeroplaneChess() {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                Class<?> gameFrameClass = Class.forName("com.example.flightchess.FlightChessFrame");
                 JFrame frame = (JFrame) gameFrameClass.getDeclaredConstructor().newInstance();
                 showGameWindow(frame);
             } catch (Exception e) {
