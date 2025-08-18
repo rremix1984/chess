@@ -121,7 +121,8 @@ public class OverlayLayer extends JComponent {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
-        AffineTransform old = g2d.getTransform();
+        // Save the incoming transform so we can restore it before returning.
+        AffineTransform originalTransform = g2d.getTransform();
         g2d.scale(viewScale, viewScale);
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
@@ -144,14 +145,14 @@ public class OverlayLayer extends JComponent {
                 int x = (getWidth() - bounds.width) / 2 - bounds.x;
                 int y = bounds.height + 10;
 
-                AffineTransform originalTransform = g2d.getTransform();
+                AffineTransform bannerTransform = g2d.getTransform();
                 g2d.translate(x, y);
                 g2d.setStroke(new BasicStroke(8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 g2d.setColor(Color.WHITE);
                 g2d.draw(shape);
                 g2d.setColor(new Color(0xC00000));
                 g2d.fill(shape);
-                g2d.setTransform(originalTransform);
+                g2d.setTransform(bannerTransform);
             } else {
                 g2d.setFont(getFont().deriveFont(Font.BOLD, 64f));
                 FontMetrics fm = g2d.getFontMetrics();
@@ -175,7 +176,8 @@ public class OverlayLayer extends JComponent {
             g2d.drawOval(r.x - radius, r.y - radius, radius * 2, radius * 2);
             g2d.setComposite(oldComposite);
         }
-        g2d.setTransform(old);
+        // Restore the original transform to avoid affecting other painting code.
+        g2d.setTransform(originalTransform);
     }
 
     private static class Particle {
