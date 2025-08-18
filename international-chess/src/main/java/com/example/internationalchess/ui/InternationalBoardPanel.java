@@ -1346,10 +1346,10 @@ public class InternationalBoardPanel extends JPanel {
         final String piece;
         final int fromRow, fromCol, toRow, toCol;
         final int startX, startY, endX, endY;
-        Timer timer;
+        final Rectangle dirtyRect;
         long startTime;
         final int duration = 300; // 动画时长(ms)
-        double progress;
+        volatile double progress;
 
         PieceMoveAnimation(String piece, int fromRow, int fromCol, int toRow, int toCol) {
             this.piece = piece;
@@ -1361,20 +1361,35 @@ public class InternationalBoardPanel extends JPanel {
             this.startY = fromRow * CELL_SIZE + CELL_SIZE / 2;
             this.endX = toCol * CELL_SIZE + CELL_SIZE / 2;
             this.endY = toRow * CELL_SIZE + CELL_SIZE / 2;
+
+            int minX = Math.min(startX, endX) - CELL_SIZE / 2 - 20;
+            int minY = Math.min(startY, endY) - CELL_SIZE / 2 - 40;
+            int width = Math.abs(endX - startX) + CELL_SIZE + 40;
+            int height = Math.abs(endY - startY) + CELL_SIZE + 80;
+            this.dirtyRect = new Rectangle(minX, minY, width, height);
         }
 
         void start() {
             startTime = System.currentTimeMillis();
-            timer = new Timer(16, e -> {
-                long elapsed = System.currentTimeMillis() - startTime;
-                progress = Math.min(1.0, elapsed / (double) duration);
-                if (progress >= 1.0) {
-                    timer.stop();
-                    moveAnimation = null;
+            Thread animator = new Thread(() -> {
+                while (progress < 1.0) {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    progress = Math.min(1.0, elapsed / (double) duration);
+                    SwingUtilities.invokeLater(() -> repaint(dirtyRect));
+                    try {
+                        Thread.sleep(16);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                 }
-                repaint();
+                SwingUtilities.invokeLater(() -> {
+                    moveAnimation = null;
+                    repaint(dirtyRect);
+                });
             });
-            timer.start();
+            animator.setDaemon(true);
+            animator.start();
         }
 
         boolean isActive() {
