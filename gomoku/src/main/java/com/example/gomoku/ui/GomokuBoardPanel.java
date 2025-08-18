@@ -436,6 +436,21 @@ public class GomokuBoardPanel extends JPanel {
         g2d.setStroke(originalStroke);
         g2d.setPaint(originalPaint);
     }
+
+    private double easeOutBounce(double t) {
+        if (t < 1 / 2.75) {
+            return 7.5625 * t * t;
+        } else if (t < 2 / 2.75) {
+            t -= 1.5 / 2.75;
+            return 7.5625 * t * t + 0.75;
+        } else if (t < 2.5 / 2.75) {
+            t -= 2.25 / 2.75;
+            return 7.5625 * t * t + 0.9375;
+        } else {
+            t -= 2.625 / 2.75;
+            return 7.5625 * t * t + 0.984375;
+        }
+    }
     
     /**
      * 绘制专业黑子（改进的深灰色而非纯黑）

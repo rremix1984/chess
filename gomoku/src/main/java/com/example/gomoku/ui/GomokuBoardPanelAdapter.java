@@ -4,9 +4,6 @@ import com.example.gomoku.core.GameState;
 import com.example.gomoku.core.GomokuBoard;
 import com.example.gomoku.core.GomokuGameManager;
 import com.example.gomoku.ChatPanel;
-import audio.SoundManager;
-import static audio.SoundManager.Event.*;
-import static audio.SoundManager.SoundProfile.*;
 
 import javax.swing.*;
 import java.awt.*;
@@ -68,9 +65,6 @@ public class GomokuBoardPanelAdapter extends JPanel {
             // 尝试通过GameManager落子
             boolean success = gameManager.makePlayerMove(row, col);
             if (success) {
-                // 播放落子音效
-                SoundManager.play(STONE, PIECE_DROP);
-                
                 // 更新界面
                 repaint();
             }

@@ -1,10 +1,14 @@
 package com.example.go.lad;
 
+import com.example.go.GoStoneRenderer;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.function.Consumer;
+import audio.SoundManager;
+import static audio.SoundManager.Event.*;
+import static audio.SoundManager.SoundProfile.*;
 
 /**
  * Minimal board panel capable of drawing a position and notifying on clicks.
@@ -156,6 +160,7 @@ public class GoBoardPanel extends JPanel {
             int sy = originY + (lastMove.y - 1) * cell;
             g2.setColor(Color.RED);
             g2.drawRect(sx - cell / 2, sy - cell / 2, cell, cell);
+
         }
     }
 
