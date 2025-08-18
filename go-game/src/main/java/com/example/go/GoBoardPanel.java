@@ -588,7 +588,6 @@ public class GoBoardPanel extends JPanel {
             double t = easeOutCubic(animProgress);
             double scale = 1.5 - 0.5 * t; // 从1.5缩小到1.0
             int diameter = Math.max(2, Math.round((float) (STONE_RADIUS * 2 * scale)));
-
             // 阴影与棋子本体
             GoStoneRenderer.drawShadow(g2d, animEndX, animEndY, diameter, (float) t);
             GoStoneRenderer.drawWithoutShadow(g2d, animEndX, animEndY, diameter, animPlayer == GoGame.WHITE);
