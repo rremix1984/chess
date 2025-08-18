@@ -19,10 +19,24 @@ public class GoGame {
     private int whiteCaptured;
     private boolean gameEnded;
     private int consecutivePasses;
-    
+
     // 劫争检测相关
     private String lastBoardState;
     private GoPosition lastCapturePosition;
+
+    // 棋盘历史快照
+    private Deque<BoardState> history;
+
+    private static class BoardState {
+        int[][] board;
+        int currentPlayer;
+        int blackCaptured;
+        int whiteCaptured;
+        boolean gameEnded;
+        int consecutivePasses;
+        String lastBoardState;
+        GoPosition lastCapturePosition;
+    }
     
     public GoGame() {
         board = new int[BOARD_SIZE][BOARD_SIZE];
@@ -34,6 +48,8 @@ public class GoGame {
         gameEnded = false;
         consecutivePasses = 0;
         initializeBoard();
+        history = new ArrayDeque<>();
+        history.push(createSnapshot());
     }
     
     private void initializeBoard() {
@@ -42,6 +58,35 @@ public class GoGame {
                 board[i][j] = EMPTY;
             }
         }
+    }
+
+    private BoardState createSnapshot() {
+        BoardState s = new BoardState();
+        s.board = new int[BOARD_SIZE][BOARD_SIZE];
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            System.arraycopy(board[i], 0, s.board[i], 0, BOARD_SIZE);
+        }
+        s.currentPlayer = currentPlayer;
+        s.blackCaptured = blackCaptured;
+        s.whiteCaptured = whiteCaptured;
+        s.gameEnded = gameEnded;
+        s.consecutivePasses = consecutivePasses;
+        s.lastBoardState = lastBoardState;
+        s.lastCapturePosition = lastCapturePosition == null ? null : new GoPosition(lastCapturePosition.row, lastCapturePosition.col);
+        return s;
+    }
+
+    private void restore(BoardState s) {
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            System.arraycopy(s.board[i], 0, board[i], 0, BOARD_SIZE);
+        }
+        currentPlayer = s.currentPlayer;
+        blackCaptured = s.blackCaptured;
+        whiteCaptured = s.whiteCaptured;
+        gameEnded = s.gameEnded;
+        consecutivePasses = s.consecutivePasses;
+        lastBoardState = s.lastBoardState;
+        lastCapturePosition = s.lastCapturePosition == null ? null : new GoPosition(s.lastCapturePosition.row, s.lastCapturePosition.col);
     }
     
     /**
@@ -118,7 +163,7 @@ public class GoGame {
         GoMove move = new GoMove(new GoPosition(row, col), currentPlayer);
         move.capturedStones.addAll(capturedStones);
         moveHistory.add(move);
-        
+
         // 更新劫争检测状态
         lastBoardState = currentBoardState;
         if (capturedStones.size() == 1) {
@@ -126,10 +171,11 @@ public class GoGame {
         } else {
             lastCapturePosition = null;
         }
-        
+
         // 切换玩家
         currentPlayer = (currentPlayer == BLACK) ? WHITE : BLACK;
-        
+
+        history.push(createSnapshot());
         return true;
     }
     
@@ -144,48 +190,50 @@ public class GoGame {
         
         GoMove move = new GoMove(null, currentPlayer);
         moveHistory.add(move);
-        
+
         currentPlayer = (currentPlayer == BLACK) ? WHITE : BLACK;
+        history.push(createSnapshot());
     }
     
-    /**
-     * 悔棋
-     */
-    public boolean undoMove() {
-        if (moveHistory.isEmpty()) {
+    /** 单步撤回（仅退一手） */
+    public boolean undoOneMove() {
+        if (history.size() <= 1 || moveHistory.isEmpty()) {
             return false;
         }
-        
-        GoMove lastMove = moveHistory.remove(moveHistory.size() - 1);
-        
-        // 如果是弃权，直接切换玩家
-        if (lastMove.position == null) {
-            currentPlayer = lastMove.player;
-            consecutivePasses = Math.max(0, consecutivePasses - 1);
-            return true;
-        }
-        
-        // 移除最后下的棋子
-        board[lastMove.position.row][lastMove.position.col] = EMPTY;
-        
-        // 恢复被吃掉的棋子
-        for (GoPosition pos : lastMove.capturedStones) {
-            int capturedPlayer = (lastMove.player == BLACK) ? WHITE : BLACK;
-            board[pos.row][pos.col] = capturedPlayer;
-            
-            if (capturedPlayer == BLACK) {
-                blackCaptured--;
-            } else {
-                whiteCaptured--;
-            }
-        }
-        
-        // 切换回上一个玩家
-        currentPlayer = lastMove.player;
-        gameEnded = false;
-        consecutivePasses = 0;
-        
+        history.pop();
+        moveHistory.remove(moveHistory.size() - 1);
+        BoardState prev = history.peek();
+        restore(prev);
         return true;
+    }
+
+    /** 一次悔棋：黑白各退一步 */
+    public boolean undoOneTurn() {
+        if (history.size() <= 2 || moveHistory.size() < 2) {
+            return false;
+        }
+        history.pop();
+        moveHistory.remove(moveHistory.size() - 1);
+        history.pop();
+        moveHistory.remove(moveHistory.size() - 1);
+        BoardState prev = history.peek();
+        restore(prev);
+        return true;
+    }
+
+    /** 多步悔棋 */
+    public boolean undoNTurns(int n) {
+        boolean ok = false;
+        for (int i = 0; i < n; i++) {
+            if (!undoOneTurn()) break;
+            ok = true;
+        }
+        return ok;
+    }
+
+    // 兼容旧方法
+    public boolean undoMove() {
+        return undoOneMove();
     }
     
     /**
@@ -292,6 +340,8 @@ public class GoGame {
         consecutivePasses = 0;
         lastBoardState = null;
         lastCapturePosition = null;
+        history.clear();
+        history.push(createSnapshot());
     }
 
     // Getters
@@ -450,6 +500,8 @@ public class GoGame {
         consecutivePasses = 0;
         lastBoardState = null;
         lastCapturePosition = null;
+        history.clear();
+        history.push(createSnapshot());
     }
     
     /**
