@@ -18,8 +18,8 @@ import java.util.List;
 public class GoBoardPanel extends JPanel {
     private static final int BOARD_SIZE = 19;
     private static final int CELL_SIZE = 30;
-    // 缩小棋盘四周的边距以减少页面空白
-    private static final int MARGIN = 20;
+    // 调整棋盘边距，确保坐标完整且界面紧凑
+    private static final int MARGIN = 25;
     private static final int STONE_RADIUS = 12;
     
     private GoGame game;
@@ -69,10 +69,10 @@ public class GoBoardPanel extends JPanel {
     public GoBoardPanel() {
         this.game = new GoGame();
         Sfx.init();
-        // 调整默认尺寸以适应新的较小边距
+        // 根据棋盘尺寸和边距设置面板大小，避免周围空白
         setPreferredSize(new Dimension(
-            BOARD_SIZE * CELL_SIZE + 2 * MARGIN,
-            BOARD_SIZE * CELL_SIZE + 2 * MARGIN + 40
+            MARGIN * 2 + (BOARD_SIZE - 1) * CELL_SIZE,
+            MARGIN * 2 + (BOARD_SIZE - 1) * CELL_SIZE
         ));
         setBackground(new Color(220, 179, 92)); // 棋盘颜色
         
@@ -517,9 +517,9 @@ public class GoBoardPanel extends JPanel {
     private void drawBoard(Graphics2D g2d) {
         // 绘制棋盘背景
         g2d.setColor(new Color(220, 179, 92));
-        g2d.fillRect(MARGIN - 15, MARGIN - 15, 
-                    BOARD_SIZE * CELL_SIZE + 30, 
-                    BOARD_SIZE * CELL_SIZE + 30);
+        g2d.fillRect(MARGIN - 15, MARGIN - 15,
+                    (BOARD_SIZE - 1) * CELL_SIZE + 30,
+                    (BOARD_SIZE - 1) * CELL_SIZE + 30);
         
         // 绘制棋盘线条
         g2d.setColor(Color.BLACK);
@@ -621,9 +621,9 @@ public class GoBoardPanel extends JPanel {
             // 上方显示坐标
             g2d.drawString(label, x - labelWidth / 2, MARGIN - 10);
             
-            // 下方显示坐标
-            g2d.drawString(label, x - labelWidth / 2, 
-                          MARGIN + BOARD_SIZE * CELL_SIZE + 20);
+            // 下方显示坐标，紧贴棋盘以减少空白
+            g2d.drawString(label, x - labelWidth / 2,
+                          MARGIN + (BOARD_SIZE - 1) * CELL_SIZE + 10);
         }
         
         // 绘制行坐标 (1-19) - 纵坐标，在左侧和右侧都显示
@@ -635,8 +635,8 @@ public class GoBoardPanel extends JPanel {
             // 左侧显示坐标
             g2d.drawString(label, MARGIN - labelWidth - 10, y + 4);
             
-            // 右侧显示坐标
-            g2d.drawString(label, MARGIN + BOARD_SIZE * CELL_SIZE + 10, y + 4);
+            // 右侧显示坐标，紧贴棋盘边缘
+            g2d.drawString(label, MARGIN + (BOARD_SIZE - 1) * CELL_SIZE + 10, y + 4);
         }
     }
     

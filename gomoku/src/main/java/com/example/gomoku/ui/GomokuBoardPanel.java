@@ -4,6 +4,7 @@ import com.example.gomoku.core.GameState;
 import com.example.gomoku.core.GomokuBoard;
 import com.example.gomoku.ChatPanel;
 import audio.SoundManager;
+import audio.Sfx;
 import static audio.SoundManager.Event.*;
 import static audio.SoundManager.SoundProfile.*;
 import com.example.gomoku.ai.GomokuZeroAI;
@@ -40,7 +41,8 @@ public class GomokuBoardPanel extends JPanel {
     private java.util.List<GomokuMoveRecord> moveHistory = new java.util.ArrayList<>();
 
     // 棋盘绘制相关常量
-    private static final int MARGIN = 30; // 棋盘边距
+    // 调整边距使棋盘更紧凑，同时保证坐标完整显示
+    private static final int MARGIN = 25; // 棋盘边距
     private static final int CELL_SIZE = 40; // 格子大小
     private static final int PIECE_SIZE = 34; // 棋子大小
 
@@ -62,6 +64,7 @@ public class GomokuBoardPanel extends JPanel {
                 MARGIN * 2 + CELL_SIZE * (GomokuBoard.BOARD_SIZE - 1),
                 MARGIN * 2 + CELL_SIZE * (GomokuBoard.BOARD_SIZE - 1)));
         setBackground(new Color(249, 214, 91)); // 浅黄色背景，模拟木质棋盘
+        Sfx.init();
         
         // 添加鼠标事件监听
         addMouseListener(new MouseAdapter() {
@@ -98,8 +101,8 @@ public class GomokuBoardPanel extends JPanel {
                 // 记录移动历史（用于悔棋）
                 moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
 
-                // 播放落子音效
-                SoundManager.play(STONE, PIECE_DROP);
+                // 播放落子音效（与围棋一致）
+                Sfx.playStoneOnWood(0.7f);
 
                 // 动画与状态更新
                 startDropAnimation(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK);
@@ -174,7 +177,8 @@ public class GomokuBoardPanel extends JPanel {
             moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
 
             // 播放落子音效
-            SoundManager.play(STONE, PIECE_DROP);
+            // 播放落子音效（与围棋一致）
+            Sfx.playStoneOnWood(0.7f);
 
             // 动画与状态更新
             startDropAnimation(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK);
@@ -371,9 +375,10 @@ public class GomokuBoardPanel extends JPanel {
             int stringWidth = fm.stringWidth(label);
             
             // 上方坐标
-            g2d.drawString(label, x - stringWidth / 2, MARGIN - 8);
-            // 下方坐标
-            g2d.drawString(label, x - stringWidth / 2, MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 20);
+            g2d.drawString(label, x - stringWidth / 2, MARGIN - 10);
+            // 下方坐标（紧贴棋盘边缘，确保不被遮挡）
+            g2d.drawString(label, x - stringWidth / 2,
+                    MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 10);
         }
         
         // 绘制行坐标（1-15）
@@ -384,9 +389,11 @@ public class GomokuBoardPanel extends JPanel {
             int stringHeight = fm.getAscent();
             
             // 左侧坐标
-            g2d.drawString(label, MARGIN - stringWidth - 8, y + stringHeight / 2);
+            g2d.drawString(label, MARGIN - stringWidth - 10, y + stringHeight / 2);
             // 右侧坐标
-            g2d.drawString(label, MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 8, y + stringHeight / 2);
+            g2d.drawString(label,
+                    MARGIN + (GomokuBoard.BOARD_SIZE - 1) * CELL_SIZE + 10,
+                    y + stringHeight / 2);
         }
     }
     

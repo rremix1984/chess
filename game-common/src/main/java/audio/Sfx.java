@@ -38,18 +38,18 @@ public final class Sfx {
      */
     private static Clip generateClip(boolean tick) {
         try {
-            int samples = (int)(SAMPLE_RATE * (tick ? 0.04 : 0.22));
+            int samples = (int)(SAMPLE_RATE * (tick ? 0.03 : 0.22));
             byte[] data = new byte[samples * 2];
-            double freq = tick ? 5_000 + Math.random() * 2_000
+            double freq = tick ? 7_000 + Math.random() * 3_000
                                : 250 + Math.random() * 200;
             for (int i = 0; i < samples; i++) {
                 double t = i / (double) SAMPLE_RATE;
                 double env = Math.exp(-t * (tick ? 60 : 8));
                 double sample;
                 if (tick) {
-                    // mix sine with a little noise for a crisp click
-                    sample = (Math.sin(2 * Math.PI * freq * t) * 0.7
-                             + (Math.random() * 2 - 1) * 0.3) * env;
+                    // mix sine with minimal noise for a cleaner click
+                    sample = (Math.sin(2 * Math.PI * freq * t) * 0.85
+                             + (Math.random() * 2 - 1) * 0.1) * env;
                 } else {
                     sample = Math.sin(2 * Math.PI * freq * t) * env;
                 }
