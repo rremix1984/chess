@@ -49,8 +49,6 @@ public class GoBoardPanel extends JPanel {
     private double animProgress;
     private Timer dropTimer;
     private int animPlayer;
-    private long animStartTime;
-    private static final int DROP_DURATION = 600;
     
     // 回调接口
     public interface GameStateCallback {
@@ -203,6 +201,7 @@ public class GoBoardPanel extends JPanel {
         if (pos != null && game.isValidMove(pos.row, pos.col)) {
             if (game.makeMove(pos.row, pos.col)) {
                 lastMove = pos;
+                playMoveSound();
                 startDropAnimation(pos.row, pos.col, game.getBoard()[pos.row][pos.col]);
                 updateGameState();
 
@@ -327,6 +326,7 @@ public class GoBoardPanel extends JPanel {
                     if (aiMove != null) {
                         if (game.makeMove(aiMove.row, aiMove.col)) {
                             lastMove = aiMove;
+                            playMoveSound();
                             startDropAnimation(aiMove.row, aiMove.col, game.getBoard()[aiMove.row][aiMove.col]);
                             // 显示数字坐标
                             int displayRow = GoGame.BOARD_SIZE - aiMove.row;
@@ -411,19 +411,17 @@ public class GoBoardPanel extends JPanel {
         animatingMove = new GoPosition(row, col);
         animPlayer = player;
         animEndY = MARGIN + row * CELL_SIZE;
-        animStartY = -CELL_SIZE * 5;
+        animStartY = animEndY - CELL_SIZE * 3;
         animProgress = 0;
-        animStartTime = System.currentTimeMillis();
         if (dropTimer != null && dropTimer.isRunning()) {
             dropTimer.stop();
         }
         dropTimer = new Timer(15, e -> {
-            long elapsed = System.currentTimeMillis() - animStartTime;
-            animProgress = Math.min(1.0, elapsed / (double) DROP_DURATION);
+            animProgress += 0.1;
             if (animProgress >= 1) {
+                animProgress = 1;
                 dropTimer.stop();
                 animatingMove = null;
-                playMoveSound();
             }
             repaint();
         });
@@ -583,30 +581,39 @@ public class GoBoardPanel extends JPanel {
         // 绘制动画棋子
         if (animatingMove != null && dropTimer != null && dropTimer.isRunning()) {
             int x = MARGIN + animatingMove.col * CELL_SIZE;
-            double eased = easeOutBounce(animProgress);
-            int y = (int) (animStartY + (animEndY - animStartY) * eased);
-            double scale = 0.6 + 0.4 * eased;
-            GoStoneRenderer.draw(g2d, x, y, (int) (STONE_RADIUS * 2 * scale), animPlayer == GoGame.WHITE);
+            int y = (int) (animStartY + (animEndY - animStartY) * (1 - Math.pow(1 - animProgress, 3)));
+            drawStone(g2d, x, y, animPlayer);
         }
     }
 
     private void drawStone(Graphics2D g2d, int x, int y, int player) {
-        GoStoneRenderer.draw(g2d, x, y, STONE_RADIUS * 2, player == GoGame.WHITE);
-    }
+        // 阴影
+        g2d.setColor(new Color(0, 0, 0, 50));
+        g2d.fillOval(x - STONE_RADIUS + 2, y - STONE_RADIUS + 2,
+                STONE_RADIUS * 2, STONE_RADIUS * 2);
 
-    private double easeOutBounce(double t) {
-        if (t < 1 / 2.75) {
-            return 7.5625 * t * t;
-        } else if (t < 2 / 2.75) {
-            t -= 1.5 / 2.75;
-            return 7.5625 * t * t + 0.75;
-        } else if (t < 2.5 / 2.75) {
-            t -= 2.25 / 2.75;
-            return 7.5625 * t * t + 0.9375;
+        // 渐变主体
+        if (player == GoGame.BLACK) {
+            RadialGradientPaint gradient = new RadialGradientPaint(
+                    x - 3, y - 3, STONE_RADIUS,
+                    new float[]{0.0f, 1.0f},
+                    new Color[]{new Color(80, 80, 80), Color.BLACK});
+            g2d.setPaint(gradient);
         } else {
-            t -= 2.625 / 2.75;
-            return 7.5625 * t * t + 0.984375;
+            RadialGradientPaint gradient = new RadialGradientPaint(
+                    x - 3, y - 3, STONE_RADIUS,
+                    new float[]{0.0f, 1.0f},
+                    new Color[]{Color.WHITE, new Color(200, 200, 200)});
+            g2d.setPaint(gradient);
         }
+        g2d.fillOval(x - STONE_RADIUS, y - STONE_RADIUS,
+                STONE_RADIUS * 2, STONE_RADIUS * 2);
+
+        // 边框
+        g2d.setColor(Color.BLACK);
+        g2d.setStroke(new BasicStroke(1.0f));
+        g2d.drawOval(x - STONE_RADIUS, y - STONE_RADIUS,
+                STONE_RADIUS * 2, STONE_RADIUS * 2);
     }
     
     /**
@@ -884,6 +891,7 @@ public class GoBoardPanel extends JPanel {
                     if (aiMove != null) {
                         if (game.makeMove(aiMove.row, aiMove.col)) {
                             lastMove = aiMove;
+                            playMoveSound();
                             startDropAnimation(aiMove.row, aiMove.col, game.getBoard()[aiMove.row][aiMove.col]);
                             // 使用数字坐标显示移动
                             int displayRow = GoGame.BOARD_SIZE - aiMove.row; // 19-1 (从上到下)
