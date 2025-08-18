@@ -14,6 +14,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
@@ -56,6 +58,11 @@ public class InternationalBoardPanel extends JPanel {
 
     // 棋子移动动画
     private PieceMoveAnimation moveAnimation;
+    private final ExecutorService animationExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "MoveAnimator");
+        t.setDaemon(true);
+        return t;
+    });
     
     public InternationalBoardPanel() {
         this.board = new InternationalChessBoard();
@@ -1341,15 +1348,20 @@ public class InternationalBoardPanel extends JPanel {
         moveAnimation.start();
     }
 
+    /** 清理资源，停止动画线程 */
+    public void dispose() {
+        animationExecutor.shutdownNow();
+    }
+
     /** 棋子移动动画实现 */
     private class PieceMoveAnimation {
         final String piece;
         final int fromRow, fromCol, toRow, toCol;
         final int startX, startY, endX, endY;
-        Timer timer;
+        final Rectangle dirtyRect;
         long startTime;
         final int duration = 300; // 动画时长(ms)
-        double progress;
+        volatile double progress;
 
         PieceMoveAnimation(String piece, int fromRow, int fromCol, int toRow, int toCol) {
             this.piece = piece;
@@ -1361,20 +1373,33 @@ public class InternationalBoardPanel extends JPanel {
             this.startY = fromRow * CELL_SIZE + CELL_SIZE / 2;
             this.endX = toCol * CELL_SIZE + CELL_SIZE / 2;
             this.endY = toRow * CELL_SIZE + CELL_SIZE / 2;
+
+            int minX = Math.min(startX, endX) - CELL_SIZE / 2 - 20;
+            int minY = Math.min(startY, endY) - CELL_SIZE / 2 - 40;
+            int width = Math.abs(endX - startX) + CELL_SIZE + 40;
+            int height = Math.abs(endY - startY) + CELL_SIZE + 80;
+            this.dirtyRect = new Rectangle(minX, minY, width, height);
         }
 
         void start() {
             startTime = System.currentTimeMillis();
-            timer = new Timer(16, e -> {
-                long elapsed = System.currentTimeMillis() - startTime;
-                progress = Math.min(1.0, elapsed / (double) duration);
-                if (progress >= 1.0) {
-                    timer.stop();
-                    moveAnimation = null;
+            animationExecutor.execute(() -> {
+                while (progress < 1.0) {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    progress = Math.min(1.0, elapsed / (double) duration);
+                    SwingUtilities.invokeLater(() -> repaint(dirtyRect));
+                    try {
+                        Thread.sleep(16);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                 }
-                repaint();
+                SwingUtilities.invokeLater(() -> {
+                    moveAnimation = null;
+                    repaint(dirtyRect);
+                });
             });
-            timer.start();
         }
 
         boolean isActive() {

@@ -3,6 +3,7 @@ package com.example.common.ui.overlay;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.font.GlyphVector;
+import java.awt.geom.AffineTransform;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -129,7 +130,7 @@ public class OverlayLayer extends JComponent {
 
         // 绘制横幅
         if (bannerText != null && bannerAlpha > 0f) {
-            Composite old = g2d.getComposite();
+            Composite oldComposite = g2d.getComposite();
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, bannerAlpha));
             if (bannerStyle == Style.ALERT_BRUSH) {
                 Font base = getFont().deriveFont(Font.BOLD, 72f);
@@ -139,13 +140,14 @@ public class OverlayLayer extends JComponent {
                 Rectangle bounds = shape.getBounds();
                 int x = (getWidth() - bounds.width) / 2 - bounds.x;
                 int y = bounds.height + 10;
+                AffineTransform originalTransform = g2d.getTransform();
                 g2d.translate(x, y);
                 g2d.setStroke(new BasicStroke(8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 g2d.setColor(Color.WHITE);
                 g2d.draw(shape);
                 g2d.setColor(new Color(0xC00000));
                 g2d.fill(shape);
-                g2d.translate(-x, -y);
+                g2d.setTransform(originalTransform);
             } else {
                 g2d.setFont(getFont().deriveFont(Font.BOLD, 64f));
                 FontMetrics fm = g2d.getFontMetrics();
@@ -154,20 +156,20 @@ public class OverlayLayer extends JComponent {
                 g2d.setColor(Color.RED);
                 g2d.drawString(bannerText, x, y);
             }
-            g2d.setComposite(old);
+            g2d.setComposite(oldComposite);
         }
 
         // 绘制冲击波环
         for (Ring r : rings) {
             float alpha = 1f - r.age / 200f;
             if (alpha <= 0f) continue;
-            Composite old = g2d.getComposite();
+            Composite oldComposite = g2d.getComposite();
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
             int radius = (int)(r.age * 0.4);
             g2d.setColor(new Color(255, 0, 0));
             g2d.setStroke(new BasicStroke(3f));
             g2d.drawOval(r.x - radius, r.y - radius, radius * 2, radius * 2);
-            g2d.setComposite(old);
+            g2d.setComposite(oldComposite);
         }
     }
 
