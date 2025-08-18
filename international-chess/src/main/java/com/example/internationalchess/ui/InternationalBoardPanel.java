@@ -53,6 +53,9 @@ public class InternationalBoardPanel extends JPanel {
     private int aiSuggestionToRow = -1;
     private int aiSuggestionToCol = -1;
     private Timer aiSuggestionTimer; // 用于定时清除建议高亮
+
+    // 棋子移动动画
+    private PieceMoveAnimation moveAnimation;
     
     public InternationalBoardPanel() {
         this.board = new InternationalChessBoard();
@@ -173,14 +176,22 @@ public class InternationalBoardPanel extends JPanel {
         g2d.setFont(new Font("Arial Unicode MS", Font.BOLD, 48));
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         FontMetrics fm = g2d.getFontMetrics();
-        
+
         for (int row = 0; row < BOARD_SIZE; row++) {
             for (int col = 0; col < BOARD_SIZE; col++) {
                 String piece = board.getPiece(row, col);
                 if (piece != null && !piece.trim().isEmpty()) {
+                    if (moveAnimation != null && moveAnimation.isActive() && row == moveAnimation.toRow && col == moveAnimation.toCol) {
+                        continue; // 动画负责绘制该棋子
+                    }
                     drawProfessionalPiece(g2d, piece, col, row, fm);
                 }
             }
+        }
+
+        // 绘制移动中的棋子
+        if (moveAnimation != null && moveAnimation.isActive()) {
+            moveAnimation.draw(g2d, fm);
         }
     }
     
@@ -188,27 +199,31 @@ public class InternationalBoardPanel extends JPanel {
      * 绘制专业的棋子（带立体效果）
      */
     private void drawProfessionalPiece(Graphics2D g2d, String piece, int col, int row, FontMetrics fm) {
-        String symbol = getPieceSymbol(piece);
-        if (symbol.isEmpty()) return;
-        
         int centerX = col * CELL_SIZE + CELL_SIZE / 2;
         int centerY = row * CELL_SIZE + CELL_SIZE / 2;
+        drawProfessionalPieceAt(g2d, piece, centerX, centerY, fm);
+    }
+
+    // 支持在任意像素位置绘制专业棋子
+    private void drawProfessionalPieceAt(Graphics2D g2d, String piece, int centerX, int centerY, FontMetrics fm) {
+        String symbol = getPieceSymbol(piece);
+        if (symbol.isEmpty()) return;
+
         int pieceSize = (int)(CELL_SIZE * 0.7); // 棋子占格子70%
-        
         boolean isWhite = piece.charAt(0) == 'W';
-        
+
         // 绘制远距离阴影（环境光阴影）
         drawEnvironmentShadow(g2d, centerX, centerY, pieceSize);
-        
+
         // 绘制棋子底座（圆形或方形）
         drawPieceBase(g2d, centerX, centerY, pieceSize, isWhite);
-        
+
         // 绘制棋子符号
         drawPieceSymbol(g2d, symbol, centerX, centerY, fm, isWhite);
-        
+
         // 绘制高亮和阴影效果
         drawPieceEffects(g2d, centerX, centerY, pieceSize, isWhite);
-        
+
         // 绘制表面光照效果
         drawSurfaceLighting(g2d, centerX, centerY, pieceSize, isWhite);
     }
@@ -593,14 +608,16 @@ public class InternationalBoardPanel extends JPanel {
         } else {
             // 尝试移动
             if (board.isValidMove(selectedRow, selectedCol, row, col)) {
+                String movingPiece = board.getPiece(selectedRow, selectedCol);
                 String targetPiece = board.getPiece(row, col);
                 if (board.movePiece(selectedRow, selectedCol, row, col)) {
+                    startMoveAnimation(movingPiece, selectedRow, selectedCol, row, col);
                     SoundManager.play(WOOD, targetPiece != null ? PIECE_CAPTURE : PIECE_DROP);
                     updateStatus("移动成功");
-                    
+
                     // 检查游戏状态
                     checkGameState();
-                    
+
                     // 如果AI启用且游戏仍在进行，让AI走棋
                     if (aiEnabled && board.getGameState() == GameState.PLAYING) {
                         SwingUtilities.invokeLater(this::makeAIMove);
@@ -800,6 +817,7 @@ public class InternationalBoardPanel extends JPanel {
         boolean isCapture = targetPiece != null;
         
         if (board.movePiece(fromRow, fromCol, toRow, toCol)) {
+            startMoveAnimation(piece, fromRow, fromCol, toRow, toCol);
             SoundManager.play(WOOD, isCapture ? PIECE_CAPTURE : PIECE_DROP);
             
             // 生成移动描述
@@ -1316,5 +1334,63 @@ public class InternationalBoardPanel extends JPanel {
                 }
             }
         }.execute();
+    }
+
+    private void startMoveAnimation(String piece, int fromRow, int fromCol, int toRow, int toCol) {
+        moveAnimation = new PieceMoveAnimation(piece, fromRow, fromCol, toRow, toCol);
+        moveAnimation.start();
+    }
+
+    /** 棋子移动动画实现 */
+    private class PieceMoveAnimation {
+        final String piece;
+        final int fromRow, fromCol, toRow, toCol;
+        final int startX, startY, endX, endY;
+        Timer timer;
+        long startTime;
+        final int duration = 300; // 动画时长(ms)
+        double progress;
+
+        PieceMoveAnimation(String piece, int fromRow, int fromCol, int toRow, int toCol) {
+            this.piece = piece;
+            this.fromRow = fromRow;
+            this.fromCol = fromCol;
+            this.toRow = toRow;
+            this.toCol = toCol;
+            this.startX = fromCol * CELL_SIZE + CELL_SIZE / 2;
+            this.startY = fromRow * CELL_SIZE + CELL_SIZE / 2;
+            this.endX = toCol * CELL_SIZE + CELL_SIZE / 2;
+            this.endY = toRow * CELL_SIZE + CELL_SIZE / 2;
+        }
+
+        void start() {
+            startTime = System.currentTimeMillis();
+            timer = new Timer(16, e -> {
+                long elapsed = System.currentTimeMillis() - startTime;
+                progress = Math.min(1.0, elapsed / (double) duration);
+                if (progress >= 1.0) {
+                    timer.stop();
+                    moveAnimation = null;
+                }
+                repaint();
+            });
+            timer.start();
+        }
+
+        boolean isActive() {
+            return progress < 1.0;
+        }
+
+        void draw(Graphics2D g2d, FontMetrics fm) {
+            double eased = 1 - Math.pow(1 - progress, 3);
+            int currentX = (int) (startX + (endX - startX) * eased);
+            int currentY = (int) (startY + (endY - startY) * eased - Math.sin(eased * Math.PI) * 20);
+
+            int shake = (int) (Math.sin(eased * Math.PI * 4) * (1 - eased) * 5);
+            currentX += shake;
+            currentY += shake;
+
+            drawProfessionalPieceAt(g2d, piece, currentX, currentY, fm);
+        }
     }
 }

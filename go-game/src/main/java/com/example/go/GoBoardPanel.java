@@ -18,7 +18,8 @@ import java.util.List;
 public class GoBoardPanel extends JPanel {
     private static final int BOARD_SIZE = 19;
     private static final int CELL_SIZE = 30;
-    private static final int MARGIN = 40;
+    // 缩小棋盘四周的边距以减少页面空白
+    private static final int MARGIN = 20;
     private static final int STONE_RADIUS = 12;
     
     private GoGame game;
@@ -68,9 +69,10 @@ public class GoBoardPanel extends JPanel {
     public GoBoardPanel() {
         this.game = new GoGame();
         Sfx.init();
+        // 调整默认尺寸以适应新的较小边距
         setPreferredSize(new Dimension(
             BOARD_SIZE * CELL_SIZE + 2 * MARGIN,
-            BOARD_SIZE * CELL_SIZE + 2 * MARGIN + 50
+            BOARD_SIZE * CELL_SIZE + 2 * MARGIN + 40
         ));
         setBackground(new Color(220, 179, 92)); // 棋盘颜色
         
