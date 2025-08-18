@@ -1394,7 +1394,6 @@ public class InternationalBoardPanel extends JPanel {
 
         void start() {
             startTime = System.currentTimeMillis();
-
             animationExecutor.execute(() -> {
                 while (progress < 1.0) {
                     long elapsed = System.currentTimeMillis() - startTime;
