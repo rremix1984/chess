@@ -414,10 +414,8 @@ public class GoBoardPanel extends JPanel {
         animPlayer = player;
         animEndX = MARGIN + col * CELL_SIZE;
         animEndY = MARGIN + row * CELL_SIZE;
-        animStartX = getWidth() / 2;
+        // 从屏幕外顶部开始下落
         animStartY = -CELL_SIZE * 2;
-        animDuration = 600;
-        animStartTime = System.currentTimeMillis();
         animProgress = 0;
 
         if (dropTimer != null && dropTimer.isRunning()) {
@@ -425,9 +423,9 @@ public class GoBoardPanel extends JPanel {
         }
 
         dropTimer = new Timer(15, e -> {
-            long elapsed = System.currentTimeMillis() - animStartTime;
-            animProgress = Math.min(1.0, elapsed / (double) animDuration);
-            if (animProgress >= 1.0) {
+            animProgress += 0.05;
+            if (animProgress >= 1) {
+                animProgress = 1;
                 dropTimer.stop();
                 playMoveSound();
                 animatingMove = null;
@@ -589,11 +587,11 @@ public class GoBoardPanel extends JPanel {
 
         // 绘制动画棋子
         if (animatingMove != null && dropTimer != null && dropTimer.isRunning()) {
+            int x = MARGIN + animatingMove.col * CELL_SIZE;
             double p = animProgress;
-            double pos = easeOutBounce(p);
-            int x = (int) (animStartX + (animEndX - animStartX) * pos);
-            int y = (int) (animStartY + (animEndY - animStartY) * pos);
-            double scale = 0.5 + 0.5 * easeOutCubic(Math.min(1.0, p));
+            double eased = easeOut(p);
+            int y = (int) (animStartY + (animEndY - animStartY) * eased);
+            double scale = 0.6 + 0.4 * eased;
             drawStone(g2d, x, y, animPlayer, scale);
         }
     }
@@ -607,25 +605,8 @@ public class GoBoardPanel extends JPanel {
         GoStoneRenderer.draw(g2d, x, y, diameter, player == GoGame.WHITE);
     }
 
-    private double easeOutCubic(double t) {
+    private double easeOut(double t) {
         return 1 - Math.pow(1 - t, 3);
-    }
-
-    private double easeOutBounce(double t) {
-        double n1 = 7.5625;
-        double d1 = 2.75;
-        if (t < 1 / d1) {
-            return n1 * t * t;
-        } else if (t < 2 / d1) {
-            t -= 1.5 / d1;
-            return n1 * t * t + 0.75;
-        } else if (t < 2.5 / d1) {
-            t -= 2.25 / d1;
-            return n1 * t * t + 0.9375;
-        } else {
-            t -= 2.625 / d1;
-            return n1 * t * t + 0.984375;
-        }
     }
 
     /**
