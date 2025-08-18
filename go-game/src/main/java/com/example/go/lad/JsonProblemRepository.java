@@ -10,6 +10,8 @@ import java.io.Reader;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -17,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 import java.util.stream.Stream;
 
 /**
@@ -35,10 +38,21 @@ public class JsonProblemRepository implements ProblemRepository {
             if (dirURL == null) {
                 return;
             }
-            Path dir = Paths.get(dirURL.toURI());
-            try (Stream<Path> paths = Files.list(dir)) {
-                paths.filter(p -> p.toString().endsWith(".json"))
-                        .forEach(this::loadFile);
+            var uri = dirURL.toURI();
+            if ("jar".equals(uri.getScheme())) {
+                try (FileSystem fs = FileSystems.newFileSystem(uri, Collections.emptyMap())) {
+                    Path dir = fs.getPath("/problems");
+                    try (Stream<Path> paths = Files.list(dir)) {
+                        paths.filter(p -> p.toString().endsWith(".json"))
+                                .forEach(this::loadFile);
+                    }
+                }
+            } else {
+                Path dir = Paths.get(uri);
+                try (Stream<Path> paths = Files.list(dir)) {
+                    paths.filter(p -> p.toString().endsWith(".json"))
+                            .forEach(this::loadFile);
+                }
             }
         } catch (URISyntaxException | IOException e) {
             e.printStackTrace();
