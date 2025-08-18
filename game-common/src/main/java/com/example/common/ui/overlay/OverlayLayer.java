@@ -3,6 +3,7 @@ package com.example.common.ui.overlay;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.font.GlyphVector;
+import java.awt.geom.AffineTransform;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -142,13 +143,14 @@ public class OverlayLayer extends JComponent {
                 Rectangle bounds = shape.getBounds();
                 int x = (getWidth() - bounds.width) / 2 - bounds.x;
                 int y = bounds.height + 10;
+                AffineTransform oldTx = g2d.getTransform();
                 g2d.translate(x, y);
                 g2d.setStroke(new BasicStroke(8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 g2d.setColor(Color.WHITE);
                 g2d.draw(shape);
                 g2d.setColor(new Color(0xC00000));
                 g2d.fill(shape);
-                g2d.translate(-x, -y);
+                g2d.setTransform(oldTx);
             } else {
                 g2d.setFont(getFont().deriveFont(Font.BOLD, 64f));
                 FontMetrics fm = g2d.getFontMetrics();
