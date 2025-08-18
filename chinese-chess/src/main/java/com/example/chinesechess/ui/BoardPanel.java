@@ -6012,13 +6012,19 @@ public class BoardPanel extends JPanel {
             float eased = (float) easeOutCubic(progress);
             int currentX = (int) (startX + (endX - startX) * eased);
             int currentY = (int) (startY + (endY - startY) * eased);
+
+            // 模拟下落过程中的透视缩放
             float sizeFactor = 1f + (1f - eased) * 0.5f;
             int size = (int) (CELL_SIZE * 0.9 * sizeFactor);
-            int offsetX = 5, offsetY = 5;
+
+            // 阴影随着高度逐渐靠近棋子，偏移量逐渐减小
+            int shadowOffset = (int) (5 + 15 * (1f - eased));
             Composite old = g2d.getComposite();
             g2d.setColor(new Color(0, 0, 0, 100));
-            g2d.fillOval(currentX + offsetX - size / 2, currentY + offsetY - size / 2, size, size);
+            g2d.fillOval(currentX + shadowOffset - size / 2,
+                         currentY + shadowOffset - size / 2, size, size);
             g2d.setComposite(old);
+
             drawPieceAt(g2d, piece, currentX, currentY, sizeFactor, 1f);
         }
 
