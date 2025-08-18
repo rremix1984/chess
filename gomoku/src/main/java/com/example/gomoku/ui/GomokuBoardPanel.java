@@ -56,6 +56,7 @@ public class GomokuBoardPanel extends JPanel {
     private int animDuration;
     private double animProgress;
     private Timer dropTimer;
+    private boolean playedSfx;
     
     /**
      * 构造函数
@@ -104,10 +105,7 @@ public class GomokuBoardPanel extends JPanel {
                 // 记录移动历史（用于悔棋）
                 moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
 
-                // 播放落子音效（与围棋一致）
-                Sfx.playStoneOnWood(0.7f);
-
-                // 动画与状态更新
+                // 动画与状态更新（音效在动画末尾触发）
                 startDropAnimation(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK);
                 updateStatus();
 
@@ -179,11 +177,7 @@ public class GomokuBoardPanel extends JPanel {
             // 记录AI移动历史（用于悔棋）
             moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
 
-            // 播放落子音效
-            // 播放落子音效（与围棋一致）
-            Sfx.playStoneOnWood(0.7f);
-
-            // 动画与状态更新
+            // 动画与状态更新（音效在动画末尾触发）
             startDropAnimation(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK);
             updateStatus();
         }
@@ -198,13 +192,19 @@ public class GomokuBoardPanel extends JPanel {
         animDuration = 1000;
         animStartTime = System.currentTimeMillis();
         animProgress = 0;
+        playedSfx = false;
         if (dropTimer != null && dropTimer.isRunning()) {
             dropTimer.stop();
         }
         dropTimer = new Timer(15, e -> {
-            long elapsed = System.currentTimeMillis() - animStartTime;
-            animProgress = Math.min(1.0, elapsed / (double) animDuration);
-            if (animProgress >= 1.0) {
+
+            animProgress += 0.1;
+            if (!playedSfx && animProgress >= 0.98) {
+                playMoveSound();
+                playedSfx = true;
+            }
+            if (animProgress >= 1) {
+                animProgress = 1;
                 dropTimer.stop();
                 animRow = -1;
             }
@@ -212,6 +212,11 @@ public class GomokuBoardPanel extends JPanel {
         });
         dropTimer.start();
         repaint();
+    }
+
+    /** 播放落子音效 */
+    private void playMoveSound() {
+        Sfx.playStoneOnWood(0.7f);
     }
     
     /**
