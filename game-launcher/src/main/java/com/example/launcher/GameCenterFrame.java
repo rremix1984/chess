@@ -100,7 +100,10 @@ public class GameCenterFrame extends JFrame implements NetworkClient.ClientEvent
                 if (!e.getValueIsAdjusting()) {
                     String selected = gameList.getSelectedValue();
                     if ("围棋死活".equals(selected)) {
-                        SwingUtilities.invokeLater(() -> new LifeAndDeathFrame().setVisible(true));
+                        SwingUtilities.invokeLater(() -> {
+                            new LifeAndDeathFrame().setVisible(true);
+                            gameList.setSelectedIndex(0);
+                        });
                         return;
                     }
                     selectedGameType = GAME_MAP.get(selected);

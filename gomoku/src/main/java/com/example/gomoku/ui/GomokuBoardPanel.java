@@ -38,11 +38,22 @@ public class GomokuBoardPanel extends JPanel {
     
     // 移动历史记录（用于悔棋功能）
     private java.util.List<GomokuMoveRecord> moveHistory = new java.util.ArrayList<>();
-    
+
     // 棋盘绘制相关常量
     private static final int MARGIN = 30; // 棋盘边距
     private static final int CELL_SIZE = 40; // 格子大小
     private static final int PIECE_SIZE = 34; // 棋子大小
+
+    // 落子动画
+    private int animRow = -1;
+    private int animCol = -1;
+    private char animPiece;
+    private int animStartY;
+    private int animEndY;
+    private double animProgress;
+    private Timer dropTimer;
+    private long animStartTime;
+    private static final int DROP_DURATION = 600;
     
     /**
      * 构造函数
@@ -88,14 +99,11 @@ public class GomokuBoardPanel extends JPanel {
             if (success) {
                 // 记录移动历史（用于悔棋）
                 moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
-                
-                // 播放落子音效
-                SoundManager.play(STONE, PIECE_DROP);
-                
-                // 更新界面
-                repaint();
+
+                // 动画与状态更新
+                startDropAnimation(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK);
                 updateStatus();
-                
+
                 // 如果游戏未结束且AI已启用，让AI走棋
                 if (board.getGameState() == GameState.PLAYING && aiEnabled) {
                     SwingUtilities.invokeLater(this::makeAIMove);
@@ -163,14 +171,36 @@ public class GomokuBoardPanel extends JPanel {
         if (success) {
             // 记录AI移动历史（用于悔棋）
             moveHistory.add(new GomokuMoveRecord(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK));
-            
-            // 播放落子音效
-                    SoundManager.play(STONE, PIECE_DROP);
-            
-            // 更新界面
-            repaint();
+
+            // 动画与状态更新
+            startDropAnimation(row, col, board.isBlackTurn() ? GomokuBoard.WHITE : GomokuBoard.BLACK);
             updateStatus();
         }
+    }
+
+    private void startDropAnimation(int row, int col, char piece) {
+        animRow = row;
+        animCol = col;
+        animPiece = piece;
+        animEndY = MARGIN + row * CELL_SIZE;
+        animStartY = -CELL_SIZE * 5;
+        animProgress = 0;
+        animStartTime = System.currentTimeMillis();
+        if (dropTimer != null && dropTimer.isRunning()) {
+            dropTimer.stop();
+        }
+        dropTimer = new Timer(15, e -> {
+            long elapsed = System.currentTimeMillis() - animStartTime;
+            animProgress = Math.min(1.0, elapsed / (double) DROP_DURATION);
+            if (animProgress >= 1) {
+                dropTimer.stop();
+                animRow = -1;
+                SoundManager.play(STONE, PIECE_DROP);
+            }
+            repaint();
+        });
+        dropTimer.start();
+        repaint();
     }
     
     /**
@@ -295,9 +325,21 @@ public class GomokuBoardPanel extends JPanel {
             for (int col = 0; col < GomokuBoard.BOARD_SIZE; col++) {
                 char piece = board.getPiece(row, col);
                 if (piece != ' ') {
+                    if (dropTimer != null && dropTimer.isRunning() && row == animRow && col == animCol) {
+                        continue; // 动画棋子稍后绘制
+                    }
                     drawPiece(g2d, row, col, piece);
                 }
             }
+        }
+
+        // 绘制动画棋子
+        if (dropTimer != null && dropTimer.isRunning()) {
+            int centerX = MARGIN + animCol * CELL_SIZE;
+            double eased = easeOutBounce(animProgress);
+            int currentY = (int) (animStartY + (animEndY - animStartY) * eased);
+            double scale = 0.6 + 0.4 * eased;
+            drawPieceAt(g2d, centerX, currentY, animPiece, scale);
         }
         
         // 绘制最后一步棋的标记
@@ -364,31 +406,51 @@ public class GomokuBoardPanel extends JPanel {
     private void drawPiece(Graphics2D g2d, int row, int col, char piece) {
         int centerX = MARGIN + col * CELL_SIZE;
         int centerY = MARGIN + row * CELL_SIZE;
-        int pieceRadius = PIECE_SIZE / 2;
+        drawPieceAt(g2d, centerX, centerY, piece, 1.0);
+    }
+
+    private void drawPieceAt(Graphics2D g2d, int centerX, int centerY, char piece, double scale) {
+        int pieceRadius = (int) Math.round(PIECE_SIZE / 2.0 * scale);
+        int size = pieceRadius * 2;
         int x = centerX - pieceRadius;
         int y = centerY - pieceRadius;
-        
+
         // 保存原始状态
         Composite originalComposite = g2d.getComposite();
         Stroke originalStroke = g2d.getStroke();
         Paint originalPaint = g2d.getPaint();
-        
+
         // 绘制环境阴影（多层柔和阴影）
-        drawEnvironmentShadow(g2d, centerX, centerY, PIECE_SIZE);
-        
+        drawEnvironmentShadow(g2d, centerX, centerY, size);
+
         if (piece == GomokuBoard.BLACK) {
             drawProfessionalBlackPiece(g2d, centerX, centerY, pieceRadius);
         } else {
             drawProfessionalWhitePiece(g2d, centerX, centerY, pieceRadius);
         }
-        
+
         // 绘制表面光照效果
         drawSurfaceLighting(g2d, centerX, centerY, pieceRadius, piece == GomokuBoard.WHITE);
-        
+
         // 恢复原始状态
         g2d.setComposite(originalComposite);
         g2d.setStroke(originalStroke);
         g2d.setPaint(originalPaint);
+    }
+
+    private double easeOutBounce(double t) {
+        if (t < 1 / 2.75) {
+            return 7.5625 * t * t;
+        } else if (t < 2 / 2.75) {
+            t -= 1.5 / 2.75;
+            return 7.5625 * t * t + 0.75;
+        } else if (t < 2.5 / 2.75) {
+            t -= 2.25 / 2.75;
+            return 7.5625 * t * t + 0.9375;
+        } else {
+            t -= 2.625 / 2.75;
+            return 7.5625 * t * t + 0.984375;
+        }
     }
     
     /**

@@ -121,16 +121,22 @@ public final class PieceRenderer {
     private static void paintDropShadow(Graphics2D g, int cx, int cy, int rOuter, int d) {
         int w = Math.round(rOuter * 1.4f);
         int h = Math.round(rOuter * 0.35f);
-        int y = cy + rOuter / 2;
+        float offset = d * 0.05f;
+        int x = Math.round(cx - w / 2f + offset);
+        int y = Math.round(cy - h / 2f + rOuter * 0.6f + offset);
 
-        BufferedImage shadow = new BufferedImage(d, d, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage shadow = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D sg = shadow.createGraphics(); enableAA(sg);
-        sg.setColor(new Color(0, 0, 0, 180));
-        sg.fill(new Ellipse2D.Float(cx - w / 2f, y, w, h));
+        int alpha = Math.min(200, 80 + d / 2);
+        RadialGradientPaint rg = new RadialGradientPaint(
+                new Point2D.Float(w / 2f, h / 2f), Math.max(w, h) / 2f,
+                new float[]{0f, 1f}, new Color[]{new Color(0, 0, 0, alpha), new Color(0, 0, 0, 0)});
+        sg.setPaint(rg);
+        sg.fill(new Ellipse2D.Float(0, 0, w, h));
         sg.dispose();
 
         BufferedImage blurred = gaussianBlur(shadow, Math.max(2f, d / 60f));
-        g.drawImage(blurred, 0, 0, null);
+        g.drawImage(blurred, x, y, null);
     }
 
     private static void paintRim(Graphics2D g, int cx, int cy, int rOuter, int rimW) {
