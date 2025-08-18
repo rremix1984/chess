@@ -46,6 +46,9 @@ public class GoBoardPanel extends JPanel {
     private GoPosition animatingMove;
     private int animStartX;
     private int animStartY;
+
+    private int animCtrlX;
+    private int animCtrlY;
     private int animEndX;
     private int animEndY;
     private long animStartTime;
@@ -414,8 +417,13 @@ public class GoBoardPanel extends JPanel {
         animPlayer = player;
         animEndX = MARGIN + col * CELL_SIZE;
         animEndY = MARGIN + row * CELL_SIZE;
-        // 从屏幕外顶部开始下落
+
+        animStartX = -CELL_SIZE * 2;
         animStartY = -CELL_SIZE * 2;
+        animCtrlX = animEndX;
+        animCtrlY = animStartY;
+        animDuration = 1000;
+        animStartTime = System.currentTimeMillis();
         animProgress = 0;
 
         if (dropTimer != null && dropTimer.isRunning()) {
@@ -423,9 +431,9 @@ public class GoBoardPanel extends JPanel {
         }
 
         dropTimer = new Timer(15, e -> {
-            animProgress += 0.05;
-            if (animProgress >= 1) {
-                animProgress = 1;
+            long elapsed = System.currentTimeMillis() - animStartTime;
+            animProgress = Math.min(1.0, elapsed / (double) animDuration);
+            if (animProgress >= 1.0) {
                 dropTimer.stop();
                 playMoveSound();
                 animatingMove = null;
@@ -587,12 +595,13 @@ public class GoBoardPanel extends JPanel {
 
         // 绘制动画棋子
         if (animatingMove != null && dropTimer != null && dropTimer.isRunning()) {
-            int x = MARGIN + animatingMove.col * CELL_SIZE;
+
             double p = animProgress;
-            double eased = easeOut(p);
-            int y = (int) (animStartY + (animEndY - animStartY) * eased);
-            double scale = 0.6 + 0.4 * eased;
-            drawStone(g2d, x, y, animPlayer, scale);
+            double t = easeInOutCubic(p);
+            double x = quadraticBezier(animStartX, animCtrlX, animEndX, t);
+            double y = quadraticBezier(animStartY, animCtrlY, animEndY, t);
+            double scale = 0.6 + 0.4 * t;
+            drawStone(g2d, (int) x, (int) y, animPlayer, scale);
         }
     }
 
@@ -605,8 +614,13 @@ public class GoBoardPanel extends JPanel {
         GoStoneRenderer.draw(g2d, x, y, diameter, player == GoGame.WHITE);
     }
 
-    private double easeOut(double t) {
-        return 1 - Math.pow(1 - t, 3);
+    private double quadraticBezier(double p0, double p1, double p2, double t) {
+        double u = 1 - t;
+        return u * u * p0 + 2 * u * t * p1 + t * t * p2;
+    }
+
+    private double easeInOutCubic(double t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     }
 
     /**
