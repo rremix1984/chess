@@ -121,7 +121,6 @@ public final class PieceRenderer {
     private static void paintDropShadow(Graphics2D g, int cx, int cy, int rOuter, int d) {
         int w = Math.round(rOuter * 1.4f);
         int h = Math.round(rOuter * 0.35f);
-
         float offset = d * 0.05f;
         int x = Math.round(cx - w / 2f + offset);
         int y = Math.round(cy - h / 2f + rOuter * 0.6f + offset);
