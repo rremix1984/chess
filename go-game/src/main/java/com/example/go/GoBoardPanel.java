@@ -44,8 +44,12 @@ public class GoBoardPanel extends JPanel {
 
     // 落子动画状态
     private GoPosition animatingMove;
+    private int animStartX;
     private int animStartY;
+    private int animEndX;
     private int animEndY;
+    private long animStartTime;
+    private int animDuration;
     private double animProgress;
     private Timer dropTimer;
     private int animPlayer;
@@ -408,13 +412,16 @@ public class GoBoardPanel extends JPanel {
     private void startDropAnimation(int row, int col, int player) {
         animatingMove = new GoPosition(row, col);
         animPlayer = player;
+        animEndX = MARGIN + col * CELL_SIZE;
         animEndY = MARGIN + row * CELL_SIZE;
         // 从屏幕外顶部开始下落
         animStartY = -CELL_SIZE * 2;
         animProgress = 0;
+
         if (dropTimer != null && dropTimer.isRunning()) {
             dropTimer.stop();
         }
+
         dropTimer = new Timer(15, e -> {
             animProgress += 0.05;
             if (animProgress >= 1) {
