@@ -6007,22 +6007,18 @@ public class BoardPanel extends JPanel {
         void draw(Graphics2D g2d) {
             float eased = (float) easeOutCubic(progress);
 
-            // 圆心不变，只改变棋子尺寸
-            float sizeFactor = 1.5f - 0.5f * eased;
+            // 圆心保持不变，仅通过缩放模拟透视效果
+            float sizeFactor = 1f + (1f - eased) * 0.5f; // 从 1.5 缩小至 1.0
             int size = (int) (CELL_SIZE * 0.9 * sizeFactor);
 
-            // 阴影位置与大小随时间偏移
-            float shadowProgress = eased;
-            int shadowOffsetX = (int) (8 * shadowProgress);
-            int shadowOffsetY = (int) (8 * shadowProgress);
-            int shadowWidth = (int) (size * (0.9 + 0.1 * shadowProgress));
-            int shadowHeight = (int) (shadowWidth * 0.6);
-
+            // 阴影始终偏移到棋子右下方，并随棋子尺寸缩放
+            int offsetX = 5;
+            int offsetY = 5;
             Composite old = g2d.getComposite();
             g2d.setColor(new Color(0, 0, 0, 100));
-            g2d.fillOval(centerX + shadowOffsetX - shadowWidth / 2,
-                         centerY + shadowOffsetY - shadowHeight / 2,
-                         shadowWidth, shadowHeight);
+            g2d.fillOval(centerX + offsetX - size / 2,
+                         centerY + offsetY - size / 2,
+                         size, size);
             g2d.setComposite(old);
 
             drawPieceAt(g2d, piece, centerX, centerY, sizeFactor, 1f);
