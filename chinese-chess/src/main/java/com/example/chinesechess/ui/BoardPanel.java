@@ -162,6 +162,8 @@ public class BoardPanel extends JPanel {
 
     // 当前棋子移动动画
     private PieceAnimation currentAnimation = null;
+    // 当前棋子飞入动画
+    private PieceDropAnimation dropAnimation = null;
 
     public BoardPanel(Board board) {
         this.board = board;
@@ -5916,9 +5918,24 @@ public class BoardPanel extends JPanel {
 
     /** 绘制当前走子动画 */
     private void drawCurrentAnimation(Graphics2D g2d) {
+        if (dropAnimation != null) {
+            dropAnimation.draw(g2d);
+        }
         if (currentAnimation != null) {
             currentAnimation.draw(g2d);
         }
+    }
+
+    /** 启动飞入动画 */
+    public void startDropAnimation(Piece piece, Position end) {
+        int endRow = getDisplayRow(end.getX());
+        int endCol = getDisplayCol(end.getY());
+        int endX = MARGIN + endCol * CELL_SIZE;
+        int endY = MARGIN + endRow * CELL_SIZE;
+        int startX = endX;
+        int startY = getHeight() + CELL_SIZE;
+        dropAnimation = new PieceDropAnimation(piece, startX, startY, endX, endY, 600);
+        dropAnimation.start();
     }
 
     /** 启动走子动画 */
@@ -5957,6 +5974,58 @@ public class BoardPanel extends JPanel {
     private double easeOutCubic(double t) {
         t -= 1.0;
         return t * t * t + 1.0;
+    }
+
+    /** 棋子飞入动画类 */
+    private class PieceDropAnimation {
+        private final Piece piece;
+        private final int startX, startY, endX, endY;
+        private final int duration;
+        private Timer timer;
+        private long startTime;
+        private float progress;
+
+        PieceDropAnimation(Piece piece, int startX, int startY, int endX, int endY, int duration) {
+            this.piece = piece;
+            this.startX = startX;
+            this.startY = startY;
+            this.endX = endX;
+            this.endY = endY;
+            this.duration = duration;
+        }
+
+        void start() {
+            startTime = System.currentTimeMillis();
+            timer = new Timer(16, e -> {
+                long elapsed = System.currentTimeMillis() - startTime;
+                progress = Math.min(1f, elapsed / (float) duration);
+                if (progress >= 1f) {
+                    timer.stop();
+                    finish();
+                }
+                repaint();
+            });
+            timer.start();
+        }
+
+        void draw(Graphics2D g2d) {
+            float eased = (float) easeOutCubic(progress);
+            int currentX = (int) (startX + (endX - startX) * eased);
+            int currentY = (int) (startY + (endY - startY) * eased);
+            float sizeFactor = 1f + (1f - eased) * 0.5f;
+            int size = (int) (CELL_SIZE * 0.9 * sizeFactor);
+            int offsetX = 5, offsetY = 5;
+            Composite old = g2d.getComposite();
+            g2d.setColor(new Color(0, 0, 0, 100));
+            g2d.fillOval(currentX + offsetX - size / 2, currentY + offsetY - size / 2, size, size);
+            g2d.setComposite(old);
+            drawPieceAt(g2d, piece, currentX, currentY, sizeFactor, 1f);
+        }
+
+        private void finish() {
+            dropAnimation = null;
+            repaint();
+        }
     }
 
     /** 棋子移动动画类 */
