@@ -38,20 +38,23 @@ public final class Sfx {
      */
     private static Clip generateClip(boolean tick) {
         try {
-            int samples = (int)(SAMPLE_RATE * (tick ? 0.03 : 0.22));
+            int samples = (int)(SAMPLE_RATE * (tick ? 0.025 : 0.18));
             byte[] data = new byte[samples * 2];
-            double freq = tick ? 7_000 + Math.random() * 3_000
-                               : 250 + Math.random() * 200;
+            double freq = tick ? 8_000 + Math.random() * 4_000
+                               : 220 + Math.random() * 120;
             for (int i = 0; i < samples; i++) {
                 double t = i / (double) SAMPLE_RATE;
-                double env = Math.exp(-t * (tick ? 60 : 8));
+                double env = Math.exp(-t * (tick ? 70 : 8));
                 double sample;
                 if (tick) {
-                    // mix sine with minimal noise for a cleaner click
-                    sample = (Math.sin(2 * Math.PI * freq * t) * 0.85
-                             + (Math.random() * 2 - 1) * 0.1) * env;
+                    // brighter click: add harmonic and reduce noise
+                    sample = (Math.sin(2 * Math.PI * freq * t)
+                             + Math.sin(2 * Math.PI * freq * 1.7 * t) * 0.3
+                             + (Math.random() * 2 - 1) * 0.05) * env;
                 } else {
-                    sample = Math.sin(2 * Math.PI * freq * t) * env;
+                    // subtle second harmonic for wood resonance
+                    sample = (Math.sin(2 * Math.PI * freq * t)
+                             + Math.sin(2 * Math.PI * freq * 2 * t) * 0.25) * env;
                 }
                 int val = (int)(sample * Short.MAX_VALUE);
                 data[i * 2] = (byte)(val & 0xff);

@@ -392,8 +392,10 @@ public class GoBoardPanel extends JPanel {
         List<GoMove> history = game.getMoveHistory();
         if (!history.isEmpty()) {
             GoMove last = history.get(history.size() - 1);
-            Sfx.playStoneOnWood(0.7f);
-            if (!last.capturedStones.isEmpty()) {
+            int captures = last.capturedStones.size();
+            float power = 0.7f + Math.min(0.3f, captures * 0.1f);
+            Sfx.playStoneOnWood(power);
+            if (captures > 0) {
                 SoundManager.play(STONE, PIECE_CAPTURE);
             }
         }
