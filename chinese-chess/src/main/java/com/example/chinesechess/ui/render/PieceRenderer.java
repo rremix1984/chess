@@ -137,6 +137,14 @@ public final class PieceRenderer {
 
         BufferedImage blurred = gaussianBlur(shadow, Math.max(2f, d / 60f));
         g.drawImage(blurred, x, y, null);
+
+        // 额外的月牙形阴影以增强立体感
+        g.setColor(new Color(0, 0, 0, 60));
+        int crescentW = Math.round(rOuter * 1.2f);
+        int crescentH = Math.round(rOuter * 0.6f);
+        int crescentX = cx - crescentW / 2;
+        int crescentY = cy + rOuter - crescentH / 2;
+        g.fillArc(crescentX, crescentY, crescentW, crescentH, 0, 180);
     }
 
     private static void paintRim(Graphics2D g, int cx, int cy, int rOuter, int rimW) {
