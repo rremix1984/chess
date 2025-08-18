@@ -14,6 +14,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
@@ -56,6 +58,11 @@ public class InternationalBoardPanel extends JPanel {
 
     // 棋子移动动画
     private PieceMoveAnimation moveAnimation;
+    private final ExecutorService animationExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "MoveAnimator");
+        t.setDaemon(true);
+        return t;
+    });
     
     public InternationalBoardPanel() {
         this.board = new InternationalChessBoard();
@@ -1352,6 +1359,11 @@ public class InternationalBoardPanel extends JPanel {
         moveAnimation.start();
     }
 
+    /** 清理资源，停止动画线程 */
+    public void dispose() {
+        animationExecutor.shutdownNow();
+    }
+
     /** 棋子移动动画实现 */
     private class PieceMoveAnimation {
         final String piece;
@@ -1382,7 +1394,7 @@ public class InternationalBoardPanel extends JPanel {
 
         void start() {
             startTime = System.currentTimeMillis();
-            Thread animator = new Thread(() -> {
+            animationExecutor.execute(() -> {
                 while (progress < 1.0) {
                     long elapsed = System.currentTimeMillis() - startTime;
                     progress = Math.min(1.0, elapsed / (double) duration);
@@ -1399,8 +1411,6 @@ public class InternationalBoardPanel extends JPanel {
                     repaint(dirtyRect);
                 });
             });
-            animator.setDaemon(true);
-            animator.start();
         }
 
         boolean isActive() {
