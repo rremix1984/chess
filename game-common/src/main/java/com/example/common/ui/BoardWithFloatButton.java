@@ -38,7 +38,6 @@ public class BoardWithFloatButton extends JLayeredPane {
             }
         });
     }
-
     @Override
     public Dimension getPreferredSize() {
         return board.getPreferredSize();
@@ -70,4 +69,5 @@ public class BoardWithFloatButton extends JLayeredPane {
 
     public WoodButton getFullscreenButton() { return enterButton; }
     public WoodButton getExitButton() { return exitButton; }
+
 }
