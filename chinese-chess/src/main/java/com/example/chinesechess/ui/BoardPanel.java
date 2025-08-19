@@ -31,7 +31,6 @@ import java.awt.geom.Point2D;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Rectangle2D;
-import java.awt.geom.Area;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -57,9 +56,6 @@ public class BoardPanel extends JPanel {
     private double viewOffsetX = 0.0;
     private double viewOffsetY = 0.0;
     private AffineTransform viewTx = new AffineTransform();
-    private Rectangle2D.Float innerRect;
-    private Rectangle2D.Float frameOuterRect;
-    private Rectangle2D.Float wrapRect;
     
     // 游戏状态
     private Piece selectedPiece = null;
@@ -1001,9 +997,7 @@ public class BoardPanel extends JPanel {
         Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-
-        computeBoardGeometry();
-
+        
         // 绘制3D背景
         draw3DBackground(g2d);
 
@@ -1022,19 +1016,7 @@ public class BoardPanel extends JPanel {
         // 绘制坐标
         drawCoordinates(g2d);
     }
-
-    private void computeBoardGeometry() {
-        innerRect = new Rectangle2D.Float(MARGIN, MARGIN, 8 * CELL_SIZE, 9 * CELL_SIZE);
-        float frameThickness = innerRect.width * 0.028f;
-        float wrapBezel = innerRect.width * 0.02f;
-        frameOuterRect = grow(innerRect, frameThickness);
-        wrapRect = grow(frameOuterRect, wrapBezel);
-    }
-
-    private Rectangle2D.Float grow(Rectangle2D.Float r, float d) {
-        return new Rectangle2D.Float(r.x - d, r.y - d, r.width + 2 * d, r.height + 2 * d);
-    }
-
+    
     /**
      * 绘制3D背景效果
      */
@@ -1042,6 +1024,7 @@ public class BoardPanel extends JPanel {
         // 绘制华丽的背景渐变
         drawLuxuriousBackground(g2d);
         
+
         // 添加木纹纹理效果
         drawEnhancedWoodTexture(g2d);
 
@@ -1086,18 +1069,24 @@ public class BoardPanel extends JPanel {
      * 绘制装饰性边框
      */
     private void drawDecorativeBorder(Graphics2D g2d) {
-        if (wrapRect == null || frameOuterRect == null) {
-            return;
-        }
+        // 基于内盘矩形计算外框，确保缩放和居中时始终贴合棋盘
+        Rectangle2D.Float inner = new Rectangle2D.Float(
+                MARGIN, MARGIN, 8 * CELL_SIZE, 9 * CELL_SIZE);
+        float borderWidth = inner.width * 0.028f;
+        Rectangle2D.Float outer = new Rectangle2D.Float(
+                inner.x - borderWidth, inner.y - borderWidth,
+                inner.width + 2 * borderWidth, inner.height + 2 * borderWidth);
+
         Paint old = g2d.getPaint();
-        Paint grad = new GradientPaint(0f, wrapRect.y,
-                new Color(101, 67, 33), 0f,
-                wrapRect.y + wrapRect.height,
-                new Color(139, 69, 19));
-        g2d.setPaint(grad);
-        Area wrapArea = new Area(wrapRect);
-        wrapArea.subtract(new Area(frameOuterRect));
-        g2d.fill(wrapArea);
+        GradientPaint borderGradient = new GradientPaint(
+                0f, outer.y, new Color(101, 67, 33),
+                0f, outer.y + outer.height, new Color(139, 69, 19));
+        g2d.setPaint(borderGradient);
+        g2d.fill(outer);
+
+        // 挖掉内盘区域以避免描边偏移
+        g2d.setPaint(new Color(245, 222, 179));
+        g2d.fill(inner);
         g2d.setPaint(old);
     }
     
@@ -1219,19 +1208,10 @@ public class BoardPanel extends JPanel {
      * 绘制包围棋盘的红色外框
      */
     private void drawBoardFrame(Graphics2D g2d) {
-        if (frameOuterRect == null || innerRect == null) {
-            return;
-        }
-        Paint old = g2d.getPaint();
-        Paint grad = new GradientPaint(0f, wrapRect.y,
-                new Color(101, 67, 33), 0f,
-                wrapRect.y + wrapRect.height,
-                new Color(139, 69, 19));
-        g2d.setPaint(grad);
-        Area frameArea = new Area(frameOuterRect);
-        frameArea.subtract(new Area(innerRect));
-        g2d.fill(frameArea);
-        g2d.setPaint(old);
+        // 使用与棋盘线条一致的颜色以保持视觉统一
+        g2d.setColor(new Color(139, 69, 19));
+        g2d.setStroke(new BasicStroke(8f));
+        g2d.draw(new Rectangle2D.Float(MARGIN, MARGIN, 8 * CELL_SIZE, 9 * CELL_SIZE));
     }
     
     /**
