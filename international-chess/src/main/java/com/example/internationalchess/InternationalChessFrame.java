@@ -16,6 +16,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+
+import com.example.common.ui.BoardWithFloatButton;
+import com.example.common.ui.FullscreenToggler;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -26,6 +29,7 @@ public class InternationalChessFrame extends JFrame {
 
     private JLabel statusLabel;
     private InternationalBoardPanel boardPanel;
+    private BoardWithFloatButton boardContainer;
     private JButton aiToggleButton;
     private JComboBox<String> difficultyComboBox;
     private JComboBox<String> playerColorComboBox;
@@ -34,6 +38,10 @@ public class InternationalChessFrame extends JFrame {
     private ChatPanel chatPanel;
     private AILogPanel aiLogPanel;
     private StockfishLogPanel stockfishLogPanel;
+
+    private JPanel controlPanel;
+    private JPanel rightPanel;
+    private FullscreenToggler fullscreenToggler;
     
     // 游戏模式相关
     private ButtonGroup gameModeGroup;
@@ -70,13 +78,14 @@ public class InternationalChessFrame extends JFrame {
         
         // 创建主面板
         JPanel mainPanel = new JPanel(new BorderLayout());
-        
+
         // 创建带坐标的棋盘面板
         JPanel boardWithCoordinates = createBoardWithCoordinates();
-        mainPanel.add(boardWithCoordinates, BorderLayout.CENTER);
-        
+        boardContainer = new BoardWithFloatButton(boardWithCoordinates);
+        mainPanel.add(boardContainer, BorderLayout.CENTER);
+
         // 右侧面板 - 显示Stockfish日志和AI分析面板
-        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel = new JPanel(new BorderLayout());
         rightPanel.add(stockfishLogPanel, BorderLayout.CENTER);
         
         // AI分析按钮
@@ -94,13 +103,25 @@ public class InternationalChessFrame extends JFrame {
         add(mainPanel, BorderLayout.CENTER);
 
         // 创建控制面板（现在statusLabel已经初始化）
-        JPanel controlPanel = createControlPanel();
+        controlPanel = createControlPanel();
         add(controlPanel, BorderLayout.NORTH);
 
         // 设置BoardPanel的状态更新回调
         boardPanel.setStatusUpdateCallback(this::updateStatus);
         boardPanel.setChatPanel(chatPanel);
         boardPanel.setStockfishLogPanel(stockfishLogPanel);
+
+        fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel);
+        boardContainer.getFullscreenButton().addActionListener(e -> {
+            if (!fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
+        });
+        boardContainer.getExitButton().addActionListener(e -> {
+            if (fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
+        });
         
         // 默认启用大模型AI
         initializeDefaultAI();
@@ -479,7 +500,6 @@ public class InternationalChessFrame extends JFrame {
         
         // 创建顶部列标签 (a-h)
         JPanel topLabels = new JPanel(new GridLayout(1, 8));
-        topLabels.setPreferredSize(new Dimension(560, 20));
         for (char c = 'a'; c <= 'h'; c++) {
             JLabel label = new JLabel(String.valueOf(c), JLabel.CENTER);
             label.setFont(new Font("宋体", Font.BOLD, 14));
@@ -488,7 +508,6 @@ public class InternationalChessFrame extends JFrame {
         
         // 创建底部列标签 (a-h)
         JPanel bottomLabels = new JPanel(new GridLayout(1, 8));
-        bottomLabels.setPreferredSize(new Dimension(560, 20));
         for (char c = 'a'; c <= 'h'; c++) {
             JLabel label = new JLabel(String.valueOf(c), JLabel.CENTER);
             label.setFont(new Font("宋体", Font.BOLD, 14));
@@ -497,7 +516,6 @@ public class InternationalChessFrame extends JFrame {
         
         // 创建左侧行标签 (8-1)
         JPanel leftLabels = new JPanel(new GridLayout(8, 1));
-        leftLabels.setPreferredSize(new Dimension(20, 560));
         for (int i = 8; i >= 1; i--) {
             JLabel label = new JLabel(String.valueOf(i), JLabel.CENTER);
             label.setFont(new Font("宋体", Font.BOLD, 14));
@@ -506,7 +524,6 @@ public class InternationalChessFrame extends JFrame {
         
         // 创建右侧行标签 (8-1)
         JPanel rightLabels = new JPanel(new GridLayout(8, 1));
-        rightLabels.setPreferredSize(new Dimension(20, 560));
         for (int i = 8; i >= 1; i--) {
             JLabel label = new JLabel(String.valueOf(i), JLabel.CENTER);
             label.setFont(new Font("宋体", Font.BOLD, 14));
@@ -519,7 +536,8 @@ public class InternationalChessFrame extends JFrame {
         panel.add(leftLabels, BorderLayout.WEST);
         panel.add(rightLabels, BorderLayout.EAST);
         panel.add(boardPanel, BorderLayout.CENTER);
-        
+        panel.setBorder(BorderFactory.createEmptyBorder(0, 40, 0, 60));
+
         return panel;
     }
     
