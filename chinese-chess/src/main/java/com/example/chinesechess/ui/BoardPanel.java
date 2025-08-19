@@ -1189,6 +1189,7 @@ public class BoardPanel extends JPanel {
 
         // 绘制围绕棋盘的红色外框
         drawBoardFrame(g2d);
+
     }
     
     /**
