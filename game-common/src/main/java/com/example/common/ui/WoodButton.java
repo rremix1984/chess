@@ -69,7 +69,9 @@ public class WoodButton extends JComponent {
         g2.draw(shape);
 
         // Text with shadow (supports multi-line)
-        g2.setFont(new Font(Font.MONOSPACED, Font.BOLD, 20f));
+        // Font constructor expects an int size; use integer literal to avoid
+        // loss of precision compilation warnings on JDK 11.
+        g2.setFont(new Font(Font.MONOSPACED, Font.BOLD, 20));
         FontMetrics fm = g2.getFontMetrics();
         String[] lines = text.split("\\n");
         int lineHeight = fm.getHeight();

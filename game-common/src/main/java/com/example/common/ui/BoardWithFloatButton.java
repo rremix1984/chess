@@ -31,7 +31,6 @@ public class BoardWithFloatButton extends JLayeredPane {
         exitButton.setTextLabel("┘└\n┐┌");
         add(enterButton, JLayeredPane.PALETTE_LAYER);
         add(exitButton, JLayeredPane.PALETTE_LAYER);
-
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
