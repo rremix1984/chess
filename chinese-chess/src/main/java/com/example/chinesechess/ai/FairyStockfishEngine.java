@@ -271,16 +271,14 @@ public class FairyStockfishEngine {
                 }
             }
             
-            // 🔧 实用解决方案：由于Fairy-Stockfish在FEN处理上有问题
-            // 只在标准开局位置使用该引擎，其他位置返回null使用备用AI
+            // 设置棋盘局面：支持任意 FEN，而不仅仅是开局位置
             log("设置棋盘位置: " + fen);
-            
             if (isInitialPosition(fen)) {
-                log("检测到标准开局位置，使用Fairy-Stockfish");
+                // 初始局面可直接使用 startpos 指令，更简洁
                 sendCommand("position startpos");
             } else {
-                log("检测到非标准位置，由于Fairy-Stockfish的FEN处理限制，返回null使用备用AI");
-                return null; // 返回null让上层使用备用AI
+                // 其它任意局面使用 FEN 描述
+                sendCommand("position fen " + fen);
             }
             
             // 再次确认引擎就绪

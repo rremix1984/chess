@@ -14,6 +14,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+
+import com.example.common.ui.BoardWithFloatButton;
+import com.example.common.ui.FullscreenToggler;
 import java.util.List;
 
 /**
@@ -23,6 +26,7 @@ public class GomokuFrame extends JFrame {
 
     private JLabel statusLabel;
     private GomokuBoardPanelAdapter boardPanel;
+    private BoardWithFloatButton boardContainer;
     private ChatPanel chatPanel;
     private JTextArea aiLogArea;
     private JButton aiToggleButton;
@@ -42,6 +46,10 @@ public class GomokuFrame extends JFrame {
     private boolean isAIvsAIMode = false;
     private Object blackAI;
     private Object whiteAI;
+
+    private JPanel controlPanel;
+    private JPanel rightPanel;
+    private FullscreenToggler fullscreenToggler;
     
     // 游戏管理器
     private GomokuGameManager gameManager;
@@ -117,15 +125,16 @@ public class GomokuFrame extends JFrame {
         
         // 创建主要内容面板（棋盘+右侧面板）
         JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.add(boardPanel, BorderLayout.CENTER);
-        
+        boardContainer = new BoardWithFloatButton(boardPanel);
+        mainPanel.add(boardContainer, BorderLayout.CENTER);
+
         // 创建右侧面板（AI日志+聊天）
-        JPanel rightPanel = createRightPanel();
+        rightPanel = createRightPanel();
         mainPanel.add(rightPanel, BorderLayout.EAST);
         add(mainPanel, BorderLayout.CENTER);
 
         // 创建控制面板
-        JPanel controlPanel = createControlPanel();
+        controlPanel = createControlPanel();
         add(controlPanel, BorderLayout.NORTH);
 
         // 创建状态栏
@@ -134,6 +143,18 @@ public class GomokuFrame extends JFrame {
         statusLabel.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
         statusLabel.setPreferredSize(new Dimension(GameConfig.WINDOW_WIDTH, 30));
         add(statusLabel, BorderLayout.SOUTH);
+
+        fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel);
+        boardContainer.getFullscreenButton().addActionListener(e -> {
+            if (!fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
+        });
+        boardContainer.getExitButton().addActionListener(e -> {
+            if (fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
+        });
 
         // 初始化游戏管理器
         initializeGameManager();
