@@ -16,6 +16,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+
+import com.example.common.ui.BoardWithFloatButton;
+import com.example.common.ui.FullscreenToggler;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -26,6 +29,7 @@ public class InternationalChessFrame extends JFrame {
 
     private JLabel statusLabel;
     private InternationalBoardPanel boardPanel;
+    private BoardWithFloatButton boardContainer;
     private JButton aiToggleButton;
     private JComboBox<String> difficultyComboBox;
     private JComboBox<String> playerColorComboBox;
@@ -34,6 +38,10 @@ public class InternationalChessFrame extends JFrame {
     private ChatPanel chatPanel;
     private AILogPanel aiLogPanel;
     private StockfishLogPanel stockfishLogPanel;
+
+    private JPanel controlPanel;
+    private JPanel rightPanel;
+    private FullscreenToggler fullscreenToggler;
     
     // 游戏模式相关
     private ButtonGroup gameModeGroup;
@@ -70,13 +78,14 @@ public class InternationalChessFrame extends JFrame {
         
         // 创建主面板
         JPanel mainPanel = new JPanel(new BorderLayout());
-        
+
         // 创建带坐标的棋盘面板
         JPanel boardWithCoordinates = createBoardWithCoordinates();
-        mainPanel.add(boardWithCoordinates, BorderLayout.CENTER);
-        
+        boardContainer = new BoardWithFloatButton(boardWithCoordinates);
+        mainPanel.add(boardContainer, BorderLayout.CENTER);
+
         // 右侧面板 - 显示Stockfish日志和AI分析面板
-        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel = new JPanel(new BorderLayout());
         rightPanel.add(stockfishLogPanel, BorderLayout.CENTER);
         
         // AI分析按钮
@@ -94,13 +103,19 @@ public class InternationalChessFrame extends JFrame {
         add(mainPanel, BorderLayout.CENTER);
 
         // 创建控制面板（现在statusLabel已经初始化）
-        JPanel controlPanel = createControlPanel();
+        controlPanel = createControlPanel();
         add(controlPanel, BorderLayout.NORTH);
 
         // 设置BoardPanel的状态更新回调
         boardPanel.setStatusUpdateCallback(this::updateStatus);
         boardPanel.setChatPanel(chatPanel);
         boardPanel.setStockfishLogPanel(stockfishLogPanel);
+
+        fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel);
+        boardContainer.getButton().addActionListener(e -> {
+            fullscreenToggler.toggle();
+            boardContainer.getButton().setTextLabel(fullscreenToggler.isFullscreen() ? "取消全屏 ✕" : "全屏 ⛶");
+        });
         
         // 默认启用大模型AI
         initializeDefaultAI();

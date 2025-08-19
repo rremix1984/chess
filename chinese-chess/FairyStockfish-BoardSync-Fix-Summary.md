@@ -16,12 +16,12 @@ Through detailed debugging and testing, we discovered that:
 
 ## Solution Implemented
 
-### Pragmatic Approach: Position-Based Engine Selection
+### Revised Approach: Full FEN Support
 
-We implemented a practical solution that:
-
-1. **Standard Opening Position**: Uses Fairy-Stockfish with `position startpos` command
-2. **Non-Standard Positions**: Returns `null` to trigger fallback to the enhanced AI backup
+The engine interface has been updated so that Fairy‑Stockfish can analyse any legal
+Xiangqi position. Instead of falling back for non‑standard layouts, the wrapper now
+issues `position fen <FEN>` for arbitrary board states and only falls back if the
+engine itself is unavailable.
 
 ### Key Changes Made
 
@@ -39,12 +39,11 @@ We implemented a practical solution that:
 ### Code Changes Summary
 ```java
 // In getBestMove() method
+log("设置棋盘位置: " + fen);
 if (isInitialPosition(fen)) {
-    log("检测到标准开局位置，使用Fairy-Stockfish");
     sendCommand("position startpos");
 } else {
-    log("检测到非标准位置，由于Fairy-Stockfish的FEN处理限制，返回null使用备用AI");
-    return null; // Trigger fallback to enhanced AI
+    sendCommand("position fen " + fen);
 }
 ```
 
@@ -53,13 +52,11 @@ if (isInitialPosition(fen)) {
 ### Before Fix
 - Fairy-Stockfish suggested invalid moves like `g8g2` on empty positions
 - UCI moves failed conversion due to missing pieces at start positions
-- Game would fall back to enhanced AI after failed move validation
 
 ### After Fix
-- Standard opening positions: Fairy-Stockfish works perfectly ✅
-- Non-standard positions: Clean fallback to enhanced AI ✅
+- Fairy-Stockfish accepts arbitrary FEN strings ✅
 - No more invalid move suggestions ✅
-- Proper engine state synchronization ✅
+- Proper engine state synchronisation without fallback ✅
 
 ## Benefits of This Solution
 

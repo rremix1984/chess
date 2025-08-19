@@ -10,6 +10,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+
+import com.example.common.ui.BoardWithFloatButton;
+import com.example.common.ui.FullscreenToggler;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -18,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public class GoFrame extends JFrame {
     private GoBoardPanel boardPanel;
+    private BoardWithFloatButton boardContainer;
     private GoAILogPanel aiLogPanel;
     private GoChatPanel chatPanel;
     private JLabel statusLabel;
@@ -62,6 +66,10 @@ public class GoFrame extends JFrame {
     private boolean isGameRunning = false;
     private boolean isGamePaused = false;
     private GameMode currentGameMode = GameMode.PLAYER_VS_AI;
+
+    private JPanel topControlPanel;
+    private JTabbedPane rightTabbedPane;
+    private FullscreenToggler fullscreenToggler;
     
     // 游戏模式枚举
     public enum GameMode {
@@ -276,29 +284,36 @@ public class GoFrame extends JFrame {
         setLayout(new BorderLayout());
         
         // 创建顶部控制面板
-        JPanel topControlPanel = createTopControlPanel();
+        topControlPanel = createTopControlPanel();
         add(topControlPanel, BorderLayout.NORTH);
         
         // 创建主面板（棋盘+右侧面板）
         JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.add(boardPanel, BorderLayout.CENTER);
+        boardContainer = new BoardWithFloatButton(boardPanel);
+        mainPanel.add(boardContainer, BorderLayout.CENTER);
         
         // 创建右侧面板（AI日志+聊天）
-        JTabbedPane rightTabbedPane = new JTabbedPane();
+        rightTabbedPane = new JTabbedPane();
         rightTabbedPane.addTab("AI分析", aiLogPanel);
         rightTabbedPane.addTab("与AI对话", chatPanel);
         rightTabbedPane.setPreferredSize(new Dimension(300, 600));
-        
+
         // 设置标签页字体颜色为黑色
         rightTabbedPane.setForeground(Color.BLACK);
         rightTabbedPane.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-        
+
         mainPanel.add(rightTabbedPane, BorderLayout.EAST);
         add(mainPanel, BorderLayout.CENTER);
         
         // 状态栏
         statusLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         add(statusLabel, BorderLayout.SOUTH);
+
+        fullscreenToggler = new FullscreenToggler(this, topControlPanel, rightTabbedPane);
+        boardContainer.getButton().addActionListener(e -> {
+            fullscreenToggler.toggle();
+            boardContainer.getButton().setTextLabel(fullscreenToggler.isFullscreen() ? "取消全屏 ✕" : "全屏 ⛶");
+        });
     }
     
     /**
@@ -704,17 +719,17 @@ public class GoFrame extends JFrame {
     }
     
     /**
-     * 返回主选择界面
+     * 返回游戏中心界面
      */
     private void returnToSelection() {
         dispose();
         SwingUtilities.invokeLater(() -> {
             try {
-                Class<?> selectionFrameClass = Class.forName("com.example.launcher.GameSelectionFrame");
-                JFrame selectionFrame = (JFrame) selectionFrameClass.getDeclaredConstructor().newInstance();
-                selectionFrame.setVisible(true);
+                Class<?> centerFrameClass = Class.forName("com.example.launcher.GameCenterFrame");
+                JFrame centerFrame = (JFrame) centerFrameClass.getDeclaredConstructor().newInstance();
+                centerFrame.setVisible(true);
             } catch (Exception e) {
-                ExceptionHandler.logError("GoFrame", "返回主选择界面失败: " + e.getMessage());
+                ExceptionHandler.logError("GoFrame", "返回游戏中心失败: " + e.getMessage());
             }
         });
     }
