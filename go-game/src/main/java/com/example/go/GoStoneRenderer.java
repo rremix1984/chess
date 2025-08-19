@@ -42,21 +42,17 @@ public class GoStoneRenderer {
      * Draws a soft blurred shadow offset to the bottom-right.
      */
     public static void drawShadow(Graphics2D g, int cx, int cy, int diameter, float alphaFactor) {
-        int shadowDiameter = Math.round(diameter * 1.1f);
-        int radius = shadowDiameter / 2;
-        int offset = Math.round(diameter * 0.25f);
-        int blur = Math.max(2, diameter / 6);
-        int size = shadowDiameter + blur * 2;
-
+        int off = 2;
+        int size = diameter + off * 2;
         BufferedImage shadow = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D sg = shadow.createGraphics();
         enableAA(sg);
-        sg.setColor(new Color(0, 0, 0, (int) (80 * alphaFactor)));
-        sg.fillOval(blur, blur, shadowDiameter, shadowDiameter);
+        sg.setColor(new Color(0, 0, 0, (int) (76 * alphaFactor)));
+        sg.fillOval(off, off, diameter, diameter);
         sg.dispose();
-
-        BufferedImage blurred = gaussianBlur(shadow, blur);
-        g.drawImage(blurred, cx - radius - blur + offset, cy - radius - blur + offset, null);
+        BufferedImage blurred = gaussianBlur(shadow, 1f);
+        int r = diameter / 2;
+        g.drawImage(blurred, cx - r - off, cy - r - off, null);
     }
 
     private static void enableAA(Graphics2D g) {
@@ -66,35 +62,45 @@ public class GoStoneRenderer {
     }
 
     private static void paintStone(Graphics2D g, int cx, int cy, int r, boolean white) {
-        float hx = cx - r * 0.35f;
-        float hy = cy - r * 0.35f;
-        Color mid = white ? new Color(250, 250, 250, 230) : new Color(70, 70, 70);
-        Color edge = white ? new Color(210, 210, 210, 230) : new Color(15, 15, 15);
         Shape stone = new Ellipse2D.Float(cx - r, cy - r, 2f * r, 2f * r);
-        RadialGradientPaint body = new RadialGradientPaint(
-                new Point2D.Float(hx, hy), r,
-                new float[]{0f, 0.6f, 1f},
-                new Color[]{Color.WHITE, mid, edge});
-        g.setPaint(body);
-        g.fill(stone);
 
-        LinearGradientPaint shade = new LinearGradientPaint(
-                cx - r, cy - r, cx + r, cy + r,
-                new float[]{0f, 1f},
-                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 90)});
-        g.setPaint(shade);
-        g.fill(stone);
+        if (white) {
+            // 白子主体：中心白色，边缘淡灰
+            RadialGradientPaint body = new RadialGradientPaint(
+                    new Point2D.Float(cx, cy), r,
+                    new float[]{0f, 1f},
+                    new Color[]{new Color(0xFFFFFF), new Color(0xE0E0E0)});
+            g.setPaint(body);
+            g.fill(stone);
 
-        RadialGradientPaint spec = new RadialGradientPaint(
-                new Point2D.Float(hx, hy), r * 0.9f,
-                new float[]{0f, 0.6f, 1f},
-                new Color[]{
-                        new Color(255, 255, 255, 115),
-                        new Color(255, 255, 255, 35),
-                        new Color(255, 255, 255, 0)
-                });
-        g.setPaint(spec);
-        g.fill(stone);
+            // 内部阴影以增加厚度
+            g.setColor(new Color(0, 0, 0, 30));
+            g.setStroke(new BasicStroke(r * 0.1f));
+            g.draw(stone);
+        } else {
+            // 黑子主体：中心略亮
+            RadialGradientPaint body = new RadialGradientPaint(
+                    new Point2D.Float(cx, cy), r,
+                    new float[]{0f, 1f},
+                    new Color[]{new Color(0x2B2B2B), new Color(0x000000)});
+            g.setPaint(body);
+            g.fill(stone);
+
+            // 边缘高光
+            g.setColor(new Color(255, 255, 255, 40));
+            g.setStroke(new BasicStroke(r * 0.08f));
+            g.draw(stone);
+        }
+
+        // 左上高光
+        Shape old = g.getClip();
+        g.setClip(stone);
+        double hw = r * 0.8;
+        double hh = r * 0.6;
+        Ellipse2D highlight = new Ellipse2D.Double(cx - r * 0.8, cy - r * 0.8, hw, hh);
+        g.setColor(new Color(255, 255, 255, white ? 153 : 128));
+        g.fill(highlight);
+        g.setClip(old);
     }
 
     private static BufferedImage gaussianBlur(BufferedImage img, float radius) {

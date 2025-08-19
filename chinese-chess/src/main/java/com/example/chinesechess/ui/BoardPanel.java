@@ -50,6 +50,7 @@ public class BoardPanel extends JPanel {
     private final Board board;
     private static final int CELL_SIZE = ChineseChessConfig.BOARD_CELL_SIZE;
     private static final int MARGIN = ChineseChessConfig.BOARD_MARGIN;
+    private static final int FRAME_PAD = 6;
     private double viewScale = 1.0;
     private double viewOffsetX = 0.0;
     private double viewOffsetY = 0.0;
@@ -1261,12 +1262,15 @@ public class BoardPanel extends JPanel {
     private void draw3DChessBoard(Graphics2D g2d) {
         // 绘制棋盘阴影
         drawBoardShadow(g2d);
-        
+
         // 绘制棋盘主体
         drawBoardMain(g2d);
-        
+
         // 绘制棋盘线条
         drawBoardLines(g2d);
+
+        // 绘制外框
+        drawBoardFrame(g2d);
     }
     
     /**
@@ -1335,6 +1339,21 @@ public class BoardPanel extends JPanel {
             g2d.drawLine(x + 1, riverBottomPixel, x + 1, MARGIN + 9 * CELL_SIZE);
             g2d.setColor(new Color(139, 69, 19));
         }
+    }
+
+    /**
+     * 绘制围绕棋盘的外框，随窗口缩放保持贴合
+     */
+    private void drawBoardFrame(Graphics2D g2d) {
+        Rectangle board = new Rectangle(MARGIN, MARGIN, 8 * CELL_SIZE, 9 * CELL_SIZE);
+        int pad = Math.round(FRAME_PAD / (float) viewScale);
+        Rectangle frame = new Rectangle(board.x - pad, board.y - pad,
+                board.width + pad * 2, board.height + pad * 2);
+        Stroke old = g2d.getStroke();
+        g2d.setStroke(new BasicStroke(8f / (float) viewScale, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(new Color(88, 44, 18));
+        g2d.draw(frame);
+        g2d.setStroke(old);
     }
 
     /** 绘制兵/卒/炮初始位置的十字标记 */
