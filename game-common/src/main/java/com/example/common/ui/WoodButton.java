@@ -16,7 +16,7 @@ public class WoodButton extends JComponent {
 
     public WoodButton() {
         setOpaque(false);
-        setPreferredSize(new Dimension(120, 40));
+        setPreferredSize(new Dimension(60, 60));
         enableEvents(AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
@@ -68,15 +68,21 @@ public class WoodButton extends JComponent {
         g2.setColor(new Color(0x6E3F1C));
         g2.draw(shape);
 
-        // Text with shadow
-        g2.setFont(getFont().deriveFont(Font.BOLD, 16f));
+        // Text with shadow (supports multi-line)
+        g2.setFont(new Font(Font.MONOSPACED, Font.BOLD, 20f));
         FontMetrics fm = g2.getFontMetrics();
-        int tx = (w - fm.stringWidth(text)) / 2;
-        int ty = (h + fm.getAscent() - fm.getDescent()) / 2;
-        g2.setColor(new Color(0, 0, 0, 60));
-        g2.drawString(text, tx + 1, ty + 1);
-        g2.setColor(new Color(36, 23, 12));
-        g2.drawString(text, tx, ty);
+        String[] lines = text.split("\\n");
+        int lineHeight = fm.getHeight();
+        int totalHeight = lines.length * lineHeight;
+        int y = (h - totalHeight) / 2 + fm.getAscent();
+        for (String line : lines) {
+            int tx = (w - fm.stringWidth(line)) / 2;
+            g2.setColor(new Color(0, 0, 0, 60));
+            g2.drawString(line, tx + 1, y + 1);
+            g2.setColor(new Color(36, 23, 12));
+            g2.drawString(line, tx, y);
+            y += lineHeight;
+        }
 
         g2.dispose();
     }

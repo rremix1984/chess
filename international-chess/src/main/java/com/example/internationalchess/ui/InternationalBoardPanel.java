@@ -14,6 +14,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.AffineTransform;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -24,7 +25,7 @@ import java.util.function.Consumer;
 public class InternationalBoardPanel extends JPanel {
     
     private static final int BOARD_SIZE = 8;
-    private static final int CELL_SIZE = 80; // 增大格子尺寸
+    private static final int CELL_SIZE = 80; // 基准格子尺寸
     private static final Color LIGHT_COLOR = new Color(255, 206, 158); // 更加温暖的浅色
     private static final Color DARK_COLOR = new Color(139, 69, 19); // 深棕色
     private static final Color SELECTED_COLOR = new Color(0, 191, 255, 150); // 天蓝色高亮
@@ -64,15 +65,22 @@ public class InternationalBoardPanel extends JPanel {
         return t;
     });
     
+    // 缩放及偏移，用于自适应全屏
+    private double scale = 1.0;
+    private double offsetX = 0;
+    private double offsetY = 0;
+
     public InternationalBoardPanel() {
         this.board = new InternationalChessBoard();
         setPreferredSize(new Dimension(BOARD_SIZE * CELL_SIZE, BOARD_SIZE * CELL_SIZE));
         setBackground(Color.WHITE);
-        
+
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                handleMouseClick(e.getX(), e.getY());
+                int x = (int) ((e.getX() - offsetX) / scale);
+                int y = (int) ((e.getY() - offsetY) / scale);
+                handleMouseClick(x, y);
             }
         });
     }
@@ -83,10 +91,21 @@ public class InternationalBoardPanel extends JPanel {
         Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         
+        scale = Math.min(getWidth(), getHeight()) / (double) (BOARD_SIZE * CELL_SIZE);
+        double boardPixel = BOARD_SIZE * CELL_SIZE * scale;
+        offsetX = (getWidth() - boardPixel) / 2.0;
+        offsetY = (getHeight() - boardPixel) / 2.0;
+
+        AffineTransform old = g2d.getTransform();
+        g2d.translate(offsetX, offsetY);
+        g2d.scale(scale, scale);
+
         drawBoard(g2d);
         drawAISuggestionHighlight(g2d);
         drawPieces(g2d);
         drawSelection(g2d);
+
+        g2d.setTransform(old);
     }
     
     private void drawBoard(Graphics2D g2d) {

@@ -21,6 +21,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 
 import com.example.common.ui.BoardWithFloatButton;
+import com.example.common.ui.BoardWithFloatButton.Position;
 import com.example.common.ui.FullscreenToggler;
 import java.util.List;
 
@@ -120,7 +121,7 @@ public class GameFrame extends JFrame {
         // 创建棋盘
         Board board = new Board();
         boardPanel = new BoardPanel(board);
-        boardPanel.setBorder(BorderFactory.createEmptyBorder(6,6,6,6));
+        boardPanel.setBorder(BorderFactory.createEmptyBorder(6,6,50,6));
         Dimension boardSize = new Dimension(800, 800);
         boardPanel.setPreferredSize(boardSize);
         
@@ -158,7 +159,7 @@ public class GameFrame extends JFrame {
         rightPanel.setMinimumSize(new Dimension(FIXED_AI_WIDTH, boardSize.height));
         rightPanel.setMaximumSize(new Dimension(FIXED_AI_WIDTH, Integer.MAX_VALUE));
 
-        boardContainer = new BoardWithFloatButton(boardPanel);
+        boardContainer = new BoardWithFloatButton(boardPanel, Position.BOTTOM_RIGHT);
 
         // 创建主要内容面板（棋盘+右侧面板）
         splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, boardContainer, rightPanel);
@@ -186,6 +187,19 @@ public class GameFrame extends JFrame {
         // 创建控制面板
         controlPanel = createControlPanel();
         add(controlPanel, BorderLayout.NORTH);
+
+        fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel)
+                .withSplitPane(splitPane);
+        boardContainer.getFullscreenButton().addActionListener(e -> {
+            if (!fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
+        });
+        boardContainer.getExitButton().addActionListener(e -> {
+            if (fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
+        });
 
         // 创建AI对AI配置面板
         createAIvsAIConfigPanel();
@@ -755,9 +769,15 @@ public class GameFrame extends JFrame {
 
         fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel)
                 .withSplitPane(splitPane);
-        boardContainer.getButton().addActionListener(e -> {
-            fullscreenToggler.toggle();
-            boardContainer.getButton().setTextLabel(fullscreenToggler.isFullscreen() ? "取消全屏 ✕" : "全屏 ⛶");
+        boardContainer.getFullscreenButton().addActionListener(e -> {
+            if (!fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
+        });
+        boardContainer.getExitButton().addActionListener(e -> {
+            if (fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
         });
         
         // 创建右侧面板（聊天+AI日志）

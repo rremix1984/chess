@@ -77,6 +77,7 @@ public class FullscreenToggler {
         frame.setUndecorated(true);
         frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
         frame.setVisible(true);
+        bringToFront();
         frame.revalidate();
         frame.repaint();
     }
@@ -97,7 +98,21 @@ public class FullscreenToggler {
         frame.setExtendedState(windowedState);
         if (windowedBounds != null) frame.setBounds(windowedBounds);
         frame.setVisible(true);
+        bringToFront();
         frame.revalidate();
         frame.repaint();
+    }
+
+    /** Ensure the game window stays above any previously opened frames. */
+    private void bringToFront() {
+        // Temporarily toggling always-on-top is a cross-platform trick to raise the window.
+        boolean aot = frame.isAlwaysOnTop();
+        try {
+            frame.setAlwaysOnTop(true);
+            frame.toFront();
+            frame.requestFocus();
+        } finally {
+            frame.setAlwaysOnTop(aot);
+        }
     }
 }

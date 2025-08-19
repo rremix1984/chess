@@ -310,9 +310,15 @@ public class GoFrame extends JFrame {
         add(statusLabel, BorderLayout.SOUTH);
 
         fullscreenToggler = new FullscreenToggler(this, topControlPanel, rightTabbedPane);
-        boardContainer.getButton().addActionListener(e -> {
-            fullscreenToggler.toggle();
-            boardContainer.getButton().setTextLabel(fullscreenToggler.isFullscreen() ? "取消全屏 ✕" : "全屏 ⛶");
+        boardContainer.getFullscreenButton().addActionListener(e -> {
+            if (!fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
+        });
+        boardContainer.getExitButton().addActionListener(e -> {
+            if (fullscreenToggler.isFullscreen()) {
+                fullscreenToggler.toggle();
+            }
         });
     }
     
