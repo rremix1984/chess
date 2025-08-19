@@ -5,6 +5,8 @@ import java.net.*;
 import java.util.concurrent.*;
 import javax.swing.SwingUtilities;
 
+import com.example.chinesechess.util.RateLimitedLogger;
+
 /**
  * 网络客户端类
  * 负责与游戏服务器的连接、消息发送接收、事件处理等
@@ -93,7 +95,6 @@ public class NetworkClient {
 
         executorService.submit(() -> {
             try {
-                System.out.println("🌐 正在连接服务器: " + host + ":" + port);
                 
                 // 创建socket连接
                 socket = new Socket();
@@ -116,8 +117,6 @@ public class NetworkClient {
 
                 // 启动心跳
                 startHeartbeat();
-
-                System.out.println("✅ 服务器连接成功");
                 
             } catch (IOException e) {
                 String error = "连接服务器失败: " + e.getMessage();
@@ -174,7 +173,7 @@ public class NetworkClient {
     private void processMessage(String jsonMessage) {
         try {
             NetworkMessage message = NetworkMessage.fromJson(jsonMessage);
-            System.out.println("📨 收到消息: " + message.getType());
+            RateLimitedLogger.log("recv-" + message.getType(), "📨 收到消息: " + message.getType());
             
             SwingUtilities.invokeLater(() -> {
                 handleMessage(message);
@@ -246,7 +245,6 @@ public class NetworkClient {
     private void handleConnectResponse(ConnectResponseMessage response) {
         if (response.isSuccess()) {
             this.playerId = response.getPlayerId();
-            System.out.println("✅ 连接认证成功，玩家ID: " + playerId);
             if (eventListener != null) {
                 SwingUtilities.invokeLater(() -> eventListener.onConnected());
             }
@@ -264,7 +262,6 @@ public class NetworkClient {
     private void handleCreateRoomResponse(CreateRoomResponseMessage response) {
         if (response.isSuccess()) {
             String roomId = response.getRoomId();
-            System.out.println("🏠 房间创建成功: " + roomId);
             if (eventListener != null) {
                 eventListener.onRoomCreated(roomId);
             }
@@ -282,7 +279,6 @@ public class NetworkClient {
         if (response.isSuccess()) {
             String roomId = response.getRoomId();
             String opponentName = response.getOpponentName();
-            System.out.println("🚪 加入房间成功: " + roomId + ", 对手: " + opponentName);
             if (eventListener != null) {
                 eventListener.onRoomJoined(roomId, opponentName);
             }
@@ -297,7 +293,7 @@ public class NetworkClient {
      * 处理房间列表响应
      */
     private void handleRoomListResponse(RoomListResponseMessage response) {
-        System.out.println("📋 收到房间列表，共 " + response.getRooms().size() + " 个房间");
+        RateLimitedLogger.log("room-list-response", "📋 收到房间列表，共 " + response.getRooms().size() + " 个房间");
         if (eventListener != null) {
             eventListener.onRoomListReceived(response.getRooms());
         }
@@ -307,17 +303,11 @@ public class NetworkClient {
      * 处理游戏开始消息
      */
     private void handleGameStart(GameStartMessage message) {
-        System.out.println("🎮 NetworkClient 收到游戏开始消息: 红方=" + message.getRedPlayer() + 
-                          ", 黑方=" + message.getBlackPlayer() + 
-                          ", 我的颜色=" + message.getYourColor());
-        System.out.println("📡 当前事件监听器类型: " + (eventListener != null ? eventListener.getClass().getSimpleName() : "null"));
         
         if (eventListener != null) {
-            System.out.println("🔄 调用 eventListener.onGameStarted...");
             eventListener.onGameStarted(message.getRedPlayer(), 
                                       message.getBlackPlayer(), 
                                       message.getYourColor());
-            System.out.println("✅ eventListener.onGameStarted 调用完成");
         } else {
             System.err.println("⚠️ 无法处理游戏开始消息：事件监听器为null！");
         }
@@ -327,8 +317,6 @@ public class NetworkClient {
      * 处理移动消息
      */
     private void handleMove(MoveMessage message) {
-        System.out.println("♟️ 收到对手移动: (" + message.getFromRow() + "," + message.getFromCol() + 
-                          ") -> (" + message.getToRow() + "," + message.getToCol() + ")");
         if (eventListener != null) {
             eventListener.onMoveReceived(message.getFromRow(), message.getFromCol(),
                                        message.getToRow(), message.getToCol());
@@ -339,7 +327,6 @@ public class NetworkClient {
      * 处理游戏结束消息
      */
     private void handleGameEnd(GameEndMessage message) {
-        System.out.println("🏁 游戏结束: 获胜者=" + message.getWinner() + ", 原因=" + message.getReason());
         if (eventListener != null) {
             eventListener.onGameEnded(message.getWinner(), message.getReason());
         }
@@ -349,8 +336,6 @@ public class NetworkClient {
      * 处理游戏状态更新消息
      */
     private void handleGameStateUpdate(GameStateUpdateMessage message) {
-        System.out.println("🔄 游戏状态更新: " + message.getGameState() + 
-                          ", 当前玩家: " + message.getCurrentPlayer());
         if (eventListener != null) {
             eventListener.onGameStateUpdate(message.getGameState(), 
                                            message.getCurrentPlayer(),
@@ -363,7 +348,6 @@ public class NetworkClient {
      * 处理游戏状态同步请求消息
      */
     private void handleGameStateSyncRequest(GameStateSyncRequestMessage message) {
-        System.out.println("🔄 收到游戏状态同步请求: 房间ID=" + message.getRoomId() + ", 原因: " + message.getReason());
         // 客户端通常不处理请求消息，这是服务器端的事情
         // 如果需要，可以在这里添加适当的日志记录
         if (eventListener != null) {
@@ -375,22 +359,12 @@ public class NetworkClient {
      * 处理游戏状态同步响应消息
      */
     private void handleGameStateSyncResponse(GameStateSyncResponseMessage response) {
-        System.out.println("🔄 收到游戏状态同步响应: 房间ID=" + response.getRoomId() + ", 成功: " + response.isSuccess());
         
         if (response.isSuccess()) {
             // 同步成功，更新本地游戏状态
-            System.out.println("✅ 游戏状态同步成功:");
-            System.out.println("   - 红方: " + response.getRedPlayer());
-            System.out.println("   - 黑方: " + response.getBlackPlayer());
-            System.out.println("   - 您的颜色: " + response.getYourColor());
-            System.out.println("   - 当前玩家: " + response.getCurrentPlayer());
-            System.out.println("   - 游戏状态: " + response.getGameState());
-            System.out.println("   - 游戏已开始: " + response.isGameStarted());
-            System.out.println("   - 游戏结束: " + response.isGameOver());
             
             // 触发游戏开始事件（如果游戏已开始）
             if (response.isGameStarted() && eventListener != null) {
-                System.out.println("🎮 通过状态同步触发游戏开始事件...");
                 eventListener.onGameStarted(response.getRedPlayer(), 
                                           response.getBlackPlayer(), 
                                           response.getYourColor());
@@ -398,7 +372,6 @@ public class NetworkClient {
             
             // 如果游戏结束，触发游戏结束事件
             if (response.isGameOver() && eventListener != null) {
-                System.out.println("🏁 通过状态同步触发游戏结束事件...");
                 eventListener.onGameEnded(response.getWinner(), "game_sync_recovered");
             }
             
@@ -453,7 +426,7 @@ public class NetworkClient {
             String json = message.toJson();
             writer.println(json);
             writer.flush();
-            System.out.println("📤 发送消息: " + message.getType());
+            RateLimitedLogger.log("send-" + message.getType(), "📤 发送消息: " + message.getType());
         } catch (Exception e) {
             System.err.println("❌ 发送消息失败: " + e.getMessage());
             notifyError("发送消息失败: " + e.getMessage());
