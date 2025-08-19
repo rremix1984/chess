@@ -4,6 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.util.function.Consumer;
 
 /**
  * Utility that toggles a frame between windowed and fullscreen modes. Certain
@@ -20,6 +21,7 @@ public class FullscreenToggler {
 
     private JSplitPane split;
     private int dividerBackup = -1;
+    private Consumer<Boolean> listener;
 
     public FullscreenToggler(JFrame frame, JComponent... hideWhenFullscreen) {
         this.frame = frame;
@@ -44,6 +46,11 @@ public class FullscreenToggler {
         return this;
     }
 
+    public FullscreenToggler onToggle(Consumer<Boolean> l) {
+        this.listener = l;
+        return this;
+    }
+
     public boolean isFullscreen() {
         return fullscreen;
     }
@@ -54,6 +61,7 @@ public class FullscreenToggler {
         } else {
             enterFullscreen();
         }
+        if (listener != null) listener.accept(fullscreen);
     }
 
     private void enterFullscreen() {

@@ -4,6 +4,8 @@ import java.io.*;
 import java.net.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.example.chinesechess.util.RateLimitedLogger;
+
 /**
  * 客户端处理器
  * 负责处理单个客户端的连接、消息接收和发送
@@ -31,8 +33,6 @@ public class ClientHandler implements Runnable {
             writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"), true);
             isConnected = true;
             
-            System.out.println("📡 客户端连接已建立: " + socket.getRemoteSocketAddress());
-            
             // 消息循环
             String line;
             while (isConnected && (line = reader.readLine()) != null) {
@@ -56,7 +56,8 @@ public class ClientHandler implements Runnable {
     private void processMessage(String jsonMessage) {
         try {
             NetworkMessage message = NetworkMessage.fromJson(jsonMessage);
-            System.out.println("📨 收到客户端消息: " + message.getType() + " from " + playerName);
+            RateLimitedLogger.log("client-recv-" + playerName + "-" + message.getType(),
+                    "📨 收到客户端消息: " + message.getType() + " from " + playerName);
             
             handleMessage(message);
             
@@ -104,7 +105,6 @@ public class ClientHandler implements Runnable {
                     handleChatMessage((ChatMessage) message);
                     break;
                 default:
-                    System.out.println("⚠️ 未知消息类型: " + message.getType());
                     break;
             }
         } catch (Exception e) {
@@ -127,8 +127,6 @@ public class ClientHandler implements Runnable {
         // 发送连接成功响应
         ConnectResponseMessage response = new ConnectResponseMessage("server", true, playerId, "1.0.0");
         sendMessage(response);
-        
-        System.out.println("✅ 玩家连接成功: " + playerName + " (ID: " + playerId + ")");
     }
     
     /**
@@ -140,11 +138,9 @@ public class ClientHandler implements Runnable {
         if (roomId != null) {
             CreateRoomResponseMessage response = new CreateRoomResponseMessage("server", roomId);
             sendMessage(response);
-            System.out.println("🏠 房间创建成功: " + roomId + " by " + playerName);
         } else {
             CreateRoomResponseMessage response = CreateRoomResponseMessage.createErrorResponse("server", "创建房间失败");
             sendMessage(response);
-            System.out.println("❌ 房间创建失败 by " + playerName);
         }
     }
     
@@ -159,11 +155,9 @@ public class ClientHandler implements Runnable {
             String opponentName = getOpponentName(request.getRoomId());
             JoinRoomResponseMessage response = new JoinRoomResponseMessage("server", true, request.getRoomId(), opponentName);
             sendMessage(response);
-            System.out.println("🚺 玩家加入房间成功: " + playerName + " ->> " + request.getRoomId());
         } else {
             JoinRoomResponseMessage response = new JoinRoomResponseMessage("server", false, "加入房间失败");
             sendMessage(response);
-            System.out.println("❌ 玩家加入房间失败: " + playerName + " ->> " + request.getRoomId());
         }
     }
     
@@ -174,7 +168,8 @@ public class ClientHandler implements Runnable {
         var roomList = server.getRoomList(request.getGameType());
         RoomListResponseMessage response = new RoomListResponseMessage(roomList);
         sendMessage(response);
-        System.out.println("📋 发送房间列表给: " + playerName + " (共" + roomList.size() + "个房间)");
+        RateLimitedLogger.log("room-list-send-" + playerName,
+                "📋 发送房间列表给: " + playerName + " (共" + roomList.size() + "个房间)");
     }
     
     /**
@@ -183,8 +178,6 @@ public class ClientHandler implements Runnable {
     private void handleMoveMessage(MoveMessage move) {
         // 转发给对手
         server.forwardMove(playerId, move);
-        System.out.println("♟️ 转发移动: " + playerName + " (" + move.getFromRow() + "," + move.getFromCol() + 
-                          ") -> (" + move.getToRow() + "," + move.getToCol() + ")");
     }
     
     /**
@@ -192,14 +185,12 @@ public class ClientHandler implements Runnable {
      */
     private void handleLeaveRoomMessage(LeaveRoomMessage message) {
         server.leaveRoom(playerId, message.getRoomId());
-        System.out.println("🚪 玩家离开房间: " + playerName);
     }
     
     /**
      * 处理断开连接消息
      */
     private void handleDisconnectMessage(DisconnectMessage message) {
-        System.out.println("👋 玩家主动断开: " + playerName + " (" + message.getReason() + ")");
         disconnect("客户端主动断开");
     }
     
@@ -217,7 +208,6 @@ public class ClientHandler implements Runnable {
      */
     private void handleChatMessage(ChatMessage message) {
         // TODO: 实现聊天消息转发
-        System.out.println("💬 聊天消息: " + playerName + " -> " + message.getContent());
     }
     
     /**
@@ -233,7 +223,8 @@ public class ClientHandler implements Runnable {
             String json = message.toJson();
             writer.println(json);
             writer.flush();
-            System.out.println("📤 发送消息给 " + playerName + ": " + message.getType());
+            RateLimitedLogger.log("send-" + playerName + "-" + message.getType(),
+                    "📤 发送消息给 " + playerName + ": " + message.getType());
         } catch (Exception e) {
             System.err.println("❌ 发送消息失败给 " + playerName + ": " + e.getMessage());
             disconnect("发送消息失败");
@@ -262,7 +253,6 @@ public class ClientHandler implements Runnable {
     public void disconnect(String reason) {
         if (isConnected) {
             isConnected = false;
-            System.out.println("🔌 断开客户端连接: " + playerName + " (" + reason + ")");
         }
     }
     
@@ -298,8 +288,6 @@ public class ClientHandler implements Runnable {
         } catch (IOException e) {
             // 忽略关闭异常
         }
-        
-        System.out.println("🧹 客户端资源清理完成: " + (playerName != null ? playerName : "未知客户端"));
     }
     
 
@@ -310,7 +298,6 @@ public class ClientHandler implements Runnable {
         try {
             GameStateSyncResponseMessage resp = server.buildSyncResponse(playerId, request.getRoomId());
             sendMessage(resp);
-            System.out.println("🔄 处理同步请求: room=" + request.getRoomId() + ", success=" + resp.isSuccess());
         } catch (Exception e) {
             System.err.println("❌ 同步请求处理失败: " + e.getMessage());
             GameStateSyncResponseMessage err = new GameStateSyncResponseMessage("server", request.getRoomId(), "服务器内部错误");
