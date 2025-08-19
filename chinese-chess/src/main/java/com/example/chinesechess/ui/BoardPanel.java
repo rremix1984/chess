@@ -31,6 +31,7 @@ import java.awt.geom.Point2D;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Rectangle2D;
+import java.awt.geom.Line2D;
 import java.awt.geom.Area;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +61,7 @@ public class BoardPanel extends JPanel {
     private Rectangle2D.Float innerRect;
     private Rectangle2D.Float frameOuterRect;
     private Rectangle2D.Float wrapRect;
+    private Rectangle2D.Float wrapInnerRect;
     
     // 游戏状态
     private Piece selectedPiece = null;
@@ -1024,15 +1026,35 @@ public class BoardPanel extends JPanel {
     }
 
     private void computeBoardGeometry() {
-        innerRect = new Rectangle2D.Float(MARGIN, MARGIN, 8 * CELL_SIZE, 9 * CELL_SIZE);
+        Rectangle2D.Float safe = new Rectangle2D.Float(0, 0, getWidth(), getHeight());
+        innerRect = computeInnerInSafe(9, 10, safe);
         float frameThickness = innerRect.width * 0.028f;
         float wrapBezel = innerRect.width * 0.02f;
+        float wrapFrameThickness = innerRect.width * 0.015f;
         frameOuterRect = grow(innerRect, frameThickness);
         wrapRect = grow(frameOuterRect, wrapBezel);
+        wrapInnerRect = shrink(wrapRect, wrapFrameThickness);
     }
 
     private Rectangle2D.Float grow(Rectangle2D.Float r, float d) {
         return new Rectangle2D.Float(r.x - d, r.y - d, r.width + 2 * d, r.height + 2 * d);
+    }
+
+    private Rectangle2D.Float shrink(Rectangle2D.Float r, float d) {
+        return grow(r, -d);
+    }
+
+    private Rectangle2D.Float computeInnerInSafe(int cols, int rows, Rectangle2D.Float safe) {
+        float pad = Math.min(safe.width, safe.height) * 0.06f;
+        float availW = safe.width - 2 * pad;
+        float availH = safe.height - 2 * pad;
+        float cell = Math.min(availW / (cols - 1f), availH / (rows - 1f));
+        float w = cell * (cols - 1f);
+        float h = cell * (rows - 1f);
+        return new Rectangle2D.Float(
+                safe.x + (safe.width - w) / 2f,
+                safe.y + (safe.height - h) / 2f,
+                w, h);
     }
 
     /**
@@ -1086,18 +1108,33 @@ public class BoardPanel extends JPanel {
      * 绘制装饰性边框
      */
     private void drawDecorativeBorder(Graphics2D g2d) {
-        if (wrapRect == null || frameOuterRect == null) {
+        if (wrapRect == null || wrapInnerRect == null) {
             return;
         }
         Paint old = g2d.getPaint();
-        Paint grad = new GradientPaint(0f, wrapRect.y,
-                new Color(101, 67, 33), 0f,
-                wrapRect.y + wrapRect.height,
-                new Color(139, 69, 19));
+        LinearGradientPaint fillGrad = new LinearGradientPaint(
+                wrapRect.x, wrapRect.y,
+                wrapRect.x, wrapRect.y + wrapRect.height,
+                new float[]{0f, 1f},
+                new Color[]{new Color(0xF7E1B5), new Color(0xE9C48C)});
+        g2d.setPaint(fillGrad);
+        g2d.fill(wrapRect);
+
+        paintBrownRing(g2d, wrapRect, wrapInnerRect);
+        g2d.setPaint(old);
+    }
+
+    private void paintBrownRing(Graphics2D g2d, Rectangle2D.Float outer, Rectangle2D.Float inner) {
+        Paint grad = new LinearGradientPaint(
+                outer.x, outer.y,
+                outer.x, outer.y + outer.height,
+                new float[]{0f, 1f},
+                new Color[]{new Color(101, 67, 33), new Color(139, 69, 19)});
+        Paint old = g2d.getPaint();
         g2d.setPaint(grad);
-        Area wrapArea = new Area(wrapRect);
-        wrapArea.subtract(new Area(frameOuterRect));
-        g2d.fill(wrapArea);
+        Area area = new Area(outer);
+        area.subtract(new Area(inner));
+        g2d.fill(area);
         g2d.setPaint(old);
     }
     
@@ -1184,35 +1221,45 @@ public class BoardPanel extends JPanel {
         // 绘制棋盘主体
         drawBoardMain(g2d);
 
+        // 绘制围绕棋盘的红色外框
+        drawBoardFrame(g2d);
+
         // 绘制棋盘线条
         drawBoardLines(g2d);
 
         // 绘制围绕棋盘的红色外框
         drawBoardFrame(g2d);
-
     }
     
     /**
      * 绘制棋盘阴影
      */
     private void drawBoardShadow(Graphics2D g2d) {
+        if (innerRect == null) {
+            return;
+        }
         int shadowOffset = 8;
         g2d.setColor(new Color(0, 0, 0, 50));
-        g2d.fillRect(MARGIN + shadowOffset, MARGIN + shadowOffset, 
-                    8 * CELL_SIZE, 9 * CELL_SIZE);
+        g2d.fill(new Rectangle2D.Float(innerRect.x + shadowOffset,
+                innerRect.y + shadowOffset,
+                innerRect.width,
+                innerRect.height));
     }
     
     /**
      * 绘制棋盘主体
      */
     private void drawBoardMain(Graphics2D g2d) {
+        if (innerRect == null) {
+            return;
+        }
         // 创建棋盘渐变效果并填充主体
         GradientPaint boardGradient = new GradientPaint(
-            MARGIN, MARGIN, new Color(255, 248, 220),  // 象牙白
-            MARGIN + 8 * CELL_SIZE, MARGIN + 9 * CELL_SIZE, new Color(245, 222, 179)  // 浅木色
+            innerRect.x, innerRect.y, new Color(255, 248, 220),
+            innerRect.x + innerRect.width, innerRect.y + innerRect.height, new Color(245, 222, 179)
         );
         g2d.setPaint(boardGradient);
-        g2d.fillRect(MARGIN, MARGIN, 8 * CELL_SIZE, 9 * CELL_SIZE);
+        g2d.fill(innerRect);
     }
 
     /**
@@ -1222,55 +1269,37 @@ public class BoardPanel extends JPanel {
         if (frameOuterRect == null || innerRect == null) {
             return;
         }
-        Paint old = g2d.getPaint();
-        Paint grad = new GradientPaint(0f, wrapRect.y,
-                new Color(101, 67, 33), 0f,
-                wrapRect.y + wrapRect.height,
-                new Color(139, 69, 19));
-        g2d.setPaint(grad);
-        Area frameArea = new Area(frameOuterRect);
-        frameArea.subtract(new Area(innerRect));
-        g2d.fill(frameArea);
-        g2d.setPaint(old);
+        paintBrownRing(g2d, frameOuterRect, innerRect);
     }
     
     /**
      * 绘制棋盘线条
      */
     private void drawBoardLines(Graphics2D g2d) {
+        if (innerRect == null) {
+            return;
+        }
         g2d.setStroke(new BasicStroke(2));
         g2d.setColor(new Color(139, 69, 19));
-        
-        // 绘制水平线，河道处留空
-        int riverTop = 4;  // 河道上边界所在行索引
-        int riverBottom = 5; // 河道下边界所在行索引
+
+        float cellX = innerRect.width / 8f;
+        float cellY = innerRect.height / 9f;
+        int riverTop = 4;
+        int riverBottom = 5;
         for (int i = 0; i < 10; i++) {
             if (i == riverTop || i == riverBottom) {
-                continue; // 跳过河道边界线，使河道无网格线
+                continue;
             }
-            int y = MARGIN + i * CELL_SIZE;
-            // 主线
-            g2d.drawLine(MARGIN, y, MARGIN + 8 * CELL_SIZE, y);
-            // 添加3D效果的高光线
-            g2d.setColor(new Color(160, 82, 45, 100));
-            g2d.drawLine(MARGIN, y + 1, MARGIN + 8 * CELL_SIZE, y + 1);
-            g2d.setColor(new Color(139, 69, 19));
+            float y = innerRect.y + i * cellY;
+            g2d.draw(new Line2D.Float(innerRect.x, y, innerRect.x + innerRect.width, y));
         }
 
-        // 绘制垂直线，河道处留空
-        int riverTopPixel = MARGIN + 4 * CELL_SIZE;
-        int riverBottomPixel = MARGIN + 5 * CELL_SIZE;
+        float riverTopPixel = innerRect.y + riverTop * cellY;
+        float riverBottomPixel = innerRect.y + riverBottom * cellY;
         for (int i = 0; i < 9; i++) {
-            int x = MARGIN + i * CELL_SIZE;
-            // 上半部分
-            g2d.drawLine(x, MARGIN, x, riverTopPixel);
-            // 下半部分
-            g2d.drawLine(x, riverBottomPixel, x, MARGIN + 9 * CELL_SIZE);
-            // 添加3D效果的高光线
-            g2d.setColor(new Color(160, 82, 45, 100));
-            g2d.drawLine(x + 1, MARGIN, x + 1, riverTopPixel);
-            g2d.drawLine(x + 1, riverBottomPixel, x + 1, MARGIN + 9 * CELL_SIZE);
-            g2d.setColor(new Color(139, 69, 19));
+            float x = innerRect.x + i * cellX;
+            g2d.draw(new Line2D.Float(x, innerRect.y, x, riverTopPixel));
+            g2d.draw(new Line2D.Float(x, riverBottomPixel, x, innerRect.y + innerRect.height));
         }
     }
 
