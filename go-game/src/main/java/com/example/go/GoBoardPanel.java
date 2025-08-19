@@ -546,28 +546,37 @@ public class GoBoardPanel extends JPanel {
      * 绘制棋盘
      */
     private void drawBoard(Graphics2D g2) {
-        int border = 12;
-        Rectangle2D outer = new Rectangle2D.Double(-border, -border,
-                boardSize - 1 + border * 2, boardSize - 1 + border * 2);
-        Paint frameGrad = new GradientPaint((float) outer.getX(), (float) outer.getY(),
-                new Color(0x8B5A2B), (float) outer.getX(),
-                (float) (outer.getY() + outer.getHeight()), new Color(0xB57A3F));
-        g2.setPaint(frameGrad);
-        g2.fill(outer);
-
-        Paint wood = new GradientPaint(0, 0, new Color(0xE6BF7B),
-                0, (float) (boardSize - 1), new Color(0xD8A865));
-        g2.setPaint(wood);
+        float borderPx = 12f;
         Rectangle2D board = new Rectangle2D.Double(0, 0, boardSize - 1, boardSize - 1);
+
+        // 木质背景：浅木色纵向渐变
+        Paint wood = new GradientPaint(0, 0, new Color(220, 190, 140),
+                0, (float) (boardSize - 1), new Color(200, 170, 120));
+        g2.setPaint(wood);
         g2.fill(board);
 
+        // 边缘略暗的径向渐变
+        RadialGradientPaint edgeShade = new RadialGradientPaint(
+                new Point2D.Double((boardSize - 1) / 2.0, (boardSize - 1) / 2.0),
+                (float) ((boardSize - 1) / 2.0),
+                new float[]{0f, 1f},
+                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 40)});
+        g2.setPaint(edgeShade);
+        g2.fill(board);
+
+        // 竖直木纹
         g2.setClip(board);
-        g2.setStroke(new BasicStroke(1f));
-        for (int y = 10; y < boardSize - 1; y += 12) {
-            g2.setColor(new Color(120, 90, 60, 18));
-            g2.draw(new Line2D.Double(0, y, boardSize - 1, y));
+        g2.setStroke(new BasicStroke((float) (1f / cell)));
+        for (double x = 10.0 / cell; x < boardSize - 1; x += 12.0 / cell) {
+            g2.setColor(new Color(180, 140, 90, 30));
+            g2.draw(new Line2D.Double(x, 0, x, boardSize - 1));
         }
         g2.setClip(null);
+
+        // 深棕色外框
+        g2.setColor(new Color(0x8B5A2B));
+        g2.setStroke(new BasicStroke(borderPx / (float) cell));
+        g2.draw(board);
 
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(GRID_STROKE_WIDTH, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));

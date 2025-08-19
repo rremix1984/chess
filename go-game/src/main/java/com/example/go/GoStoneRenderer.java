@@ -42,18 +42,17 @@ public class GoStoneRenderer {
      * Draws a soft blurred shadow offset to the bottom-right.
      */
     public static void drawShadow(Graphics2D g, int cx, int cy, int diameter, float alphaFactor) {
-        int offX = Math.round(diameter * 0.10f);
-        int offY = Math.round(diameter * 0.12f);
-        int size = diameter + Math.max(offX, offY) * 2;
+        int off = 2;
+        int size = diameter + off * 2;
         BufferedImage shadow = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D sg = shadow.createGraphics();
         enableAA(sg);
-        sg.setColor(new Color(0, 0, 0, (int) (85 * alphaFactor)));
-        sg.fillOval(offX, offY, diameter, diameter);
+        sg.setColor(new Color(0, 0, 0, (int) (76 * alphaFactor)));
+        sg.fillOval(off, off, diameter, diameter);
         sg.dispose();
-        BufferedImage blurred = gaussianBlur(shadow, Math.max(1f, diameter / 50f));
+        BufferedImage blurred = gaussianBlur(shadow, 1f);
         int r = diameter / 2;
-        g.drawImage(blurred, cx - r - offX, cy - r - offY, null);
+        g.drawImage(blurred, cx - r - off, cy - r - off, null);
     }
 
     private static void enableAA(Graphics2D g) {
@@ -64,28 +63,42 @@ public class GoStoneRenderer {
 
     private static void paintStone(Graphics2D g, int cx, int cy, int r, boolean white) {
         Shape stone = new Ellipse2D.Float(cx - r, cy - r, 2f * r, 2f * r);
-        Color[] cols = white
-                ? new Color[]{new Color(0xFFFFFF), new Color(0xEDE7DA), new Color(0xD7CBB4)}
-                : new Color[]{new Color(0x2B2B2B), new Color(0x1A1A1A), new Color(0x111111)};
-        float[] dist = {0f, 0.65f, 1f};
-        RadialGradientPaint body = new RadialGradientPaint(new Point2D.Float(cx, cy), r, dist, cols);
-        g.setPaint(body);
-        g.fill(stone);
+        if (white) {
+            // 白子主体：中心白色，边缘淡灰
+            RadialGradientPaint body = new RadialGradientPaint(
+                    new Point2D.Float(cx, cy), r,
+                    new float[]{0f, 1f},
+                    new Color[]{new Color(0xFFFFFF), new Color(0xE0E0E0)});
+            g.setPaint(body);
+            g.fill(stone);
 
-        int ox = Math.round(r * 0.35f);
-        int oy = Math.round(r * 0.35f);
-        RadialGradientPaint gloss = new RadialGradientPaint(
-                new Point2D.Float(cx - ox, cy - oy), r * 0.9f,
-                new float[]{0f, 0.6f, 1f},
-                new Color[]{
-                        new Color(255, 255, 255, white ? 130 : 90),
-                        new Color(255, 255, 255, 35),
-                        new Color(255, 255, 255, 0)
-                });
+            // 内部阴影以增加厚度
+            g.setColor(new Color(0, 0, 0, 30));
+            g.setStroke(new BasicStroke(r * 0.1f));
+            g.draw(stone);
+        } else {
+            // 黑子主体：中心略亮
+            RadialGradientPaint body = new RadialGradientPaint(
+                    new Point2D.Float(cx, cy), r,
+                    new float[]{0f, 1f},
+                    new Color[]{new Color(0x2B2B2B), new Color(0x000000)});
+            g.setPaint(body);
+            g.fill(stone);
+
+            // 边缘高光
+            g.setColor(new Color(255, 255, 255, 40));
+            g.setStroke(new BasicStroke(r * 0.08f));
+            g.draw(stone);
+        }
+
+        // 左上高光
         Shape old = g.getClip();
         g.setClip(stone);
-        g.setPaint(gloss);
-        g.fill(stone);
+        double hw = r * 0.8;
+        double hh = r * 0.6;
+        Ellipse2D highlight = new Ellipse2D.Double(cx - r * 0.8, cy - r * 0.8, hw, hh);
+        g.setColor(new Color(255, 255, 255, white ? 153 : 128));
+        g.fill(highlight);
         g.setClip(old);
     }
 
