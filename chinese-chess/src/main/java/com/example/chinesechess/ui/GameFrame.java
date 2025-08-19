@@ -59,6 +59,7 @@ public class GameFrame extends JFrame {
     private JPanel controlPanel;
     private JPanel rightPanel;
     private JSplitPane splitPane;
+    private JPanel centerPanel;
     private FullscreenToggler fullscreenToggler;
     
     // 游戏模式枚举
@@ -174,7 +175,10 @@ public class GameFrame extends JFrame {
                 splitPane.setDividerLocation(fixed);
             }
         });
-        add(splitPane, BorderLayout.CENTER);
+
+        centerPanel = new JPanel(new BorderLayout());
+        centerPanel.add(splitPane, BorderLayout.CENTER);
+        add(centerPanel, BorderLayout.CENTER);
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -189,20 +193,13 @@ public class GameFrame extends JFrame {
         add(controlPanel, BorderLayout.NORTH);
 
         fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel)
-                .withSplitPane(splitPane);
-        boardContainer.getFullscreenButton().addActionListener(e -> {
-            if (!fullscreenToggler.isFullscreen()) {
-                fullscreenToggler.toggle();
-            }
-        });
-        boardContainer.getExitButton().addActionListener(e -> {
-            if (fullscreenToggler.isFullscreen()) {
-                fullscreenToggler.toggle();
-            }
-        });
+                .withSplitPane(splitPane)
+                .onToggle(boardContainer::setFullscreen);
+        boardContainer.getFullscreenButton().addActionListener(e -> fullscreenToggler.toggle());
 
         // 创建AI对AI配置面板
         createAIvsAIConfigPanel();
+        centerPanel.add(aiVsAiConfigPanel, BorderLayout.NORTH);
 
         // 创建状态栏
         statusLabel = new JLabel("🔴 当前玩家: 红方", JLabel.CENTER);
@@ -645,8 +642,6 @@ public class GameFrame extends JFrame {
         
         // 初始隐藏面板
         aiVsAiConfigPanel.setVisible(false);
-        
-        // 不要在这里添加到主布局，会在需要时动态添加
     }
     
     /**
@@ -656,43 +651,8 @@ public class GameFrame extends JFrame {
         if (aiVsAiConfigPanel != null) {
             aiVsAiConfigPanel.setVisible(visible);
             isAiVsAiConfigVisible = visible;
-            
-            // 调整主面板布局
-            if (visible) {
-                // 移除现有的主面板
-                Component[] components = getContentPane().getComponents();
-                JPanel existingMainPanel = null;
-                for (Component comp : components) {
-                    if (comp instanceof JPanel && comp != aiVsAiConfigPanel) {
-                        // 查找包含棋盘的主面板
-                        Container container = (Container) comp;
-                        for (Component subComp : container.getComponents()) {
-                            if (subComp instanceof BoardPanel) {
-                                existingMainPanel = (JPanel) comp;
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                if (existingMainPanel != null) {
-                    // 创建新的中央面板，包含AI配置面板和原有主面板
-                    JPanel newCenterPanel = new JPanel(new BorderLayout());
-                    newCenterPanel.add(aiVsAiConfigPanel, BorderLayout.NORTH);
-                    newCenterPanel.add(existingMainPanel, BorderLayout.CENTER);
-                    
-                    // 移除旧的主面板并添加新的中央面板
-                    remove(existingMainPanel);
-                    add(newCenterPanel, BorderLayout.CENTER);
-                }
-            } else {
-                // 隐藏时恢复原有布局
-                aiVsAiConfigPanel.setVisible(false);
-            }
-            
-            // 刷新界面
-            revalidate();
-            repaint();
+            centerPanel.revalidate();
+            centerPanel.repaint();
         }
     }
     
@@ -768,17 +728,9 @@ public class GameFrame extends JFrame {
         add(controlPanel, BorderLayout.NORTH);
 
         fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel)
-                .withSplitPane(splitPane);
-        boardContainer.getFullscreenButton().addActionListener(e -> {
-            if (!fullscreenToggler.isFullscreen()) {
-                fullscreenToggler.toggle();
-            }
-        });
-        boardContainer.getExitButton().addActionListener(e -> {
-            if (fullscreenToggler.isFullscreen()) {
-                fullscreenToggler.toggle();
-            }
-        });
+                .withSplitPane(splitPane)
+                .onToggle(boardContainer::setFullscreen);
+        boardContainer.getFullscreenButton().addActionListener(e -> fullscreenToggler.toggle());
         
         // 创建右侧面板（聊天+AI日志）
         JPanel rightPanel = new JPanel(new BorderLayout());
