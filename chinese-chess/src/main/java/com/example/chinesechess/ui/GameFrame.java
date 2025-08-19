@@ -19,9 +19,12 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
+
+import com.example.common.ui.BoardWithFloatButton;
+import com.example.common.ui.FullscreenToggler;
 import java.util.List;
 
-import com.example.chinesechess.ChineseChessMain;
+import com.example.common.utils.ExceptionHandler;
 
 /**
  * 中国象棋游戏主界面
@@ -29,6 +32,7 @@ import com.example.chinesechess.ChineseChessMain;
 public class GameFrame extends JFrame {
 
     private BoardPanel boardPanel;
+    private BoardWithFloatButton boardContainer;
     private ChatPanel chatPanel;
     private AILogPanel aiLogPanel;
     private JLabel statusLabel;
@@ -50,6 +54,11 @@ public class GameFrame extends JFrame {
     private boolean isGamePaused = false;
     private JButton startGameButton;
     private JButton pauseGameButton;
+
+    private JPanel controlPanel;
+    private JPanel rightPanel;
+    private JSplitPane splitPane;
+    private FullscreenToggler fullscreenToggler;
     
     // 游戏模式枚举
     public enum GameMode {
@@ -136,22 +145,23 @@ public class GameFrame extends JFrame {
         JTabbedPane rightTabbedPane = new JTabbedPane();
         rightTabbedPane.addTab("AI分析", aiLogPanel);
         rightTabbedPane.addTab("与AI对话", chatPanel);
-        
+
         // 设置标签页字体颜色为黑色
         rightTabbedPane.setForeground(Color.BLACK);
         rightTabbedPane.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-        
+
         // 创建右侧面板容器
-        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel = new JPanel(new BorderLayout());
         rightPanel.add(rightTabbedPane, BorderLayout.CENTER);
         rightPanel.setBorder(BorderFactory.createEmptyBorder(6,6,6,6));
         rightPanel.setPreferredSize(new Dimension(FIXED_AI_WIDTH, boardSize.height));
         rightPanel.setMinimumSize(new Dimension(FIXED_AI_WIDTH, boardSize.height));
         rightPanel.setMaximumSize(new Dimension(FIXED_AI_WIDTH, Integer.MAX_VALUE));
-        
-        
+
+        boardContainer = new BoardWithFloatButton(boardPanel);
+
         // 创建主要内容面板（棋盘+右侧面板）
-        final JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, boardPanel, rightPanel);
+        splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, boardContainer, rightPanel);
         splitPane.setContinuousLayout(true);
         splitPane.setResizeWeight(1.0);
         splitPane.setOneTouchExpandable(false);
@@ -174,7 +184,7 @@ public class GameFrame extends JFrame {
         });
 
         // 创建控制面板
-        JPanel controlPanel = createControlPanel();
+        controlPanel = createControlPanel();
         add(controlPanel, BorderLayout.NORTH);
 
         // 创建AI对AI配置面板
@@ -269,8 +279,16 @@ public class GameFrame extends JFrame {
         JButton backButton = new JButton("返回大厅");
         styleButton(backButton);
         backButton.addActionListener(e -> {
-            SwingUtilities.invokeLater(() -> ChineseChessMain.main(new String[0]));
             dispose();
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    Class<?> clazz = Class.forName("com.example.launcher.GameCenterFrame");
+                    JFrame center = (JFrame) clazz.getDeclaredConstructor().newInstance();
+                    center.setVisible(true);
+                } catch (Exception ex) {
+                    ExceptionHandler.logError("GameFrame", "返回游戏中心失败: " + ex.getMessage());
+                }
+            });
         });
         leftPanel.add(backButton);
 
@@ -734,6 +752,13 @@ public class GameFrame extends JFrame {
         // 重新添加组件
         JPanel controlPanel = createControlPanel();
         add(controlPanel, BorderLayout.NORTH);
+
+        fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel)
+                .withSplitPane(splitPane);
+        boardContainer.getButton().addActionListener(e -> {
+            fullscreenToggler.toggle();
+            boardContainer.getButton().setTextLabel(fullscreenToggler.isFullscreen() ? "取消全屏 ✕" : "全屏 ⛶");
+        });
         
         // 创建右侧面板（聊天+AI日志）
         JPanel rightPanel = new JPanel(new BorderLayout());
@@ -862,20 +887,19 @@ public class GameFrame extends JFrame {
     }
     
     /**
-     * 返回游戏选择界面
+     * 返回游戏中心界面
      */
     private void returnToSelection() {
-        int result = JOptionPane.showConfirmDialog(
-            this,
-            "确定要退出当前游戏吗？",
-            "退出游戏",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.QUESTION_MESSAGE
-        );
-        
-        if (result == JOptionPane.YES_OPTION) {
-            System.exit(0); // 退出程序
-        }
+        dispose();
+        SwingUtilities.invokeLater(() -> {
+            try {
+                Class<?> clazz = Class.forName("com.example.launcher.GameCenterFrame");
+                JFrame center = (JFrame) clazz.getDeclaredConstructor().newInstance();
+                center.setVisible(true);
+            } catch (Exception e) {
+                ExceptionHandler.logError("GameFrame", "返回游戏中心失败: " + e.getMessage());
+            }
+        });
     }
     
     /**
@@ -1149,10 +1173,13 @@ public class GameFrame extends JFrame {
         
         // 设置新模式
         currentGameMode = mode;
-        
+
         // 更新游戏模式单选框状态
         updateGameModeRadios();
-        
+
+        // 根据新模式显示或隐藏 AI 对 AI 配置面板
+        toggleAIvsAIConfigPanel(mode == GameMode.AI_VS_AI);
+
         // 根据新模式进行设置
         switch (mode) {
             case PLAYER_VS_AI:

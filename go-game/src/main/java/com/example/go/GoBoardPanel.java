@@ -58,14 +58,8 @@ public class GoBoardPanel extends JPanel {
 
     // 落子动画状态
     private GoPosition animatingMove;
-    private int animEndX;
-    private int animEndY;
-    private long animStartTime;
-    private int animDuration;
-    private double animProgress;
+    private StoneDropAnim dropAnim;
     private Timer dropTimer;
-    private int animPlayer;
-    private boolean playedSfx;
     
     // 回调接口
     public interface GameStateCallback {
@@ -421,28 +415,17 @@ public class GoBoardPanel extends JPanel {
      */
     private void startDropAnimation(int row, int col, int player) {
         animatingMove = new GoPosition(row, col);
-        animPlayer = player;
-        animEndX = col;
-        animEndY = row;
-        animDuration = 1000;
-        animStartTime = System.currentTimeMillis();
-        animProgress = 0;
-        playedSfx = false;
+        Point2D p = viewTx.transform(new Point2D.Double(col, row), null);
+        int diameter = (int) Math.round(R_STONE * 2 * cell);
+        dropAnim = new StoneDropAnim();
+        dropAnim.start((int) Math.round(p.getX()), (int) Math.round(p.getY()), diameter, player == GoGame.WHITE);
 
-        if (dropTimer != null && dropTimer.isRunning()) {
+        if (dropTimer != null) {
             dropTimer.stop();
         }
-
         dropTimer = new Timer(15, e -> {
-            long elapsed = System.currentTimeMillis() - animStartTime;
-            animProgress = Math.min(1.0, elapsed / (double) animDuration);
-            if (!playedSfx && animProgress >= 0.98) {
-                playMoveSound();
-                playedSfx = true;
-            }
-            if (animProgress >= 1.0) {
-                dropTimer.stop();
-                animatingMove = null;
+            if (dropAnim == null) {
+                ((Timer) e.getSource()).stop();
             }
             repaint();
         });
@@ -546,40 +529,47 @@ public class GoBoardPanel extends JPanel {
      * 绘制棋盘
      */
     private void drawBoard(Graphics2D g2) {
-        float borderPx = 12f;
-        Rectangle2D board = new Rectangle2D.Double(0, 0, boardSize - 1, boardSize - 1);
+        Rectangle2D inner = new Rectangle2D.Double(0, 0, boardSize - 1, boardSize - 1);
+        float border = (float) ((boardSize - 1) * 0.03);
+        Rectangle2D outer = new Rectangle2D.Double(-border, -border,
+                inner.getWidth() + border * 2, inner.getHeight() + border * 2);
 
-        // 木质背景：浅木色纵向渐变
-        Paint wood = new GradientPaint(0, 0, new Color(220, 190, 140),
-                0, (float) (boardSize - 1), new Color(200, 170, 120));
-        g2.setPaint(wood);
-        g2.fill(board);
+        // 外框渐变
+        Paint frameGrad = new GradientPaint(0, 0, new Color(0x6E3F1C),
+                0, (float) outer.getHeight(), new Color(0xA7692E));
+        g2.setPaint(frameGrad);
+        g2.fill(outer);
 
-        // 边缘略暗的径向渐变
-        RadialGradientPaint edgeShade = new RadialGradientPaint(
-                new Point2D.Double((boardSize - 1) / 2.0, (boardSize - 1) / 2.0),
-                (float) ((boardSize - 1) / 2.0),
-                new float[]{0f, 1f},
-                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 40)});
-        g2.setPaint(edgeShade);
-        g2.fill(board);
+        // 顶面渐变
+        Paint topGrad = new GradientPaint(0, 0, new Color(0xEAC27A),
+                (float) inner.getWidth(), (float) inner.getHeight(), new Color(0xD0994E));
+        g2.setPaint(topGrad);
+        g2.fill(inner);
 
-        // 竖直木纹
-        g2.setClip(board);
-        g2.setStroke(new BasicStroke((float) (1f / cell)));
-        for (double x = 10.0 / cell; x < boardSize - 1; x += 12.0 / cell) {
-            g2.setColor(new Color(180, 140, 90, 30));
-            g2.draw(new Line2D.Double(x, 0, x, boardSize - 1));
+        // 木纹
+        g2.setClip(inner);
+        g2.setStroke(new BasicStroke((float) (1f / cell), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        for (double x = 10.0 / cell, i = 0; x < inner.getWidth(); x += 12.0 / cell, i++) {
+            int wobble = (int) ((i % 7) - 3);
+            g2.setColor(new Color(120, 80, 40, 26));
+            double lineX = x + wobble / cell;
+            g2.draw(new Line2D.Double(lineX, 0, lineX, inner.getHeight()));
         }
         g2.setClip(null);
 
-        // 深棕色外框
-        g2.setColor(new Color(0x8B5A2B));
-        g2.setStroke(new BasicStroke(borderPx / (float) cell));
-        g2.draw(board);
+        // 暗角
+        RadialGradientPaint vignette = new RadialGradientPaint(
+                new Point2D.Float((float) inner.getCenterX(), (float) inner.getCenterY()),
+                (float) (inner.getWidth() / 1.1f),
+                new float[]{0f, 1f},
+                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 15)});
+        g2.setPaint(vignette);
+        g2.fill(inner);
 
-        g2.setColor(Color.BLACK);
-        g2.setStroke(new BasicStroke(GRID_STROKE_WIDTH, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        // 网格
+        g2.setColor(new Color(0x4C2E16));
+        float gridW = (float) Math.min(2, Math.max(1, cell * GRID_STROKE_WIDTH)) / (float) cell;
+        g2.setStroke(new BasicStroke(gridW, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         for (int i = 0; i < boardSize; i++) {
             g2.draw(new Line2D.Double(0, i, boardSize - 1, i));
             g2.draw(new Line2D.Double(i, 0, i, boardSize - 1));
@@ -592,7 +582,7 @@ public class GoBoardPanel extends JPanel {
      * 绘制星位点
      */
     private void drawStarPoints(Graphics2D g2) {
-        g2.setColor(Color.BLACK);
+        g2.setColor(new Color(76, 46, 22, 230));
         double d = R_STAR * 2;
         if (boardSize == 19) {
             int[] p = {3, 9, 15};
@@ -621,9 +611,8 @@ public class GoBoardPanel extends JPanel {
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {
                 if (board[row][col] != GoGame.EMPTY) {
-                    if (animatingMove != null && dropTimer != null && dropTimer.isRunning()
-                            && animatingMove.row == row && animatingMove.col == col) {
-                        continue; // 正在动画的棋子稍后绘制
+                    if (animatingMove != null && animatingMove.row == row && animatingMove.col == col) {
+                        continue; // 动画中的棋子稍后绘制
                     }
                     Point2D p = viewTx.transform(new Point2D.Double(col, row), null);
                     GoStoneRenderer.draw(g2, (int) Math.round(p.getX()), (int) Math.round(p.getY()), diameter,
@@ -632,20 +621,14 @@ public class GoBoardPanel extends JPanel {
             }
         }
 
-        // 动画棋子
-        if (animatingMove != null && dropTimer != null && dropTimer.isRunning()) {
-            double t = easeOutCubic(animProgress);
-            double scale = 1.5 - 0.5 * t;
-            int d = (int) Math.max(2, Math.round(R_STONE * 2 * cell * scale));
-            Point2D p = viewTx.transform(new Point2D.Double(animEndX, animEndY), null);
-            GoStoneRenderer.drawShadow(g2, (int) Math.round(p.getX()), (int) Math.round(p.getY()), d, (float) t);
-            GoStoneRenderer.drawWithoutShadow(g2, (int) Math.round(p.getX()), (int) Math.round(p.getY()), d,
-                    animPlayer == GoGame.WHITE);
+        if (dropAnim != null) {
+            boolean cont = dropAnim.draw(g2);
+            if (!cont) {
+                dropAnim = null;
+                animatingMove = null;
+                if (dropTimer != null) dropTimer.stop();
+            }
         }
-    }
-
-    private double easeOutCubic(double t) {
-        return 1 - Math.pow(1 - t, 3);
     }
 
     /**
@@ -965,9 +948,44 @@ public class GoBoardPanel extends JPanel {
             thinking = false;
             updateGameState();
             repaint();
-            
+
             // 重新开始AI对弈
             SwingUtilities.invokeLater(() -> executeAIvsAIMove());
+        }
+    }
+
+    /**
+     * 石子下落动画：通过缩放模拟重力并伴随微弹性。
+     */
+    private final class StoneDropAnim {
+        int cx, cy, baseD; boolean white;
+        long t0; int duration = 280;
+        boolean playingSfx = false;
+        float scale = 1.35f;
+
+        void start(int cx, int cy, int baseDiameter, boolean white) {
+            this.cx = cx; this.cy = cy; this.baseD = baseDiameter; this.white = white;
+            this.t0 = System.currentTimeMillis();
+        }
+
+        boolean draw(Graphics2D g) {
+            long t = System.currentTimeMillis() - t0;
+            float p = Math.min(1f, t / (float) duration);
+            float s = 1.35f - 0.35f * (1f - (float) Math.pow(1f - p, 3f));
+            if (p >= 0.98f) {
+                if (!playingSfx) {
+                    playMoveSound();
+                    playingSfx = true;
+                }
+                float pp = Math.min(1f, (t - duration) / 120f);
+                s = 1.03f - 0.03f * (1f - (float) Math.pow(1f - pp, 2f));
+            }
+            scale = Math.max(1.0f, s);
+            int d = Math.round(baseD * scale);
+            float shadowAlpha = 0.25f + (0.36f - 0.25f) * p;
+            GoStoneRenderer.drawShadow(g, cx, cy, d, shadowAlpha);
+            GoStoneRenderer.drawWithoutShadow(g, cx, cy, d, white);
+            return p < 1f || scale > 1.001f;
         }
     }
 }
