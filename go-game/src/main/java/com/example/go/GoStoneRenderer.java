@@ -42,21 +42,18 @@ public class GoStoneRenderer {
      * Draws a soft blurred shadow offset to the bottom-right.
      */
     public static void drawShadow(Graphics2D g, int cx, int cy, int diameter, float alphaFactor) {
-        int shadowDiameter = Math.round(diameter * 1.1f);
-        int radius = shadowDiameter / 2;
-        int offset = Math.round(diameter * 0.25f);
-        int blur = Math.max(2, diameter / 6);
-        int size = shadowDiameter + blur * 2;
-
+        int offX = Math.round(diameter * 0.10f);
+        int offY = Math.round(diameter * 0.12f);
+        int size = diameter + Math.max(offX, offY) * 2;
         BufferedImage shadow = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D sg = shadow.createGraphics();
         enableAA(sg);
-        sg.setColor(new Color(0, 0, 0, (int) (80 * alphaFactor)));
-        sg.fillOval(blur, blur, shadowDiameter, shadowDiameter);
+        sg.setColor(new Color(0, 0, 0, (int) (85 * alphaFactor)));
+        sg.fillOval(offX, offY, diameter, diameter);
         sg.dispose();
-
-        BufferedImage blurred = gaussianBlur(shadow, blur);
-        g.drawImage(blurred, cx - radius - blur + offset, cy - radius - blur + offset, null);
+        BufferedImage blurred = gaussianBlur(shadow, Math.max(1f, diameter / 50f));
+        int r = diameter / 2;
+        g.drawImage(blurred, cx - r - offX, cy - r - offY, null);
     }
 
     private static void enableAA(Graphics2D g) {
@@ -66,35 +63,30 @@ public class GoStoneRenderer {
     }
 
     private static void paintStone(Graphics2D g, int cx, int cy, int r, boolean white) {
-        float hx = cx - r * 0.35f;
-        float hy = cy - r * 0.35f;
-        Color mid = white ? new Color(250, 250, 250, 230) : new Color(70, 70, 70);
-        Color edge = white ? new Color(210, 210, 210, 230) : new Color(15, 15, 15);
         Shape stone = new Ellipse2D.Float(cx - r, cy - r, 2f * r, 2f * r);
-        RadialGradientPaint body = new RadialGradientPaint(
-                new Point2D.Float(hx, hy), r,
-                new float[]{0f, 0.6f, 1f},
-                new Color[]{Color.WHITE, mid, edge});
+        Color[] cols = white
+                ? new Color[]{new Color(0xFFFFFF), new Color(0xEDE7DA), new Color(0xD7CBB4)}
+                : new Color[]{new Color(0x2B2B2B), new Color(0x1A1A1A), new Color(0x111111)};
+        float[] dist = {0f, 0.65f, 1f};
+        RadialGradientPaint body = new RadialGradientPaint(new Point2D.Float(cx, cy), r, dist, cols);
         g.setPaint(body);
         g.fill(stone);
 
-        LinearGradientPaint shade = new LinearGradientPaint(
-                cx - r, cy - r, cx + r, cy + r,
-                new float[]{0f, 1f},
-                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 90)});
-        g.setPaint(shade);
-        g.fill(stone);
-
-        RadialGradientPaint spec = new RadialGradientPaint(
-                new Point2D.Float(hx, hy), r * 0.9f,
+        int ox = Math.round(r * 0.35f);
+        int oy = Math.round(r * 0.35f);
+        RadialGradientPaint gloss = new RadialGradientPaint(
+                new Point2D.Float(cx - ox, cy - oy), r * 0.9f,
                 new float[]{0f, 0.6f, 1f},
                 new Color[]{
-                        new Color(255, 255, 255, 115),
+                        new Color(255, 255, 255, white ? 130 : 90),
                         new Color(255, 255, 255, 35),
                         new Color(255, 255, 255, 0)
                 });
-        g.setPaint(spec);
+        Shape old = g.getClip();
+        g.setClip(stone);
+        g.setPaint(gloss);
         g.fill(stone);
+        g.setClip(old);
     }
 
     private static BufferedImage gaussianBlur(BufferedImage img, float radius) {

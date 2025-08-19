@@ -546,11 +546,29 @@ public class GoBoardPanel extends JPanel {
      * 绘制棋盘
      */
     private void drawBoard(Graphics2D g2) {
-        // 棋盘背景
-        g2.setColor(new Color(220, 179, 92));
-        g2.fill(new Rectangle2D.Double(0, 0, boardSize - 1, boardSize - 1));
+        int border = 12;
+        Rectangle2D outer = new Rectangle2D.Double(-border, -border,
+                boardSize - 1 + border * 2, boardSize - 1 + border * 2);
+        Paint frameGrad = new GradientPaint((float) outer.getX(), (float) outer.getY(),
+                new Color(0x8B5A2B), (float) outer.getX(),
+                (float) (outer.getY() + outer.getHeight()), new Color(0xB57A3F));
+        g2.setPaint(frameGrad);
+        g2.fill(outer);
 
-        // 网格线
+        Paint wood = new GradientPaint(0, 0, new Color(0xE6BF7B),
+                0, (float) (boardSize - 1), new Color(0xD8A865));
+        g2.setPaint(wood);
+        Rectangle2D board = new Rectangle2D.Double(0, 0, boardSize - 1, boardSize - 1);
+        g2.fill(board);
+
+        g2.setClip(board);
+        g2.setStroke(new BasicStroke(1f));
+        for (int y = 10; y < boardSize - 1; y += 12) {
+            g2.setColor(new Color(120, 90, 60, 18));
+            g2.draw(new Line2D.Double(0, y, boardSize - 1, y));
+        }
+        g2.setClip(null);
+
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(GRID_STROKE_WIDTH, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         for (int i = 0; i < boardSize; i++) {
@@ -558,7 +576,6 @@ public class GoBoardPanel extends JPanel {
             g2.draw(new Line2D.Double(i, 0, i, boardSize - 1));
         }
 
-        // 星位
         drawStarPoints(g2);
     }
 
