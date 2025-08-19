@@ -578,7 +578,6 @@ public class GoBoardPanel extends JPanel {
         g2.setStroke(new BasicStroke(borderPx / (float) cell));
         g2.draw(board);
 
-        // 网格线
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(GRID_STROKE_WIDTH, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         for (int i = 0; i < boardSize; i++) {

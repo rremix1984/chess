@@ -63,7 +63,6 @@ public class GoStoneRenderer {
 
     private static void paintStone(Graphics2D g, int cx, int cy, int r, boolean white) {
         Shape stone = new Ellipse2D.Float(cx - r, cy - r, 2f * r, 2f * r);
-
         if (white) {
             // 白子主体：中心白色，边缘淡灰
             RadialGradientPaint body = new RadialGradientPaint(
