@@ -1024,14 +1024,14 @@ public class BoardPanel extends JPanel {
         // 绘制华丽的背景渐变
         drawLuxuriousBackground(g2d);
         
-        // 添加装饰性边框（随缩放动态贴合棋盘）
-        drawDecorativeBorder(g2d);
-
         // 添加木纹纹理效果
         drawEnhancedWoodTexture(g2d);
 
         // 添加背景装饰图案
         drawBackgroundPattern(g2d);
+
+        // 最后绘制装饰性边框，确保不被覆盖
+        drawDecorativeBorder(g2d);
     }
     
     /**
@@ -1174,6 +1174,9 @@ public class BoardPanel extends JPanel {
 
         // 绘制棋盘线条
         drawBoardLines(g2d);
+
+        // 绘制围绕棋盘的红色外框
+        drawBoardFrame(g2d);
     }
     
     /**
@@ -1190,18 +1193,22 @@ public class BoardPanel extends JPanel {
      * 绘制棋盘主体
      */
     private void drawBoardMain(Graphics2D g2d) {
-        // 创建棋盘渐变效果
+        // 创建棋盘渐变效果并填充主体
         GradientPaint boardGradient = new GradientPaint(
             MARGIN, MARGIN, new Color(255, 248, 220),  // 象牙白
             MARGIN + 8 * CELL_SIZE, MARGIN + 9 * CELL_SIZE, new Color(245, 222, 179)  // 浅木色
         );
         g2d.setPaint(boardGradient);
         g2d.fillRect(MARGIN, MARGIN, 8 * CELL_SIZE, 9 * CELL_SIZE);
-        
-        // 绘制棋盘边框
-        g2d.setStroke(new BasicStroke(3));
-        g2d.setColor(new Color(139, 69, 19));
-        g2d.drawRect(MARGIN - 2, MARGIN - 2, 8 * CELL_SIZE + 4, 9 * CELL_SIZE + 4);
+    }
+
+    /**
+     * 绘制包围棋盘的红色外框
+     */
+    private void drawBoardFrame(Graphics2D g2d) {
+        g2d.setColor(new Color(178, 34, 34));
+        g2d.setStroke(new BasicStroke(8f));
+        g2d.draw(new Rectangle2D.Float(MARGIN, MARGIN, 8 * CELL_SIZE, 9 * CELL_SIZE));
     }
     
     /**
