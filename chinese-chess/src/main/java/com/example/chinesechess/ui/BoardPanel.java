@@ -1024,6 +1024,7 @@ public class BoardPanel extends JPanel {
         // 绘制华丽的背景渐变
         drawLuxuriousBackground(g2d);
         
+
         // 添加木纹纹理效果
         drawEnhancedWoodTexture(g2d);
 
@@ -1177,6 +1178,7 @@ public class BoardPanel extends JPanel {
 
         // 绘制围绕棋盘的红色外框
         drawBoardFrame(g2d);
+
     }
     
     /**
