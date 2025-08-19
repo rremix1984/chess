@@ -144,17 +144,9 @@ public class GomokuFrame extends JFrame {
         statusLabel.setPreferredSize(new Dimension(GameConfig.WINDOW_WIDTH, 30));
         add(statusLabel, BorderLayout.SOUTH);
 
-        fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel);
-        boardContainer.getFullscreenButton().addActionListener(e -> {
-            if (!fullscreenToggler.isFullscreen()) {
-                fullscreenToggler.toggle();
-            }
-        });
-        boardContainer.getExitButton().addActionListener(e -> {
-            if (fullscreenToggler.isFullscreen()) {
-                fullscreenToggler.toggle();
-            }
-        });
+        fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel)
+                .onToggle(boardContainer::setFullscreen);
+        boardContainer.getFullscreenButton().addActionListener(e -> fullscreenToggler.toggle());
 
         // 初始化游戏管理器
         initializeGameManager();

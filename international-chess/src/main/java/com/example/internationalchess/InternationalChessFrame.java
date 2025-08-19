@@ -111,17 +111,9 @@ public class InternationalChessFrame extends JFrame {
         boardPanel.setChatPanel(chatPanel);
         boardPanel.setStockfishLogPanel(stockfishLogPanel);
 
-        fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel);
-        boardContainer.getFullscreenButton().addActionListener(e -> {
-            if (!fullscreenToggler.isFullscreen()) {
-                fullscreenToggler.toggle();
-            }
-        });
-        boardContainer.getExitButton().addActionListener(e -> {
-            if (fullscreenToggler.isFullscreen()) {
-                fullscreenToggler.toggle();
-            }
-        });
+        fullscreenToggler = new FullscreenToggler(this, controlPanel, rightPanel)
+                .onToggle(boardContainer::setFullscreen);
+        boardContainer.getFullscreenButton().addActionListener(e -> fullscreenToggler.toggle());
         
         // 默认启用大模型AI
         initializeDefaultAI();
